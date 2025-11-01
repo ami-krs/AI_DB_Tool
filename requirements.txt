@@ -1,0 +1,43 @@
+# Core dependencies
+python-dotenv>=1.0.1
+
+# Database drivers
+psycopg2-binary>=2.9.9        # PostgreSQL
+mysql-connector-python>=8.3.0  # MySQL
+pymssql>=2.2.11               # Microsoft SQL Server
+cx_Oracle>=8.3.0               # Oracle (optional, requires Oracle Instant Client)
+sqlalchemy>=2.0.23             # Universal database toolkit
+
+# AI/ML
+openai>=1.40.0                 # GPT for natural language to SQL
+anthropic>=0.21.0              # Claude as alternative
+
+# Web framework
+fastapi>=0.114.0
+uvicorn>=0.30.0
+jinja2>=3.1.4
+python-multipart>=0.0.9
+
+# Frontend/UI
+streamlit>=1.32.0              # Alternative: FastAPI for web UI
+
+# Data handling
+pandas>=2.2.0
+numpy>=2.1.0
+pyarrow>=16.0.0                # For Parquet export
+
+# Visualization
+plotly>=5.18.0
+matplotlib>=3.9.0
+
+# SQL parsing and analysis
+sqlparse>=0.5.0
+sqlalchemy-utils>=0.41.1
+
+# Secure credential storage
+keyring>=25.0.0
+
+# Utilities
+pydantic>=2.6.0
+typing-extensions>=4.9.0
+
