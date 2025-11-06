@@ -351,10 +351,20 @@ def inject_keyboard_shortcuts():
                         let runButton = null;
                         
                         // Method 1: Try to find hidden execute button first (most reliable)
+                        // Streamlit buttons have data-testid that includes the key
                         runButton = allButtons.find(btn => {
-                            const text = (btn.textContent || btn.innerText || '').trim();
-                            return text === '' || btn.getAttribute('data-testid')?.includes('hidden_execute');
+                            const testId = btn.getAttribute('data-testid') || '';
+                            return testId.includes('hidden_execute_btn');
                         });
+                        
+                        // Also try finding by text content "Execute"
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                const text = (btn.textContent || btn.innerText || '').trim();
+                                const testId = btn.getAttribute('data-testid') || '';
+                                return text === 'Execute' && testId.includes('hidden_execute');
+                            });
+                        }
                         
                         // Method 2: Find by text content (Run button)
                         if (!runButton) {
@@ -375,20 +385,41 @@ def inject_keyboard_shortcuts():
                         
                         if (runButton && !runButton.disabled) {
                             // Try multiple click methods
+                            console.log('Found button, clicking...', runButton);
                             runButton.focus();
+                            
+                            // Try native click first
                             runButton.click();
                             
                             // Also try dispatching events
                             const clickEvent = new MouseEvent('click', {
                                 bubbles: true,
                                 cancelable: true,
-                                view: window
+                                view: window,
+                                detail: 1
                             });
                             runButton.dispatchEvent(clickEvent);
                             
                             // Also try mousedown/mouseup
-                            runButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                            runButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                            runButton.dispatchEvent(new MouseEvent('mousedown', { 
+                                bubbles: true, 
+                                cancelable: true,
+                                view: window,
+                                detail: 1
+                            }));
+                            runButton.dispatchEvent(new MouseEvent('mouseup', { 
+                                bubbles: true, 
+                                cancelable: true,
+                                view: window,
+                                detail: 1
+                            }));
+                            
+                            // Also try focus and Enter key
+                            runButton.focus();
+                            runButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+                            runButton.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+                        } else {
+                            console.log('Button not found. Total buttons:', allButtons.length);
                         }
                     }, 100);
                     return false;
@@ -584,12 +615,21 @@ def inject_keyboard_shortcuts():
                         let runButton = null;
                         const allButtons = Array.from(document.querySelectorAll('button'));
                         
-                        // Look for hidden button by finding button with empty text or specific key
+                        // Look for hidden button by its Streamlit key attribute
+                        // Streamlit buttons have data-testid that includes the key
                         runButton = allButtons.find(btn => {
-                            const text = (btn.textContent || btn.innerText || '').trim();
-                            // Hidden button has empty text or specific attributes
-                            return text === '' || btn.getAttribute('data-testid')?.includes('hidden_execute');
+                            const testId = btn.getAttribute('data-testid') || '';
+                            return testId.includes('hidden_execute_btn') || testId.includes('hidden_execute_btn_tab');
                         });
+                        
+                        // Also try finding by text content "Execute"
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                const text = (btn.textContent || btn.innerText || '').trim();
+                                const testId = btn.getAttribute('data-testid') || '';
+                                return text === 'Execute' && testId.includes('hidden_execute');
+                            });
+                        }
                         
                         // Method 2: Find by text content (Run button)
                         if (!runButton) {
@@ -631,20 +671,41 @@ def inject_keyboard_shortcuts():
                         
                         if (runButton && !runButton.disabled) {
                             // Try multiple click methods
+                            console.log('Found button (document-level), clicking...', runButton);
                             runButton.focus();
+                            
+                            // Try native click first
                             runButton.click();
                             
                             // Also try dispatching events
                             const clickEvent = new MouseEvent('click', {
                                 bubbles: true,
                                 cancelable: true,
-                                view: window
+                                view: window,
+                                detail: 1
                             });
                             runButton.dispatchEvent(clickEvent);
                             
                             // Also try mousedown/mouseup
-                            runButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                            runButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                            runButton.dispatchEvent(new MouseEvent('mousedown', { 
+                                bubbles: true, 
+                                cancelable: true,
+                                view: window,
+                                detail: 1
+                            }));
+                            runButton.dispatchEvent(new MouseEvent('mouseup', { 
+                                bubbles: true, 
+                                cancelable: true,
+                                view: window,
+                                detail: 1
+                            }));
+                            
+                            // Also try focus and Enter key
+                            runButton.focus();
+                            runButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+                            runButton.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+                        } else {
+                            console.log('Button not found (document-level). Total buttons:', allButtons.length);
                         }
                     }, 100);
                     return false;
@@ -948,7 +1009,20 @@ def sql_editor_compact():
             execute_query(query)
     
     # Hidden button for keyboard shortcut (JavaScript will click this)
-    if st.button("", key="hidden_execute_btn", help="Hidden button for keyboard shortcut"):
+    # Use CSS to completely hide it
+    st.markdown("""
+    <style>
+        button[data-testid*="hidden_execute_btn"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            position: absolute !important;
+            left: -9999px !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    if st.button("Execute", key="hidden_execute_btn", help="Hidden button for keyboard shortcut"):
         st.session_state.keyboard_execute = True
         st.rerun()
     
@@ -1121,7 +1195,20 @@ def sql_editor_tab():
                 execute_query(query)
         
         # Hidden button for keyboard shortcut (JavaScript will click this)
-        if st.button("", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut"):
+        # Use CSS to completely hide it
+        st.markdown("""
+        <style>
+            button[data-testid*="hidden_execute_btn_tab"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                position: absolute !important;
+                left: -9999px !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Execute", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut"):
             st.session_state.keyboard_execute = True
             st.rerun()
     
