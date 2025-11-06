@@ -615,19 +615,18 @@ def inject_keyboard_shortcuts():
                         let runButton = null;
                         const allButtons = Array.from(document.querySelectorAll('button'));
                         
-                        // Look for hidden button by its Streamlit key attribute
+                        // Look for Execute button by its Streamlit key attribute
                         // Streamlit buttons have data-testid that includes the key
                         runButton = allButtons.find(btn => {
                             const testId = btn.getAttribute('data-testid') || '';
-                            return testId.includes('hidden_execute_btn') || testId.includes('hidden_execute_btn_tab');
+                            return testId.includes('execute_btn_compact') || testId.includes('execute_btn_tab');
                         });
                         
                         // Also try finding by text content "Execute"
                         if (!runButton) {
                             runButton = allButtons.find(btn => {
                                 const text = (btn.textContent || btn.innerText || '').trim();
-                                const testId = btn.getAttribute('data-testid') || '';
-                                return text === 'Execute' && testId.includes('hidden_execute');
+                                return text === 'Execute' || text.includes('Execute');
                             });
                         }
                         
@@ -1008,69 +1007,12 @@ def sql_editor_compact():
         if query.strip():
             execute_query(query)
     
-    # Hidden button for keyboard shortcut (JavaScript will click this)
-    # Create button in a way that can be hidden with CSS
-    button_clicked = st.button("Execute", key="hidden_execute_btn", help="Hidden button for keyboard shortcut")
-    
-    # Hide the button with CSS after it's created
-    st.markdown("""
-    <style>
-        /* Hide the hidden execute button and its container completely */
-        button[data-testid*="hidden_execute_btn"],
-        div[data-testid*="stButton"]:has(button[data-testid*="hidden_execute_btn"]),
-        div[data-testid*="stButton"] button[data-testid*="hidden_execute_btn"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            position: absolute !important;
-            left: -9999px !important;
-            width: 0 !important;
-            height: 0 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border: none !important;
-            overflow: hidden !important;
-            pointer-events: none !important;
-        }
-    </style>
-    <script>
-        // Hide the button container after page load
-        setTimeout(function() {
-            const buttons = document.querySelectorAll('button[data-testid*="hidden_execute_btn"]');
-            buttons.forEach(function(btn) {
-                btn.style.display = 'none';
-                btn.style.visibility = 'hidden';
-                btn.style.opacity = '0';
-                btn.style.position = 'absolute';
-                btn.style.left = '-9999px';
-                btn.style.width = '0';
-                btn.style.height = '0';
-                btn.style.padding = '0';
-                btn.style.margin = '0';
-                btn.style.border = 'none';
-                // Hide parent container
-                const parent = btn.closest('div[data-testid*="stButton"]');
-                if (parent) {
-                    parent.style.display = 'none';
-                    parent.style.visibility = 'hidden';
-                    parent.style.height = '0';
-                    parent.style.padding = '0';
-                    parent.style.margin = '0';
-                }
-            });
-        }, 100);
-    </script>
-    """, unsafe_allow_html=True)
-    
-    if button_clicked:
-        st.session_state.keyboard_execute = True
-        st.rerun()
-    
     # Action buttons in row
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        run_clicked = st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_compact")
-        if run_clicked:
+        # Execute button (replaces Run button) - also used for keyboard shortcuts
+        execute_clicked = st.button("Execute", type="primary", use_container_width=True, key="execute_btn_compact")
+        if execute_clicked:
             execute_query(query)
     with col2:
         if st.button("🤖 AI Gen", use_container_width=True):
@@ -1233,68 +1175,12 @@ def sql_editor_tab():
             st.session_state.keyboard_execute = False
             if query.strip():
                 execute_query(query)
-        
-        # Hidden button for keyboard shortcut (JavaScript will click this)
-        button_clicked_tab = st.button("Execute", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut")
-        
-        # Hide the button with CSS and JavaScript after it's created
-        st.markdown("""
-        <style>
-            /* Hide the hidden execute button and its container completely */
-            button[data-testid*="hidden_execute_btn_tab"],
-            div[data-testid*="stButton"]:has(button[data-testid*="hidden_execute_btn_tab"]),
-            div[data-testid*="stButton"] button[data-testid*="hidden_execute_btn_tab"] {
-                display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                position: absolute !important;
-                left: -9999px !important;
-                width: 0 !important;
-                height: 0 !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                border: none !important;
-                overflow: hidden !important;
-                pointer-events: none !important;
-            }
-        </style>
-        <script>
-            // Hide the button container after page load
-            setTimeout(function() {
-                const buttons = document.querySelectorAll('button[data-testid*="hidden_execute_btn_tab"]');
-                buttons.forEach(function(btn) {
-                    btn.style.display = 'none';
-                    btn.style.visibility = 'hidden';
-                    btn.style.opacity = '0';
-                    btn.style.position = 'absolute';
-                    btn.style.left = '-9999px';
-                    btn.style.width = '0';
-                    btn.style.height = '0';
-                    btn.style.padding = '0';
-                    btn.style.margin = '0';
-                    btn.style.border = 'none';
-                    // Hide parent container
-                    const parent = btn.closest('div[data-testid*="stButton"]');
-                    if (parent) {
-                        parent.style.display = 'none';
-                        parent.style.visibility = 'hidden';
-                        parent.style.height = '0';
-                        parent.style.padding = '0';
-                        parent.style.margin = '0';
-                    }
-                });
-            }, 100);
-        </script>
-        """, unsafe_allow_html=True)
-        
-        if button_clicked_tab:
-            st.session_state.keyboard_execute = True
-            st.rerun()
     
     with col2:
         st.markdown("### Actions")
         
-        execute_clicked = st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab")
+        # Execute button (replaces Run button) - also used for keyboard shortcuts
+        execute_clicked = st.button("Execute", type="primary", use_container_width=True, key="execute_btn_tab")
         if execute_clicked:
             execute_query(query)
         
