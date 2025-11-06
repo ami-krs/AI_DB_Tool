@@ -103,8 +103,6 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'rows_per_page' not in st.session_state:
     st.session_state.rows_per_page = 100
-if 'keyboard_execute' not in st.session_state:
-    st.session_state.keyboard_execute = False
 
 
 def display_paginated_dataframe(df):
@@ -615,20 +613,18 @@ def inject_keyboard_shortcuts():
                         let runButton = null;
                         const allButtons = Array.from(document.querySelectorAll('button'));
                         
-                        // Look for Execute button by its Streamlit key attribute
+                        // Look for Run button by its Streamlit key attribute
                         // Streamlit buttons have data-testid that includes the key
                         runButton = allButtons.find(btn => {
                             const testId = btn.getAttribute('data-testid') || '';
-                            return testId.includes('execute_btn_compact') || testId.includes('execute_btn_tab') || 
-                                   testId.includes('run_btn_tab') || testId.includes('run_btn_compact');
+                            return testId.includes('run_btn_tab') || testId.includes('run_btn_compact');
                         });
                         
-                        // Also try finding by text content "Execute" or "Run"
+                        // Also try finding by text content "Run"
                         if (!runButton) {
                             runButton = allButtons.find(btn => {
                                 const text = (btn.textContent || btn.innerText || '').trim();
-                                return text === 'Execute' || text.includes('Execute') || text.includes('▶️ Execute') || 
-                                       text.includes('Run') || text.includes('▶') || text.includes('▶️');
+                                return text.includes('Run') || text.includes('▶') || text.includes('▶️');
                             });
                         }
                         
@@ -1003,18 +999,10 @@ def sql_editor_compact():
         help="💡 Use sidebar to insert table names"
     )
     
-    # Check for keyboard execute trigger
-    if st.session_state.keyboard_execute:
-        st.session_state.keyboard_execute = False
-        if query.strip():
-            execute_query(query)
-    
     # Action buttons in row
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        # Execute button (replaces Run button) - also used for keyboard shortcuts
-        execute_clicked = st.button("Execute", type="primary", use_container_width=True, key="execute_btn_compact")
-        if execute_clicked:
+        if st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_compact"):
             execute_query(query)
     with col2:
         if st.button("🤖 AI Gen", use_container_width=True):
@@ -1172,18 +1160,10 @@ def sql_editor_tab():
             help="💡 Tip: Use the Quick Insert buttons above to insert table names"
         )
         
-        # Check for keyboard execute trigger
-        if st.session_state.keyboard_execute:
-            st.session_state.keyboard_execute = False
-            if query.strip():
-                execute_query(query)
-    
     with col2:
         st.markdown("### Actions")
         
-        # Execute button - also used for keyboard shortcuts
-        execute_clicked = st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab")
-        if execute_clicked:
+        if st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_tab"):
             execute_query(query)
         
         if st.button("🤖 AI Generate", use_container_width=True):
