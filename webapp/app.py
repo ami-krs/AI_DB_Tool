@@ -124,67 +124,73 @@ def display_paginated_dataframe(df):
     start_idx = (st.session_state.current_page - 1) * st.session_state.rows_per_page
     end_idx = min(start_idx + st.session_state.rows_per_page, total_rows)
     
-    # Display pagination info
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    # Display pagination info (using markdown to avoid column nesting issues)
+    st.markdown(f"**Total Rows:** {total_rows:,} | **Page:** {st.session_state.current_page} of {total_pages} | **Showing:** {start_idx + 1:,} - {end_idx:,}")
     
-    with col1:
-        st.markdown(f"**Total Rows:** {total_rows:,}")
+    # Rows per page selector
+    rows_per_page_options = [50, 100, 250, 500, 1000]
+    new_rows_per_page = st.selectbox(
+        "Rows per page:",
+        options=rows_per_page_options,
+        index=rows_per_page_options.index(st.session_state.rows_per_page) if st.session_state.rows_per_page in rows_per_page_options else 1,
+        key="rows_per_page_select"
+    )
+    if new_rows_per_page != st.session_state.rows_per_page:
+        st.session_state.rows_per_page = new_rows_per_page
+        st.session_state.current_page = 1  # Reset to first page
+        st.rerun()
     
-    with col2:
-        rows_per_page_options = [50, 100, 250, 500, 1000]
-        new_rows_per_page = st.selectbox(
-            "Rows per page:",
-            options=rows_per_page_options,
-            index=rows_per_page_options.index(st.session_state.rows_per_page) if st.session_state.rows_per_page in rows_per_page_options else 1,
-            key="rows_per_page_select",
-            label_visibility="collapsed"
-        )
-        if new_rows_per_page != st.session_state.rows_per_page:
-            st.session_state.rows_per_page = new_rows_per_page
-            st.session_state.current_page = 1  # Reset to first page
-            st.rerun()
-    
-    with col3:
-        st.markdown(f"**Page:** {st.session_state.current_page} of {total_pages}")
-    
-    with col4:
-        st.markdown(f"**Showing:** {start_idx + 1:,} - {end_idx:,}")
-    
-    # Pagination controls
+    # Pagination controls (NO COLUMNS to prevent nesting issues when called from within columns)
     if total_pages > 1:
-        nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns([1, 1, 2, 1, 1])
+        # Create unique keys for each button to avoid conflicts
+        button_key_prefix = f"pagination_{id(df)}"
         
-        with nav_col1:
-            if st.button("⏮️ First", use_container_width=True, disabled=(st.session_state.current_page == 1)):
+        st.markdown("**Navigation:**")
+        
+        # Use HTML/CSS for horizontal button layout to avoid column nesting
+        st.markdown("""
+        <style>
+            .pagination-buttons {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                margin: 10px 0;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Navigation buttons in a simple row (no columns)
+        button_container = st.container()
+        with button_container:
+            # Use a simple approach: buttons in a row without columns
+            # We'll use st.button with custom layout via CSS or just vertical layout
+            nav_buttons = []
+            
+            if st.button("⏮️ First", disabled=(st.session_state.current_page == 1), key=f"{button_key_prefix}_first"):
                 st.session_state.current_page = 1
                 st.rerun()
-        
-        with nav_col2:
-            if st.button("◀️ Prev", use_container_width=True, disabled=(st.session_state.current_page == 1)):
+            
+            if st.button("◀️ Prev", disabled=(st.session_state.current_page == 1), key=f"{button_key_prefix}_prev"):
                 st.session_state.current_page -= 1
                 st.rerun()
-        
-        with nav_col3:
+            
             # Page number input
             page_input = st.number_input(
                 "Go to page:",
                 min_value=1,
                 max_value=total_pages,
                 value=st.session_state.current_page,
-                key="page_input",
-                label_visibility="collapsed"
+                key=f"{button_key_prefix}_input"
             )
             if page_input != st.session_state.current_page:
                 st.session_state.current_page = int(page_input)
                 st.rerun()
-        
-        with nav_col4:
-            if st.button("Next ▶️", use_container_width=True, disabled=(st.session_state.current_page == total_pages)):
+            
+            if st.button("Next ▶️", disabled=(st.session_state.current_page == total_pages), key=f"{button_key_prefix}_next"):
                 st.session_state.current_page += 1
                 st.rerun()
-        
-        with nav_col5:
-            if st.button("Last ⏭️", use_container_width=True, disabled=(st.session_state.current_page == total_pages)):
+            
+            if st.button("Last ⏭️", disabled=(st.session_state.current_page == total_pages), key=f"{button_key_prefix}_last"):
                 st.session_state.current_page = total_pages
                 st.rerun()
     
