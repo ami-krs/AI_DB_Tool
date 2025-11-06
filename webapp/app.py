@@ -5,8 +5,9 @@ Provides interactive interface for database management and AI-powered SQL querie
 
 import streamlit as st
 import pandas as pd
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import os
+import sqlparse
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -835,106 +836,219 @@ def visualizations_tab():
         st.info("👆 Execute a query in the SQL Editor to visualize results here")
 
 
-def execute_query(query: str):
-    """Execute SQL query and display results (supports SELECT, INSERT, UPDATE, DELETE, DDL)"""
+def split_sql_statements(query: str) -> List[str]:
+    """Split SQL query into individual statements, handling semicolons in strings/comments"""
     if not query.strip():
-        st.warning("Please enter a query")
-        return
+        return []
+    
+    # Use sqlparse to properly split statements
+    try:
+        parsed = sqlparse.split(query)
+        # Filter out empty statements and strip whitespace
+        statements = [stmt.strip() for stmt in parsed if stmt.strip()]
+        return statements
+    except Exception:
+        # Fallback: simple split by semicolon (may not handle all cases)
+        statements = [stmt.strip() for stmt in query.split(';') if stmt.strip()]
+        return statements
+
+
+def execute_single_statement(statement: str) -> Dict[str, Any]:
+    """Execute a single SQL statement and return result info"""
+    result = {
+        'success': False,
+        'statement': statement,
+        'type': None,
+        'rows_affected': 0,
+        'rows_retrieved': 0,
+        'dataframe': None,
+        'error': None
+    }
+    
+    if not statement.strip():
+        return result
+    
+    statement_upper = statement.strip().upper()
     
     # Determine query type
-    query_upper = query.strip().upper()
-    
-    # DDL operations (CREATE, DROP, ALTER, etc.)
-    is_ddl = any(query_upper.startswith(cmd) for cmd in [
+    is_ddl = any(statement_upper.startswith(cmd) for cmd in [
         'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 
         'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
     ])
     
-    # DML operations (INSERT, UPDATE, DELETE)
-    is_dml = any(query_upper.startswith(cmd) for cmd in ['INSERT', 'UPDATE', 'DELETE'])
-    
-    # SELECT query
-    is_select = query_upper.startswith('SELECT')
+    is_dml = any(statement_upper.startswith(cmd) for cmd in ['INSERT', 'UPDATE', 'DELETE'])
+    is_select = statement_upper.startswith('SELECT')
     
     try:
         if is_ddl or is_dml:
-            # Execute non-query operations (INSERT, UPDATE, DELETE, DDL)
-            affected_rows = st.session_state.db_manager.execute_non_query(query)
-            
-            if is_ddl:
-                st.success(f"✅ Database object operation completed successfully!")
-                
-                # Refresh table list after DDL
-                if any(query_upper.startswith(cmd) for cmd in ['CREATE', 'DROP', 'ALTER']):
-                    st.info("💡 Refresh the page to see updated schema")
-                    
-            else:  # DML
-                if affected_rows >= 0:
-                    st.success(f"✅ Query executed successfully! {affected_rows} row(s) affected.")
-                else:
-                    st.success(f"✅ Query executed successfully!")
+            # Execute non-query operations
+            affected_rows = st.session_state.db_manager.execute_non_query(statement)
+            result['success'] = True
+            result['type'] = 'DDL' if is_ddl else 'DML'
+            result['rows_affected'] = affected_rows if affected_rows >= 0 else 0
+            return result
         
         elif is_select:
             # Execute SELECT query
-            df = st.session_state.db_manager.execute_query(query)
+            df = st.session_state.db_manager.execute_query(statement)
+            result['success'] = True
+            result['type'] = 'SELECT'
+            result['rows_retrieved'] = len(df)
+            result['dataframe'] = df
+            return result
+        
+        else:
+            # Unknown query type - try SELECT first, then non-query
+            try:
+                df = st.session_state.db_manager.execute_query(statement)
+                result['success'] = True
+                result['type'] = 'SELECT'
+                result['rows_retrieved'] = len(df)
+                result['dataframe'] = df
+                return result
+            except:
+                # Fallback to non-query execution
+                affected_rows = st.session_state.db_manager.execute_non_query(statement)
+                result['success'] = True
+                result['type'] = 'DML'
+                result['rows_affected'] = affected_rows if affected_rows >= 0 else 0
+                return result
+    
+    except Exception as e:
+        result['error'] = str(e)
+        return result
+
+
+def execute_query(query: str):
+    """Execute SQL query and display results (supports multiple statements, SELECT, INSERT, UPDATE, DELETE, DDL)"""
+    if not query.strip():
+        st.warning("Please enter a query")
+        return
+    
+    # Split into multiple statements
+    statements = split_sql_statements(query)
+    
+    if not statements:
+        st.warning("No valid SQL statements found")
+        return
+    
+    # If single statement, use original behavior for backward compatibility
+    if len(statements) == 1:
+        single_statement = statements[0]
+        result = execute_single_statement(single_statement)
+        
+        if not result['success']:
+            st.error(f"❌ Query execution failed: {result['error']}")
+            st.code(single_statement, language='sql')
+            return
+        
+        # Handle single statement results (original behavior)
+        if result['type'] == 'SELECT':
             st.subheader("📊 Results")
-            
-            # Reset to first page when new query is executed
             st.session_state.current_page = 1
+            display_paginated_dataframe(result['dataframe'])
+            st.session_state.last_result_df = result['dataframe']
+            st.session_state.last_result = result['dataframe']
             
-            # Display with pagination
-            display_paginated_dataframe(df)
-            
-            # Store for visualization
-            st.session_state.last_result_df = df
-            st.session_state.last_result = df  # For compact views
-            
-            # Download options (download full dataset)
-            csv = df.to_csv(index=False)
+            csv = result['dataframe'].to_csv(index=False)
             st.download_button(
                 "📥 Download Full CSV",
                 csv,
                 "results.csv",
                 "text/csv",
-                help=f"Download all {len(df):,} rows"
+                help=f"Download all {len(result['dataframe']):,} rows"
             )
+            st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
+        
+        elif result['type'] == 'DDL':
+            st.success(f"✅ Database object operation completed successfully!")
+            if any(single_statement.strip().upper().startswith(cmd) for cmd in ['CREATE', 'DROP', 'ALTER']):
+                st.info("💡 Refresh the page to see updated schema")
+        
+        else:  # DML
+            if result['rows_affected'] >= 0:
+                st.success(f"✅ Query executed successfully! {result['rows_affected']} row(s) affected.")
+            else:
+                st.success(f"✅ Query executed successfully!")
+        
+        return
+    
+    # Multiple statements - execute each and show summary
+    st.subheader(f"📋 Executing {len(statements)} Statement(s)")
+    
+    results = []
+    success_count = 0
+    error_count = 0
+    
+    for idx, statement in enumerate(statements, 1):
+        with st.expander(f"Statement {idx}/{len(statements)}", expanded=(idx == 1)):
+            st.code(statement, language='sql')
             
-            st.success(f"✅ Query executed successfully! Retrieved {len(df):,} rows.")
+            result = execute_single_statement(statement)
+            results.append(result)
+            
+            if result['success']:
+                success_count += 1
+                
+                if result['type'] == 'SELECT':
+                    st.success(f"✅ Statement {idx} executed: Retrieved {result['rows_retrieved']:,} rows")
+                    if result['dataframe'] is not None and len(result['dataframe']) > 0:
+                        st.session_state.current_page = 1
+                        display_paginated_dataframe(result['dataframe'])
+                        
+                        # Store last result for visualization
+                        st.session_state.last_result_df = result['dataframe']
+                        st.session_state.last_result = result['dataframe']
+                
+                elif result['type'] == 'DDL':
+                    st.success(f"✅ Statement {idx} executed: DDL operation completed")
+                
+                else:  # DML
+                    st.success(f"✅ Statement {idx} executed: {result['rows_affected']} row(s) affected")
+            else:
+                error_count += 1
+                st.error(f"❌ Statement {idx} failed: {result['error']}")
+    
+    # Summary
+    st.markdown("---")
+    st.subheader("📊 Execution Summary")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Statements", len(statements))
+    with col2:
+        st.metric("✅ Successful", success_count, delta=None)
+    with col3:
+        st.metric("❌ Failed", error_count, delta=None, delta_color="inverse")
+    
+    if success_count == len(statements):
+        st.success(f"🎉 All {len(statements)} statement(s) executed successfully!")
+    elif success_count > 0:
+        st.warning(f"⚠️ {success_count} statement(s) succeeded, {error_count} statement(s) failed")
+    else:
+        st.error(f"❌ All statements failed to execute")
+    
+    # Show last SELECT result if available
+    last_select_result = None
+    for result in reversed(results):
+        if result['success'] and result['type'] == 'SELECT' and result['dataframe'] is not None:
+            last_select_result = result['dataframe']
+            break
+    
+    if last_select_result is not None:
+        st.markdown("---")
+        st.subheader("📊 Last Query Results")
+        st.session_state.current_page = 1
+        display_paginated_dataframe(last_select_result)
         
-        else:
-            # Unknown query type - try SELECT first, then non-query
-            try:
-                df = st.session_state.db_manager.execute_query(query)
-                st.subheader("📊 Results")
-                
-                # Reset to first page when new query is executed
-                st.session_state.current_page = 1
-                
-                # Display with pagination
-                display_paginated_dataframe(df)
-                
-                st.session_state.last_result_df = df
-                st.session_state.last_result = df
-                
-                # Download options (download full dataset)
-                csv = df.to_csv(index=False)
-                st.download_button(
-                    "📥 Download Full CSV",
-                    csv,
-                    "results.csv",
-                    "text/csv",
-                    help=f"Download all {len(df):,} rows"
-                )
-                
-                st.success(f"✅ Query executed successfully! Retrieved {len(df):,} rows.")
-            except:
-                # Fallback to non-query execution
-                affected_rows = st.session_state.db_manager.execute_non_query(query)
-                st.success(f"✅ Query executed successfully! {affected_rows} row(s) affected.")
-        
-    except Exception as e:
-        st.error(f"❌ Query execution failed: {e}")
-        st.code(query, language='sql')
+        csv = last_select_result.to_csv(index=False)
+        st.download_button(
+            "📥 Download Full CSV",
+            csv,
+            "results.csv",
+            "text/csv",
+            help=f"Download all {len(last_select_result):,} rows"
+        )
 
 
 def execute_generated_query(query: str):
