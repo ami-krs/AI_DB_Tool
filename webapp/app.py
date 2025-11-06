@@ -103,6 +103,8 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'rows_per_page' not in st.session_state:
     st.session_state.rows_per_page = 100
+if 'keyboard_execute' not in st.session_state:
+    st.session_state.keyboard_execute = False
 
 
 def display_paginated_dataframe(df):
@@ -344,21 +346,51 @@ def inject_keyboard_shortcuts():
                     
                     // Small delay to ensure Streamlit has processed the input
                     setTimeout(function() {
-                        // Find and click the Run button
-                        const buttons = Array.from(document.querySelectorAll('button'));
-                        const runButton = buttons.find(btn => {
+                        // Try multiple methods to find and click the Run button
+                        const allButtons = Array.from(document.querySelectorAll('button'));
+                        let runButton = null;
+                        
+                        // Method 1: Try to find hidden execute button first (most reliable)
+                        runButton = allButtons.find(btn => {
                             const text = (btn.textContent || btn.innerText || '').trim();
-                            return text.includes('Run') || text.includes('▶') || text.includes('▶️') || 
-                                   (text.length > 0 && btn.getAttribute('data-testid')?.includes('baseButton'));
+                            return text === '' || btn.getAttribute('data-testid')?.includes('hidden_execute');
                         });
-                        if (runButton && !runButton.disabled) {
-                            // Use both click methods for better compatibility
-                            runButton.click();
-                            if (runButton.dispatchEvent) {
-                                runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                            }
+                        
+                        // Method 2: Find by text content (Run button)
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                const text = (btn.textContent || btn.innerText || '').trim();
+                                return text.includes('Run') || text.includes('▶') || text.includes('▶️') || text.includes('Execute');
+                            });
                         }
-                    }, 50);
+                        
+                        // Method 3: Find primary button
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                return btn.classList.contains('primary') || 
+                                       btn.getAttribute('data-baseweb') === 'button' ||
+                                       (btn.type === 'button' && btn.getAttribute('data-testid')?.includes('baseButton'));
+                            });
+                        }
+                        
+                        if (runButton && !runButton.disabled) {
+                            // Try multiple click methods
+                            runButton.focus();
+                            runButton.click();
+                            
+                            // Also try dispatching events
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            runButton.dispatchEvent(clickEvent);
+                            
+                            // Also try mousedown/mouseup
+                            runButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            runButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        }
+                    }, 100);
                     return false;
                 }
                 
@@ -546,17 +578,75 @@ def inject_keyboard_shortcuts():
                     e.stopPropagation();
                     e.stopImmediatePropagation();
                     
+                    // Try multiple methods to find and click the Run button
                     setTimeout(function() {
-                        const buttons = Array.from(document.querySelectorAll('button'));
-                        const runButton = buttons.find(btn => {
+                        // Method 1: Try to find hidden execute button first (most reliable)
+                        let runButton = null;
+                        const allButtons = Array.from(document.querySelectorAll('button'));
+                        
+                        // Look for hidden button by finding button with empty text or specific key
+                        runButton = allButtons.find(btn => {
                             const text = (btn.textContent || btn.innerText || '').trim();
-                            return text.includes('Run') || text.includes('▶') || text.includes('▶️');
+                            // Hidden button has empty text or specific attributes
+                            return text === '' || btn.getAttribute('data-testid')?.includes('hidden_execute');
                         });
-                        if (runButton && !runButton.disabled) {
-                            runButton.click();
-                            runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                        
+                        // Method 2: Find by text content (Run button)
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                const text = (btn.textContent || btn.innerText || '').trim();
+                                return text.includes('Run') || text.includes('▶') || text.includes('▶️') || text.includes('Execute');
+                            });
                         }
-                    }, 50);
+                        
+                        // Method 3: Find primary button (Run button is usually primary)
+                        if (!runButton) {
+                            runButton = allButtons.find(btn => {
+                                return btn.classList.contains('primary') || 
+                                       btn.getAttribute('data-baseweb') === 'button' ||
+                                       (btn.type === 'button' && btn.getAttribute('data-testid')?.includes('baseButton'));
+                            });
+                        }
+                        
+                        // Method 4: Find first button in the action buttons row
+                        if (!runButton && allButtons.length > 0) {
+                            // Find the textarea first
+                            const textarea = e.target;
+                            const textareaContainer = textarea.closest('[data-testid*="stTextArea"]') || 
+                                                      textarea.closest('.stTextArea') ||
+                                                      textarea.parentElement;
+                            if (textareaContainer) {
+                                // Find the next sibling container with buttons
+                                let nextSibling = textareaContainer.nextElementSibling;
+                                while (nextSibling && !runButton) {
+                                    const btn = nextSibling.querySelector('button[type="button"]');
+                                    if (btn) {
+                                        runButton = btn;
+                                        break;
+                                    }
+                                    nextSibling = nextSibling.nextElementSibling;
+                                }
+                            }
+                        }
+                        
+                        if (runButton && !runButton.disabled) {
+                            // Try multiple click methods
+                            runButton.focus();
+                            runButton.click();
+                            
+                            // Also try dispatching events
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            runButton.dispatchEvent(clickEvent);
+                            
+                            // Also try mousedown/mouseup
+                            runButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            runButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        }
+                    }, 100);
                     return false;
                 }
             }
@@ -851,10 +941,22 @@ def sql_editor_compact():
         help="💡 Use sidebar to insert table names"
     )
     
+    # Check for keyboard execute trigger
+    if st.session_state.keyboard_execute:
+        st.session_state.keyboard_execute = False
+        if query.strip():
+            execute_query(query)
+    
+    # Hidden button for keyboard shortcut (JavaScript will click this)
+    if st.button("", key="hidden_execute_btn", help="Hidden button for keyboard shortcut"):
+        st.session_state.keyboard_execute = True
+        st.rerun()
+    
     # Action buttons in row
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        if st.button("▶️ Run", type="primary", use_container_width=True):
+        run_clicked = st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_compact")
+        if run_clicked:
             execute_query(query)
     with col2:
         if st.button("🤖 AI Gen", use_container_width=True):
@@ -1011,11 +1113,23 @@ def sql_editor_tab():
             key="sql_editor",
             help="💡 Tip: Use the Quick Insert buttons above to insert table names"
         )
+        
+        # Check for keyboard execute trigger
+        if st.session_state.keyboard_execute:
+            st.session_state.keyboard_execute = False
+            if query.strip():
+                execute_query(query)
+        
+        # Hidden button for keyboard shortcut (JavaScript will click this)
+        if st.button("", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut"):
+            st.session_state.keyboard_execute = True
+            st.rerun()
     
     with col2:
         st.markdown("### Actions")
         
-        if st.button("▶️ Execute", type="primary", use_container_width=True):
+        execute_clicked = st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab")
+        if execute_clicked:
             execute_query(query)
         
         if st.button("🤖 AI Generate", use_container_width=True):
