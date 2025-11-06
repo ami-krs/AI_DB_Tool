@@ -619,14 +619,16 @@ def inject_keyboard_shortcuts():
                         // Streamlit buttons have data-testid that includes the key
                         runButton = allButtons.find(btn => {
                             const testId = btn.getAttribute('data-testid') || '';
-                            return testId.includes('execute_btn_compact') || testId.includes('execute_btn_tab');
+                            return testId.includes('execute_btn_compact') || testId.includes('execute_btn_tab') || 
+                                   testId.includes('run_btn_tab') || testId.includes('run_btn_compact');
                         });
                         
-                        // Also try finding by text content "Execute"
+                        // Also try finding by text content "Execute" or "Run"
                         if (!runButton) {
                             runButton = allButtons.find(btn => {
                                 const text = (btn.textContent || btn.innerText || '').trim();
-                                return text === 'Execute' || text.includes('Execute');
+                                return text === 'Execute' || text.includes('Execute') || text.includes('▶️ Execute') || 
+                                       text.includes('Run') || text.includes('▶') || text.includes('▶️');
                             });
                         }
                         
@@ -1179,8 +1181,8 @@ def sql_editor_tab():
     with col2:
         st.markdown("### Actions")
         
-        # Execute button (replaces Run button) - also used for keyboard shortcuts
-        execute_clicked = st.button("Execute", type="primary", use_container_width=True, key="execute_btn_tab")
+        # Execute button - also used for keyboard shortcuts
+        execute_clicked = st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab")
         if execute_clicked:
             execute_query(query)
         
