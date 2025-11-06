@@ -7,7 +7,13 @@ import streamlit as st
 import pandas as pd
 from typing import Optional, Dict, Any, List
 import os
-import sqlparse
+
+# Try to import sqlparse, fallback to simple split if not available
+try:
+    import sqlparse
+    SQLPARSE_AVAILABLE = True
+except ImportError:
+    SQLPARSE_AVAILABLE = False
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -841,16 +847,21 @@ def split_sql_statements(query: str) -> List[str]:
     if not query.strip():
         return []
     
-    # Use sqlparse to properly split statements
-    try:
-        parsed = sqlparse.split(query)
-        # Filter out empty statements and strip whitespace
-        statements = [stmt.strip() for stmt in parsed if stmt.strip()]
-        return statements
-    except Exception:
-        # Fallback: simple split by semicolon (may not handle all cases)
-        statements = [stmt.strip() for stmt in query.split(';') if stmt.strip()]
-        return statements
+    # Use sqlparse if available for proper statement splitting
+    if SQLPARSE_AVAILABLE:
+        try:
+            parsed = sqlparse.split(query)
+            # Filter out empty statements and strip whitespace
+            statements = [stmt.strip() for stmt in parsed if stmt.strip()]
+            return statements
+        except Exception:
+            # Fallback to simple split if sqlparse fails
+            pass
+    
+    # Fallback: simple split by semicolon (handles most cases)
+    # Note: This may not handle semicolons inside strings/comments perfectly
+    statements = [stmt.strip() for stmt in query.split(';') if stmt.strip()]
+    return statements
 
 
 def execute_single_statement(statement: str) -> Dict[str, Any]:
