@@ -92,6 +92,102 @@ if 'show_chatbot' not in st.session_state:
     st.session_state.show_chatbot = True  # Show chatbot by default
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False  # Light mode by default
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 1
+if 'rows_per_page' not in st.session_state:
+    st.session_state.rows_per_page = 100
+
+
+def display_paginated_dataframe(df):
+    """Display dataframe with pagination controls"""
+    if df is None or len(df) == 0:
+        st.info("No data to display")
+        return
+    
+    total_rows = len(df)
+    total_pages = (total_rows - 1) // st.session_state.rows_per_page + 1
+    
+    # Ensure current_page is valid
+    if st.session_state.current_page > total_pages:
+        st.session_state.current_page = 1
+    if st.session_state.current_page < 1:
+        st.session_state.current_page = 1
+    
+    # Calculate pagination
+    start_idx = (st.session_state.current_page - 1) * st.session_state.rows_per_page
+    end_idx = min(start_idx + st.session_state.rows_per_page, total_rows)
+    
+    # Display pagination info
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    
+    with col1:
+        st.markdown(f"**Total Rows:** {total_rows:,}")
+    
+    with col2:
+        rows_per_page_options = [50, 100, 250, 500, 1000]
+        new_rows_per_page = st.selectbox(
+            "Rows per page:",
+            options=rows_per_page_options,
+            index=rows_per_page_options.index(st.session_state.rows_per_page) if st.session_state.rows_per_page in rows_per_page_options else 1,
+            key="rows_per_page_select",
+            label_visibility="collapsed"
+        )
+        if new_rows_per_page != st.session_state.rows_per_page:
+            st.session_state.rows_per_page = new_rows_per_page
+            st.session_state.current_page = 1  # Reset to first page
+            st.rerun()
+    
+    with col3:
+        st.markdown(f"**Page:** {st.session_state.current_page} of {total_pages}")
+    
+    with col4:
+        st.markdown(f"**Showing:** {start_idx + 1:,} - {end_idx:,}")
+    
+    # Pagination controls
+    if total_pages > 1:
+        nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns([1, 1, 2, 1, 1])
+        
+        with nav_col1:
+            if st.button("⏮️ First", use_container_width=True, disabled=(st.session_state.current_page == 1)):
+                st.session_state.current_page = 1
+                st.rerun()
+        
+        with nav_col2:
+            if st.button("◀️ Prev", use_container_width=True, disabled=(st.session_state.current_page == 1)):
+                st.session_state.current_page -= 1
+                st.rerun()
+        
+        with nav_col3:
+            # Page number input
+            page_input = st.number_input(
+                "Go to page:",
+                min_value=1,
+                max_value=total_pages,
+                value=st.session_state.current_page,
+                key="page_input",
+                label_visibility="collapsed"
+            )
+            if page_input != st.session_state.current_page:
+                st.session_state.current_page = int(page_input)
+                st.rerun()
+        
+        with nav_col4:
+            if st.button("Next ▶️", use_container_width=True, disabled=(st.session_state.current_page == total_pages)):
+                st.session_state.current_page += 1
+                st.rerun()
+        
+        with nav_col5:
+            if st.button("Last ⏭️", use_container_width=True, disabled=(st.session_state.current_page == total_pages)):
+                st.session_state.current_page = total_pages
+                st.rerun()
+    
+    # Display paginated data
+    paginated_df = df.iloc[start_idx:end_idx]
+    st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    
+    # Show info if paginated
+    if total_pages > 1:
+        st.caption(f"📄 Displaying page {st.session_state.current_page} of {total_pages} ({len(paginated_df):,} rows)")
 
 
 def inject_dark_mode_css():
@@ -783,23 +879,27 @@ def execute_query(query: str):
             df = st.session_state.db_manager.execute_query(query)
             st.subheader("📊 Results")
             
-            # Display with st.dataframe - hide index and use small columns
-            st.dataframe(df, hide_index=True)
+            # Reset to first page when new query is executed
+            st.session_state.current_page = 1
+            
+            # Display with pagination
+            display_paginated_dataframe(df)
             
             # Store for visualization
             st.session_state.last_result_df = df
             st.session_state.last_result = df  # For compact views
             
-            # Download options
+            # Download options (download full dataset)
             csv = df.to_csv(index=False)
             st.download_button(
-                "📥 Download CSV",
+                "📥 Download Full CSV",
                 csv,
                 "results.csv",
-                "text/csv"
+                "text/csv",
+                help=f"Download all {len(df):,} rows"
             )
             
-            st.success(f"✅ Query executed successfully! Retrieved {len(df)} rows.")
+            st.success(f"✅ Query executed successfully! Retrieved {len(df):,} rows.")
         
         else:
             # Unknown query type - try SELECT first, then non-query
@@ -807,21 +907,26 @@ def execute_query(query: str):
                 df = st.session_state.db_manager.execute_query(query)
                 st.subheader("📊 Results")
                 
-                # Display with st.dataframe - hide index and use small columns
-                st.dataframe(df, hide_index=True)
+                # Reset to first page when new query is executed
+                st.session_state.current_page = 1
+                
+                # Display with pagination
+                display_paginated_dataframe(df)
                 
                 st.session_state.last_result_df = df
                 st.session_state.last_result = df
                 
+                # Download options (download full dataset)
                 csv = df.to_csv(index=False)
                 st.download_button(
-                    "📥 Download CSV",
+                    "📥 Download Full CSV",
                     csv,
                     "results.csv",
-                    "text/csv"
+                    "text/csv",
+                    help=f"Download all {len(df):,} rows"
                 )
                 
-                st.success(f"✅ Query executed successfully! Retrieved {len(df)} rows.")
+                st.success(f"✅ Query executed successfully! Retrieved {len(df):,} rows.")
             except:
                 # Fallback to non-query execution
                 affected_rows = st.session_state.db_manager.execute_non_query(query)
