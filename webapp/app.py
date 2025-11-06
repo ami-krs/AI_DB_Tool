@@ -26,6 +26,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_db_tool.connectors import DatabaseManager, DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 
+# Try to import Monaco Editor component
+try:
+    from components.monaco_editor import monaco_editor
+    MONACO_AVAILABLE = True
+except ImportError:
+    try:
+        # Try alternative import path
+        import sys
+        import os
+        components_path = os.path.join(os.path.dirname(__file__), 'components')
+        if components_path not in sys.path:
+            sys.path.insert(0, components_path)
+        from monaco_editor import monaco_editor
+        MONACO_AVAILABLE = True
+    except ImportError:
+        MONACO_AVAILABLE = False
+        monaco_editor = None
+
 
 # Page configuration
 st.set_page_config(
@@ -103,6 +121,10 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'rows_per_page' not in st.session_state:
     st.session_state.rows_per_page = 100
+if 'use_monaco_editor' not in st.session_state:
+    st.session_state.use_monaco_editor = False  # Default to regular text area
+if 'api_server_url' not in st.session_state:
+    st.session_state.api_server_url = "http://localhost:8000"  # Default API URL
 
 
 def display_paginated_dataframe(df):
@@ -727,6 +749,31 @@ def main():
     with st.sidebar:
         st.title("🤖 AI Database Tool")
         
+        # Monaco Editor toggle
+        if MONACO_AVAILABLE:
+            st.markdown("---")
+            st.markdown("**⚡ Smart Editor:**")
+            use_monaco = st.toggle(
+                "Use Monaco Editor (AI Autocomplete)",
+                value=st.session_state.use_monaco_editor,
+                help="Enable Monaco Editor with AI-powered autocomplete and syntax highlighting"
+            )
+            if use_monaco != st.session_state.use_monaco_editor:
+                st.session_state.use_monaco_editor = use_monaco
+                st.rerun()
+            
+            if st.session_state.use_monaco_editor:
+                api_url = st.text_input(
+                    "API Server URL",
+                    value=st.session_state.api_server_url,
+                    help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
+                )
+                if api_url != st.session_state.api_server_url:
+                    st.session_state.api_server_url = api_url
+                    st.rerun()
+                
+                st.info("💡 Start the API server: `python webapp/api_server.py`")
+        
         # Dark mode toggle
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -954,6 +1001,78 @@ def chatbot_compact():
             st.error(response['error'])
 
 
+def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * FROM table_name LIMIT 10;"):
+    """
+    Render SQL editor (Monaco or regular text area)
+    
+    Parameters:
+    -----------
+    key : str
+        Unique key for the editor
+    height : int
+        Editor height in pixels
+    placeholder : str
+        Placeholder text
+    
+    Returns:
+    --------
+    str
+        Current SQL query value
+    """
+    # Get current query value
+    current_query = st.session_state.get('sql_editor', '')
+    
+    # Get schema info if connected
+    schema_info = None
+    tables = None
+    if st.session_state.connected and st.session_state.db_manager:
+        try:
+            tables = st.session_state.db_manager.get_tables()
+            if tables:
+                # Get schema for first table as example
+                schema_info = st.session_state.db_manager.get_table_schema(tables[0])
+        except:
+            pass
+    
+    # Use Monaco Editor if enabled and available
+    if st.session_state.use_monaco_editor and MONACO_AVAILABLE and monaco_editor:
+        try:
+            # Get theme based on dark mode
+            theme = "vs-dark" if st.session_state.dark_mode else "vs"
+            
+            # Render Monaco Editor
+            monaco_value = monaco_editor(
+                value=current_query,
+                height=height,
+                language="sql",
+                theme=theme,
+                api_url=st.session_state.api_server_url,
+                database_type=st.session_state.db_type,
+                schema_info=schema_info,
+                tables=tables,
+                key=f"monaco_{key}"
+            )
+            
+            # Update session state if value changed
+            # Note: Monaco Editor updates via JavaScript, so we need to handle this differently
+            # For now, we'll use the current_query and let Monaco handle its own state
+            return current_query
+        except Exception as e:
+            st.warning(f"Monaco Editor error: {e}. Falling back to regular editor.")
+            # Fall back to regular text area
+            pass
+    
+    # Regular text area (fallback or default)
+    query = st.text_area(
+        "Enter SQL Query",
+        height=height,
+        placeholder=placeholder,
+        key=key,
+        help="💡 Use sidebar to insert table names"
+    )
+    return query
+
+
 def sql_editor_compact():
     """Compact SQL editor for three column layout"""
     st.markdown("### 📝 SQL Editor")
@@ -991,12 +1110,10 @@ def sql_editor_compact():
         st.session_state.sql_editor = st.session_state.fixed_query
         st.session_state.fixed_query = None
     
-    query = st.text_area(
-        "Enter SQL Query",
-        height=250,
-        placeholder="SELECT * FROM table_name LIMIT 10;",
+    query = render_sql_editor(
         key="sql_editor",
-        help="💡 Use sidebar to insert table names"
+        height=250,
+        placeholder="SELECT * FROM table_name LIMIT 10;"
     )
     
     # Action buttons in row
@@ -1152,12 +1269,10 @@ def sql_editor_tab():
             st.session_state.sql_editor = st.session_state.fixed_query
             st.session_state.fixed_query = None
         
-        query = st.text_area(
-            "Enter SQL Query",
-            height=300,
-            placeholder="SELECT * FROM table_name LIMIT 10;",
+        query = render_sql_editor(
             key="sql_editor",
-            help="💡 Tip: Use the Quick Insert buttons above to insert table names"
+            height=300,
+            placeholder="SELECT * FROM table_name LIMIT 10;"
         )
         
     with col2:
