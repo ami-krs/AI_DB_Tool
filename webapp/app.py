@@ -317,11 +317,182 @@ def inject_dark_mode_css():
         """, unsafe_allow_html=True)
 
 
+def inject_keyboard_shortcuts():
+    """Inject JavaScript for keyboard shortcuts in SQL editor"""
+    st.markdown("""
+    <script>
+    (function() {
+        // Wait for Streamlit to be ready
+        function waitForStreamlit() {
+            if (window.Streamlit) {
+                setupKeyboardShortcuts();
+            } else {
+                setTimeout(waitForStreamlit, 100);
+            }
+        }
+        
+        function setupKeyboardShortcuts() {
+            // Find the SQL editor textarea
+            const textareas = document.querySelectorAll('textarea[data-testid*="stTextArea"]');
+            let sqlEditor = null;
+            
+            // Find the textarea that contains the SQL editor (usually the first one)
+            for (let textarea of textareas) {
+                const label = textarea.closest('.stTextArea')?.querySelector('label');
+                if (label && (label.textContent.includes('SQL') || label.textContent.includes('Query'))) {
+                    sqlEditor = textarea;
+                    break;
+                }
+            }
+            
+            // Fallback: use the first textarea if we can't find the SQL editor
+            if (!sqlEditor && textareas.length > 0) {
+                sqlEditor = textareas[0];
+            }
+            
+            if (!sqlEditor) return;
+            
+            // Add keyboard event listener
+            sqlEditor.addEventListener('keydown', function(e) {
+                // Ctrl+Enter: Execute query
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    // Find and click the Run button
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const runButton = buttons.find(btn => {
+                        const text = btn.textContent || btn.innerText || '';
+                        return text.includes('Run') || text.includes('▶') || text.includes('▶️');
+                    });
+                    if (runButton && !runButton.disabled) {
+                        runButton.click();
+                    }
+                    return false;
+                }
+                
+                // Ctrl+/: Toggle comment
+                if (e.ctrlKey && e.key === '/') {
+                    e.preventDefault();
+                    const start = sqlEditor.selectionStart;
+                    const end = sqlEditor.selectionEnd;
+                    const text = sqlEditor.value;
+                    const lines = text.split('\\n');
+                    
+                    // Find which lines are selected
+                    let startLine = 0;
+                    let endLine = 0;
+                    let charCount = 0;
+                    
+                    // If no selection, use current line
+                    if (start === end) {
+                        for (let i = 0; i < lines.length; i++) {
+                            if (charCount <= start && charCount + lines[i].length >= start) {
+                                startLine = i;
+                                endLine = i;
+                                break;
+                            }
+                            charCount += lines[i].length + 1; // +1 for newline
+                        }
+                    } else {
+                        // Find lines for selection
+                        for (let i = 0; i < lines.length; i++) {
+                            if (charCount <= start && charCount + lines[i].length >= start) {
+                                startLine = i;
+                            }
+                            if (charCount <= end && charCount + lines[i].length >= end) {
+                                endLine = i;
+                                break;
+                            }
+                            charCount += lines[i].length + 1; // +1 for newline
+                        }
+                    }
+                    
+                    // Toggle comments on selected lines
+                    let allCommented = true;
+                    let hasNonEmptyLines = false;
+                    for (let i = startLine; i <= endLine; i++) {
+                        if (lines[i].trim()) {
+                            hasNonEmptyLines = true;
+                            if (!lines[i].trim().startsWith('--')) {
+                                allCommented = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Apply comment toggle
+                    if (hasNonEmptyLines) {
+                        for (let i = startLine; i <= endLine; i++) {
+                            if (lines[i].trim()) {
+                                if (allCommented) {
+                                    // Remove comment (handle both '--' and '-- ')
+                                    lines[i] = lines[i].replace(/^\\s*--\\s?/, '');
+                                } else {
+                                    // Add comment
+                                    lines[i] = '-- ' + lines[i];
+                                }
+                            }
+                        }
+                    }
+                    
+                    const newText = lines.join('\\n');
+                    sqlEditor.value = newText;
+                    
+                    // Restore selection
+                    sqlEditor.setSelectionRange(start, end);
+                    
+                    // Trigger input event to update Streamlit
+                    sqlEditor.dispatchEvent(new Event('input', { bubbles: true }));
+                    return false;
+                }
+                
+                // Ctrl+S: Save to history
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    // Find and click the Save button
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const saveButton = buttons.find(btn => {
+                        const text = btn.textContent || btn.innerText || '';
+                        return text.includes('Save') || text.includes('💾');
+                    });
+                    if (saveButton && !saveButton.disabled) {
+                        saveButton.click();
+                    }
+                    return false;
+                }
+                
+                // Ctrl+L: Clear editor
+                if (e.ctrlKey && e.key === 'l') {
+                    e.preventDefault();
+                    sqlEditor.value = '';
+                    sqlEditor.dispatchEvent(new Event('input', { bubbles: true }));
+                    return false;
+                }
+            });
+        }
+        
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', waitForStreamlit);
+        } else {
+            waitForStreamlit();
+        }
+        
+        // Also try after a short delay to catch dynamically loaded content
+        setTimeout(waitForStreamlit, 500);
+        setTimeout(waitForStreamlit, 1000);
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+
+
 def main():
     """Main application"""
     
     # Inject dark mode CSS (must be called early)
     inject_dark_mode_css()
+    
+    # Inject keyboard shortcuts (must be called early)
+    inject_keyboard_shortcuts()
     
     # Sidebar
     with st.sidebar:
@@ -558,6 +729,15 @@ def sql_editor_compact():
     """Compact SQL editor for three column layout"""
     st.markdown("### 📝 SQL Editor")
     
+    # Keyboard shortcuts help
+    with st.expander("⌨️ Keyboard Shortcuts", expanded=False):
+        st.markdown("""
+        - **Ctrl+Enter**: Execute query
+        - **Ctrl+/**: Toggle comment on selected lines
+        - **Ctrl+S**: Save query to history
+        - **Ctrl+L**: Clear editor
+        """)
+    
     # Quick insert buttons for tables
     if st.session_state.connected:
         tables = st.session_state.db_manager.get_tables()
@@ -698,6 +878,15 @@ def chatbot_tab():
 def sql_editor_tab():
     """SQL Editor interface"""
     st.header("📝 Smart SQL Editor")
+    
+    # Keyboard shortcuts help
+    with st.expander("⌨️ Keyboard Shortcuts", expanded=False):
+        st.markdown("""
+        - **Ctrl+Enter**: Execute query
+        - **Ctrl+/**: Toggle comment on selected lines
+        - **Ctrl+S**: Save query to history
+        - **Ctrl+L**: Clear editor
+        """)
     
     # Quick insert buttons for tables
     if st.session_state.connected:
