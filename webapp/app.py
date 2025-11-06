@@ -1009,20 +1009,60 @@ def sql_editor_compact():
             execute_query(query)
     
     # Hidden button for keyboard shortcut (JavaScript will click this)
-    # Use CSS to completely hide it
+    # Create button in a way that can be hidden with CSS
+    button_clicked = st.button("Execute", key="hidden_execute_btn", help="Hidden button for keyboard shortcut")
+    
+    # Hide the button with CSS after it's created
     st.markdown("""
     <style>
-        button[data-testid*="hidden_execute_btn"] {
+        /* Hide the hidden execute button and its container completely */
+        button[data-testid*="hidden_execute_btn"],
+        div[data-testid*="stButton"]:has(button[data-testid*="hidden_execute_btn"]),
+        div[data-testid*="stButton"] button[data-testid*="hidden_execute_btn"] {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
             position: absolute !important;
             left: -9999px !important;
+            width: 0 !important;
+            height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
         }
     </style>
+    <script>
+        // Hide the button container after page load
+        setTimeout(function() {
+            const buttons = document.querySelectorAll('button[data-testid*="hidden_execute_btn"]');
+            buttons.forEach(function(btn) {
+                btn.style.display = 'none';
+                btn.style.visibility = 'hidden';
+                btn.style.opacity = '0';
+                btn.style.position = 'absolute';
+                btn.style.left = '-9999px';
+                btn.style.width = '0';
+                btn.style.height = '0';
+                btn.style.padding = '0';
+                btn.style.margin = '0';
+                btn.style.border = 'none';
+                // Hide parent container
+                const parent = btn.closest('div[data-testid*="stButton"]');
+                if (parent) {
+                    parent.style.display = 'none';
+                    parent.style.visibility = 'hidden';
+                    parent.style.height = '0';
+                    parent.style.padding = '0';
+                    parent.style.margin = '0';
+                }
+            });
+        }, 100);
+    </script>
     """, unsafe_allow_html=True)
     
-    if st.button("Execute", key="hidden_execute_btn", help="Hidden button for keyboard shortcut"):
+    if button_clicked:
         st.session_state.keyboard_execute = True
         st.rerun()
     
@@ -1195,20 +1235,59 @@ def sql_editor_tab():
                 execute_query(query)
         
         # Hidden button for keyboard shortcut (JavaScript will click this)
-        # Use CSS to completely hide it
+        button_clicked_tab = st.button("Execute", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut")
+        
+        # Hide the button with CSS and JavaScript after it's created
         st.markdown("""
         <style>
-            button[data-testid*="hidden_execute_btn_tab"] {
+            /* Hide the hidden execute button and its container completely */
+            button[data-testid*="hidden_execute_btn_tab"],
+            div[data-testid*="stButton"]:has(button[data-testid*="hidden_execute_btn_tab"]),
+            div[data-testid*="stButton"] button[data-testid*="hidden_execute_btn_tab"] {
                 display: none !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
                 position: absolute !important;
                 left: -9999px !important;
+                width: 0 !important;
+                height: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                overflow: hidden !important;
+                pointer-events: none !important;
             }
         </style>
+        <script>
+            // Hide the button container after page load
+            setTimeout(function() {
+                const buttons = document.querySelectorAll('button[data-testid*="hidden_execute_btn_tab"]');
+                buttons.forEach(function(btn) {
+                    btn.style.display = 'none';
+                    btn.style.visibility = 'hidden';
+                    btn.style.opacity = '0';
+                    btn.style.position = 'absolute';
+                    btn.style.left = '-9999px';
+                    btn.style.width = '0';
+                    btn.style.height = '0';
+                    btn.style.padding = '0';
+                    btn.style.margin = '0';
+                    btn.style.border = 'none';
+                    // Hide parent container
+                    const parent = btn.closest('div[data-testid*="stButton"]');
+                    if (parent) {
+                        parent.style.display = 'none';
+                        parent.style.visibility = 'hidden';
+                        parent.style.height = '0';
+                        parent.style.padding = '0';
+                        parent.style.margin = '0';
+                    }
+                });
+            }, 100);
+        </script>
         """, unsafe_allow_html=True)
         
-        if st.button("Execute", key="hidden_execute_btn_tab", help="Hidden button for keyboard shortcut"):
+        if button_clicked_tab:
             st.session_state.keyboard_execute = True
             st.rerun()
     
