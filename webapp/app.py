@@ -322,62 +322,53 @@ def inject_keyboard_shortcuts():
     st.markdown("""
     <script>
     (function() {
-        // Wait for Streamlit to be ready
-        function waitForStreamlit() {
-            if (window.Streamlit) {
-                setupKeyboardShortcuts();
-            } else {
-                setTimeout(waitForStreamlit, 100);
-            }
-        }
+        let shortcutsAttached = new Set();
         
-        function setupKeyboardShortcuts() {
-            // Find the SQL editor textarea
-            const textareas = document.querySelectorAll('textarea[data-testid*="stTextArea"]');
-            let sqlEditor = null;
+        function attachShortcutsToTextarea(textarea) {
+            // Skip if already attached
+            if (shortcutsAttached.has(textarea)) return;
             
-            // Find the textarea that contains the SQL editor (usually the first one)
-            for (let textarea of textareas) {
-                const label = textarea.closest('.stTextArea')?.querySelector('label');
-                if (label && (label.textContent.includes('SQL') || label.textContent.includes('Query'))) {
-                    sqlEditor = textarea;
-                    break;
-                }
-            }
+            // Mark as attached
+            shortcutsAttached.add(textarea);
             
-            // Fallback: use the first textarea if we can't find the SQL editor
-            if (!sqlEditor && textareas.length > 0) {
-                sqlEditor = textareas[0];
-            }
-            
-            if (!sqlEditor) return;
-            
-            // Add keyboard event listener
-            sqlEditor.addEventListener('keydown', function(e) {
+            // Add keyboard event listener with capture phase
+            textarea.addEventListener('keydown', function(e) {
                 // Helper: Check if Ctrl (Windows/Linux) or Cmd (Mac) is pressed
                 const isModifierPressed = e.ctrlKey || e.metaKey;
                 
                 // Ctrl+Enter or Cmd+Enter: Execute query
-                if (isModifierPressed && e.key === 'Enter') {
+                if (isModifierPressed && (e.key === 'Enter' || e.keyCode === 13)) {
                     e.preventDefault();
-                    // Find and click the Run button
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const runButton = buttons.find(btn => {
-                        const text = btn.textContent || btn.innerText || '';
-                        return text.includes('Run') || text.includes('▶') || text.includes('▶️');
-                    });
-                    if (runButton && !runButton.disabled) {
-                        runButton.click();
-                    }
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    // Small delay to ensure Streamlit has processed the input
+                    setTimeout(function() {
+                        // Find and click the Run button
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const runButton = buttons.find(btn => {
+                            const text = (btn.textContent || btn.innerText || '').trim();
+                            return text.includes('Run') || text.includes('▶') || text.includes('▶️') || 
+                                   (text.length > 0 && btn.getAttribute('data-testid')?.includes('baseButton'));
+                        });
+                        if (runButton && !runButton.disabled) {
+                            // Use both click methods for better compatibility
+                            runButton.click();
+                            if (runButton.dispatchEvent) {
+                                runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                            }
+                        }
+                    }, 50);
                     return false;
                 }
                 
                 // Ctrl+/ or Cmd+/: Toggle comment
                 if (isModifierPressed && e.key === '/') {
                     e.preventDefault();
-                    const start = sqlEditor.selectionStart;
-                    const end = sqlEditor.selectionEnd;
-                    const text = sqlEditor.value;
+                    e.stopPropagation();
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
                     const lines = text.split('\\n');
                     
                     // Find which lines are selected
@@ -438,51 +429,138 @@ def inject_keyboard_shortcuts():
                     }
                     
                     const newText = lines.join('\\n');
-                    sqlEditor.value = newText;
+                    textarea.value = newText;
                     
                     // Restore selection
-                    sqlEditor.setSelectionRange(start, end);
+                    textarea.setSelectionRange(start, end);
                     
                     // Trigger input event to update Streamlit
-                    sqlEditor.dispatchEvent(new Event('input', { bubbles: true }));
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
                     return false;
                 }
                 
                 // Ctrl+S or Cmd+S: Save to history
-                if (isModifierPressed && e.key === 's') {
+                if (isModifierPressed && (e.key === 's' || e.keyCode === 83)) {
                     e.preventDefault();
+                    e.stopPropagation();
                     // Find and click the Save button
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const saveButton = buttons.find(btn => {
-                        const text = btn.textContent || btn.innerText || '';
-                        return text.includes('Save') || text.includes('💾');
-                    });
-                    if (saveButton && !saveButton.disabled) {
-                        saveButton.click();
-                    }
+                    setTimeout(function() {
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const saveButton = buttons.find(btn => {
+                            const text = (btn.textContent || btn.innerText || '').trim();
+                            return text.includes('Save') || text.includes('💾');
+                        });
+                        if (saveButton && !saveButton.disabled) {
+                            saveButton.click();
+                        }
+                    }, 50);
                     return false;
                 }
                 
                 // Ctrl+L or Cmd+L: Clear editor
-                if (isModifierPressed && e.key === 'l') {
+                if (isModifierPressed && (e.key === 'l' || e.keyCode === 76)) {
                     e.preventDefault();
-                    sqlEditor.value = '';
-                    sqlEditor.dispatchEvent(new Event('input', { bubbles: true }));
+                    e.stopPropagation();
+                    textarea.value = '';
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
                     return false;
                 }
+            }, true); // Use capture phase for better event handling
+        }
+        
+        function setupKeyboardShortcuts() {
+            // Find all textareas
+            const textareas = document.querySelectorAll('textarea');
+            
+            // Try to find SQL editor textarea
+            let sqlEditor = null;
+            for (let textarea of textareas) {
+                // Check if it's the SQL editor by looking at the label
+                const container = textarea.closest('[data-testid*="stTextArea"]') || 
+                                 textarea.closest('.stTextArea') ||
+                                 textarea.parentElement;
+                if (container) {
+                    const label = container.querySelector('label');
+                    if (label && (label.textContent.includes('SQL') || label.textContent.includes('Query') || 
+                        label.textContent.includes('Enter SQL'))) {
+                        sqlEditor = textarea;
+                        break;
+                    }
+                }
+            }
+            
+            // Fallback: use the first textarea if we can't find the SQL editor
+            if (!sqlEditor && textareas.length > 0) {
+                sqlEditor = textareas[0];
+            }
+            
+            // Attach shortcuts to found textarea
+            if (sqlEditor) {
+                attachShortcutsToTextarea(sqlEditor);
+            }
+        }
+        
+        // Use MutationObserver to watch for dynamically added textareas
+        const observer = new MutationObserver(function(mutations) {
+            setupKeyboardShortcuts();
+        });
+        
+        // Start observing
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
             });
         }
         
         // Initialize when page loads
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', waitForStreamlit);
-        } else {
-            waitForStreamlit();
+        function init() {
+            setupKeyboardShortcuts();
+            // Also try multiple times to catch dynamically loaded content
+            setTimeout(setupKeyboardShortcuts, 100);
+            setTimeout(setupKeyboardShortcuts, 500);
+            setTimeout(setupKeyboardShortcuts, 1000);
+            setTimeout(setupKeyboardShortcuts, 2000);
         }
         
-        // Also try after a short delay to catch dynamically loaded content
-        setTimeout(waitForStreamlit, 500);
-        setTimeout(waitForStreamlit, 1000);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        
+        // Also listen for Streamlit events
+        if (window.parent) {
+            window.parent.addEventListener('load', init);
+        }
+        
+        // Document-level event listener as fallback (catches events even if textarea not found)
+        document.addEventListener('keydown', function(e) {
+            // Only handle if focus is on a textarea
+            if (e.target && e.target.tagName === 'TEXTAREA') {
+                const isModifierPressed = e.ctrlKey || e.metaKey;
+                
+                // Cmd+Enter or Ctrl+Enter: Execute query
+                if (isModifierPressed && (e.key === 'Enter' || e.keyCode === 13)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    setTimeout(function() {
+                        const buttons = Array.from(document.querySelectorAll('button'));
+                        const runButton = buttons.find(btn => {
+                            const text = (btn.textContent || btn.innerText || '').trim();
+                            return text.includes('Run') || text.includes('▶') || text.includes('▶️');
+                        });
+                        if (runButton && !runButton.disabled) {
+                            runButton.click();
+                            runButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                        }
+                    }, 50);
+                    return false;
+                }
+            }
+        }, true); // Use capture phase
     })();
     </script>
     """, unsafe_allow_html=True)
