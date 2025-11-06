@@ -90,14 +90,149 @@ if 'show_db_info' not in st.session_state:
     st.session_state.show_db_info = False  # Minimize by default
 if 'show_chatbot' not in st.session_state:
     st.session_state.show_chatbot = True  # Show chatbot by default
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False  # Light mode by default
+
+
+def inject_dark_mode_css():
+    """Inject dark mode CSS"""
+    if st.session_state.dark_mode:
+        st.markdown("""
+        <style>
+            /* Dark mode styles */
+            .stApp {
+                background-color: #0E1117;
+                color: #FAFAFA;
+            }
+            
+            /* Sidebar dark mode */
+            [data-testid="stSidebar"] {
+                background-color: #1E1E1E;
+            }
+            
+            /* Text colors */
+            h1, h2, h3, h4, h5, h6, p, label, span {
+                color: #FAFAFA !important;
+            }
+            
+            /* Input fields */
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea,
+            .stSelectbox > div > div > select {
+                background-color: #262730;
+                color: #FAFAFA;
+                border-color: #3E3E3E;
+            }
+            
+            /* Buttons */
+            .stButton > button {
+                background-color: #262730;
+                color: #FAFAFA;
+                border-color: #3E3E3E;
+            }
+            
+            .stButton > button:hover {
+                background-color: #3E3E3E;
+                border-color: #4E4E4E;
+            }
+            
+            /* Dataframes */
+            .dataframe {
+                background-color: #1E1E1E;
+                color: #FAFAFA;
+            }
+            
+            .dataframe th {
+                background-color: #262730;
+                color: #FAFAFA;
+            }
+            
+            .dataframe td {
+                background-color: #1E1E1E;
+                color: #FAFAFA;
+            }
+            
+            /* Code blocks */
+            .stCodeBlock {
+                background-color: #1E1E1E;
+            }
+            
+            /* Expanders */
+            .streamlit-expanderHeader {
+                background-color: #262730;
+                color: #FAFAFA;
+            }
+            
+            /* Info boxes */
+            .stInfo {
+                background-color: #1E3A5F;
+                color: #FAFAFA;
+            }
+            
+            .stSuccess {
+                background-color: #1E5F3A;
+                color: #FAFAFA;
+            }
+            
+            .stWarning {
+                background-color: #5F3A1E;
+                color: #FAFAFA;
+            }
+            
+            .stError {
+                background-color: #5F1E1E;
+                color: #FAFAFA;
+            }
+            
+            /* Chat messages */
+            [data-testid="stChatMessage"] {
+                background-color: #262730;
+            }
+            
+            /* Selectbox dropdown */
+            .stSelectbox > div > div > select {
+                background-color: #262730;
+                color: #FAFAFA;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Light mode - minimal override to ensure clean light theme
+        st.markdown("""
+        <style>
+            /* Light mode - use Streamlit defaults */
+            .stApp {
+                background-color: #FFFFFF;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
 
 def main():
     """Main application"""
     
+    # Inject dark mode CSS (must be called early)
+    inject_dark_mode_css()
+    
     # Sidebar
     with st.sidebar:
         st.title("🤖 AI Database Tool")
+        
+        # Dark mode toggle
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Theme:**")
+        with col2:
+            dark_mode_toggle = st.toggle(
+                "🌙",
+                value=st.session_state.dark_mode,
+                key="dark_mode_toggle",
+                help="Toggle dark mode"
+            )
+            if dark_mode_toggle != st.session_state.dark_mode:
+                st.session_state.dark_mode = dark_mode_toggle
+                st.rerun()
+        
         st.markdown("---")
         
         # Layout toggle
