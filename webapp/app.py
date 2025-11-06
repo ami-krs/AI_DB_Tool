@@ -354,8 +354,11 @@ def inject_keyboard_shortcuts():
             
             // Add keyboard event listener
             sqlEditor.addEventListener('keydown', function(e) {
-                // Ctrl+Enter: Execute query
-                if (e.ctrlKey && e.key === 'Enter') {
+                // Helper: Check if Ctrl (Windows/Linux) or Cmd (Mac) is pressed
+                const isModifierPressed = e.ctrlKey || e.metaKey;
+                
+                // Ctrl+Enter or Cmd+Enter: Execute query
+                if (isModifierPressed && e.key === 'Enter') {
                     e.preventDefault();
                     // Find and click the Run button
                     const buttons = Array.from(document.querySelectorAll('button'));
@@ -369,8 +372,8 @@ def inject_keyboard_shortcuts():
                     return false;
                 }
                 
-                // Ctrl+/: Toggle comment
-                if (e.ctrlKey && e.key === '/') {
+                // Ctrl+/ or Cmd+/: Toggle comment
+                if (isModifierPressed && e.key === '/') {
                     e.preventDefault();
                     const start = sqlEditor.selectionStart;
                     const end = sqlEditor.selectionEnd;
@@ -445,8 +448,8 @@ def inject_keyboard_shortcuts():
                     return false;
                 }
                 
-                // Ctrl+S: Save to history
-                if (e.ctrlKey && e.key === 's') {
+                // Ctrl+S or Cmd+S: Save to history
+                if (isModifierPressed && e.key === 's') {
                     e.preventDefault();
                     // Find and click the Save button
                     const buttons = Array.from(document.querySelectorAll('button'));
@@ -460,8 +463,8 @@ def inject_keyboard_shortcuts():
                     return false;
                 }
                 
-                // Ctrl+L: Clear editor
-                if (e.ctrlKey && e.key === 'l') {
+                // Ctrl+L or Cmd+L: Clear editor
+                if (isModifierPressed && e.key === 'l') {
                     e.preventDefault();
                     sqlEditor.value = '';
                     sqlEditor.dispatchEvent(new Event('input', { bubbles: true }));
@@ -732,10 +735,10 @@ def sql_editor_compact():
     # Keyboard shortcuts help
     with st.expander("⌨️ Keyboard Shortcuts", expanded=False):
         st.markdown("""
-        - **Ctrl+Enter**: Execute query
-        - **Ctrl+/**: Toggle comment on selected lines
-        - **Ctrl+S**: Save query to history
-        - **Ctrl+L**: Clear editor
+        - **Ctrl+Enter** (or **Cmd+Enter** on Mac): Execute query
+        - **Ctrl+/** (or **Cmd+/** on Mac): Toggle comment on selected lines
+        - **Ctrl+S** (or **Cmd+S** on Mac): Save query to history
+        - **Ctrl+L** (or **Cmd+L** on Mac): Clear editor
         """)
     
     # Quick insert buttons for tables
@@ -882,10 +885,10 @@ def sql_editor_tab():
     # Keyboard shortcuts help
     with st.expander("⌨️ Keyboard Shortcuts", expanded=False):
         st.markdown("""
-        - **Ctrl+Enter**: Execute query
-        - **Ctrl+/**: Toggle comment on selected lines
-        - **Ctrl+S**: Save query to history
-        - **Ctrl+L**: Clear editor
+        - **Ctrl+Enter** (or **Cmd+Enter** on Mac): Execute query
+        - **Ctrl+/** (or **Cmd+/** on Mac): Toggle comment on selected lines
+        - **Ctrl+S** (or **Cmd+S** on Mac): Save query to history
+        - **Ctrl+L** (or **Cmd+L** on Mac): Clear editor
         """)
     
     # Quick insert buttons for tables
