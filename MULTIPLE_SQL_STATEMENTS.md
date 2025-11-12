@@ -230,3 +230,4 @@ SELECT * FROM test_table;
 
 **Enjoy executing multiple SQL statements at once!** 📝
 
+

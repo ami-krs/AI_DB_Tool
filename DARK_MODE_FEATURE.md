@@ -115,3 +115,4 @@ Dark mode toggle has been successfully added to the AI Database Tool!
 
 **Enjoy your new dark mode!** 🌙
 
+

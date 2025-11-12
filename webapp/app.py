@@ -26,10 +26,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_db_tool.connectors import DatabaseManager, DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 
-# Try to import Monaco Editor component
+# Try to import CodeMirror editor component
 try:
-    from components.monaco_editor import monaco_editor
-    MONACO_AVAILABLE = True
+    from components.codemirror_editor import codemirror_editor
+    CODEMIRROR_AVAILABLE = True
 except ImportError:
     try:
         # Try alternative import path
@@ -38,10 +38,27 @@ except ImportError:
         components_path = os.path.join(os.path.dirname(__file__), 'components')
         if components_path not in sys.path:
             sys.path.insert(0, components_path)
-        from monaco_editor import monaco_editor
-        MONACO_AVAILABLE = True
+        from codemirror_editor import codemirror_editor
+        CODEMIRROR_AVAILABLE = True
     except ImportError:
-        MONACO_AVAILABLE = False
+        CODEMIRROR_AVAILABLE = False
+        codemirror_editor = None
+
+# Try to import Monaco editor component
+try:
+    from components.monaco_editor import monaco_editor
+    MONACO_EDITOR_AVAILABLE = True
+except ImportError:
+    try:
+        import sys
+        import os
+        components_path = os.path.join(os.path.dirname(__file__), 'components')
+        if components_path not in sys.path:
+            sys.path.insert(0, components_path)
+        from monaco_editor import monaco_editor
+        MONACO_EDITOR_AVAILABLE = True
+    except ImportError:
+        MONACO_EDITOR_AVAILABLE = False
         monaco_editor = None
 
 
@@ -121,8 +138,11 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 1
 if 'rows_per_page' not in st.session_state:
     st.session_state.rows_per_page = 100
-if 'use_monaco_editor' not in st.session_state:
-    st.session_state.use_monaco_editor = False  # Default to regular text area
+if 'editor_mode' not in st.session_state:
+    legacy_flag = st.session_state.get('use_codemirror_editor', False)
+    st.session_state.editor_mode = 'codemirror' if legacy_flag else 'textarea'
+if 'use_codemirror_editor' not in st.session_state:
+    st.session_state.use_codemirror_editor = st.session_state.editor_mode != 'textarea'
 if 'api_server_url' not in st.session_state:
     st.session_state.api_server_url = "http://localhost:8000"  # Default API URL
 
@@ -749,30 +769,51 @@ def main():
     with st.sidebar:
         st.title("🤖 AI Database Tool")
         
-        # Monaco Editor toggle
-        if MONACO_AVAILABLE:
-            st.markdown("---")
-            st.markdown("**⚡ Smart Editor:**")
-            use_monaco = st.toggle(
-                "Use Monaco Editor (AI Autocomplete)",
-                value=st.session_state.use_monaco_editor,
-                help="Enable Monaco Editor with AI-powered autocomplete and syntax highlighting"
+        # Smart Editor selection
+        st.markdown("---")
+        st.markdown("**⚡ Smart Editor:**")
+
+        editor_options = [("textarea", "Streamlit Text Area (Default)")]
+        if CODEMIRROR_AVAILABLE:
+            editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
+        if MONACO_EDITOR_AVAILABLE:
+            editor_options.append(("monaco", "Monaco (VS Code Experience)"))
+
+        valid_modes = [value for value, _ in editor_options]
+        if st.session_state.editor_mode not in valid_modes:
+            st.session_state.editor_mode = "textarea"
+
+        current_index = valid_modes.index(st.session_state.editor_mode)
+        option_labels = [label for _, label in editor_options]
+
+        selected_label = st.selectbox(
+            "SQL Editor Mode",
+            option_labels,
+            index=current_index,
+            key="editor_mode_select",
+            help="Choose which SQL editor to use in the workspace."
+        )
+
+        selected_mode = next(value for value, label in editor_options if label == selected_label)
+        if selected_mode != st.session_state.editor_mode:
+            st.session_state.editor_mode = selected_mode
+            st.session_state.use_codemirror_editor = selected_mode != "textarea"
+            st.rerun()
+
+        if st.session_state.editor_mode in ("codemirror", "monaco"):
+            api_url = st.text_input(
+                "API Server URL",
+                value=st.session_state.api_server_url,
+                autocomplete="url",
+                help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
             )
-            if use_monaco != st.session_state.use_monaco_editor:
-                st.session_state.use_monaco_editor = use_monaco
+            if api_url != st.session_state.api_server_url:
+                st.session_state.api_server_url = api_url
                 st.rerun()
-            
-            if st.session_state.use_monaco_editor:
-                api_url = st.text_input(
-                    "API Server URL",
-                    value=st.session_state.api_server_url,
-                    help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
-                )
-                if api_url != st.session_state.api_server_url:
-                    st.session_state.api_server_url = api_url
-                    st.rerun()
-                
-                st.info("💡 Start the API server: `python webapp/api_server.py`")
+
+            st.info("💡 Start the API server: `python webapp/api_server.py`")
+        elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
+            st.info("Install the optional smart editor components to enable AI autocomplete.")
         
         # Dark mode toggle
         col1, col2 = st.columns([3, 1])
@@ -1003,7 +1044,7 @@ def chatbot_compact():
 
 def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * FROM table_name LIMIT 10;"):
     """
-    Render SQL editor (Monaco or regular text area)
+    Render SQL editor (Monaco, CodeMirror, or regular text area)
     
     Parameters:
     -----------
@@ -1025,23 +1066,50 @@ def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * 
     # Get schema info if connected
     schema_info = None
     tables = None
+    table_columns: Dict[str, List[str]] = {}
     if st.session_state.connected and st.session_state.db_manager:
         try:
             tables = st.session_state.db_manager.get_tables()
             if tables:
-                # Get schema for first table as example
-                schema_info = st.session_state.db_manager.get_table_schema(tables[0])
-        except:
+                for table_name in tables[:20]:
+                    try:
+                        schema = st.session_state.db_manager.get_table_schema(table_name)
+                        columns = [col['name'] for col in schema.get('columns', [])]
+                        if columns:
+                            table_columns[table_name] = columns
+                    except Exception:
+                        continue
+                if tables:
+                    schema_info = st.session_state.db_manager.get_table_schema(tables[0])
+        except Exception:
             pass
-    
-    # Use Monaco Editor if enabled and available
-    if st.session_state.use_monaco_editor and MONACO_AVAILABLE and monaco_editor:
+
+    if not table_columns and tables:
+        table_columns = {table: [] for table in tables[:10]}
+
+    sql_hint_config = {
+        "language": "sql",
+        "theme": "darcula",
+        "autoCloseBrackets": True,
+        "lineNumbers": True,
+        "sql": {
+            "tables": table_columns
+            or {
+                "employees": ["id", "name", "salary"],
+                "departments": ["dept_id", "dept_name"],
+            }
+        },
+    }
+
+    editor_mode = st.session_state.get('editor_mode', 'textarea')
+    st.session_state.use_codemirror_editor = editor_mode != 'textarea'
+
+    # Use Monaco Editor if selected and available
+    if editor_mode == 'monaco' and MONACO_EDITOR_AVAILABLE and monaco_editor:
         try:
-            # Get theme based on dark mode
             theme = "vs-dark" if st.session_state.dark_mode else "vs"
-            
-            # Render Monaco Editor
-            monaco_value = monaco_editor(
+
+            editor_value = monaco_editor(
                 value=current_query,
                 height=height,
                 language="sql",
@@ -1050,18 +1118,44 @@ def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * 
                 database_type=st.session_state.db_type,
                 schema_info=schema_info,
                 tables=tables,
+                config=sql_hint_config,
                 key=f"monaco_{key}"
             )
-            
-            # Update session state if value changed
-            # Note: Monaco Editor updates via JavaScript, so we need to handle this differently
-            # For now, we'll use the current_query and let Monaco handle its own state
-            return current_query
+
+            if editor_value != current_query:
+                st.session_state.sql_editor = editor_value
+            return editor_value
         except Exception as e:
-            st.warning(f"Monaco Editor error: {e}. Falling back to regular editor.")
-            # Fall back to regular text area
-            pass
-    
+            st.warning(f"Monaco editor error: {e}. Falling back to regular editor.")
+            st.session_state.editor_mode = 'textarea'
+            st.session_state.use_codemirror_editor = False
+
+    # Use CodeMirror Editor if selected and available
+    if editor_mode == 'codemirror' and CODEMIRROR_AVAILABLE and codemirror_editor:
+        try:
+            theme = "vs-dark" if st.session_state.dark_mode else "vs"
+
+            editor_value = codemirror_editor(
+                value=current_query,
+                height=height,
+                language="sql",
+                theme=theme,
+                api_url=st.session_state.api_server_url,
+                database_type=st.session_state.db_type,
+                schema_info=schema_info,
+                tables=tables,
+                config=sql_hint_config,
+                key=f"codemirror_{key}"
+            )
+
+            if editor_value != current_query:
+                st.session_state.sql_editor = editor_value
+            return editor_value
+        except Exception as e:
+            st.warning(f"CodeMirror editor error: {e}. Falling back to regular editor.")
+            st.session_state.editor_mode = 'textarea'
+            st.session_state.use_codemirror_editor = False
+
     # Regular text area (fallback or default)
     query = st.text_area(
         "Enter SQL Query",

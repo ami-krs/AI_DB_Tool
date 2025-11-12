@@ -193,3 +193,4 @@ SELECT * FROM small_table LIMIT 10;
 
 **Enjoy efficient browsing of large query results!** 📄
 
+

@@ -74,3 +74,4 @@ st.dataframe(df, hide_index=True)
 
 **Note:** Index column hidden ✅ | Column width is a Streamlit limitation, not a bug.
 
+

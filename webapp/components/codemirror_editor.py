@@ -1,25 +1,24 @@
-"""
-Monaco Editor component wrapper.
-"""
+"""CodeMirror editor Streamlit component wrapper."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
+import os
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import streamlit.components.v1 as components
 
-_COMPONENT_DIR = Path(__file__).resolve().parent / "monaco_editor_component/build"
+_COMPONENT_DIR = os.path.join(
+    os.path.dirname(__file__), "codemirror_editor_component", "build"
+)
 
-_monaco_component = components.declare_component(
-    "monaco_editor",
-    path=str(_COMPONENT_DIR),
+_codemirror_component = components.declare_component(
+    "codemirror_editor",
+    path=_COMPONENT_DIR,
 )
 
 
-def monaco_editor(
+def codemirror_editor(
     value: str = "",
     height: int = 300,
     language: str = "sql",
@@ -31,11 +30,11 @@ def monaco_editor(
     config: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
 ) -> str:
-    """Render the Monaco editor with AI autocomplete."""
+    """Render the CodeMirror editor with AI autocomplete."""
 
-    component_key = key or f"monaco_{uuid4().hex}"
+    component_key = key or f"codemirror_{uuid4().hex}"
 
-    component_value = _monaco_component(
+    component_value = _codemirror_component(
         value=value,
         height=height,
         language=language,
@@ -44,11 +43,10 @@ def monaco_editor(
         databaseType=database_type or "",
         schemaInfo=schema_info or {},
         tables=tables or [],
-        componentId=component_key,
         config=config or {},
-        default=value,
+        componentId=component_key,
         key=component_key,
+        default=value,
     )
 
     return component_value if component_value is not None else value
-
