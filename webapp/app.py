@@ -169,13 +169,14 @@ def display_paginated_dataframe(df):
     # Display pagination info (using markdown to avoid column nesting issues)
     st.markdown(f"**Total Rows:** {total_rows:,} | **Page:** {st.session_state.current_page} of {total_pages} | **Showing:** {start_idx + 1:,} - {end_idx:,}")
     
-    # Rows per page selector
+    # Rows per page selector - use unique key based on dataframe ID
+    rows_per_page_key = f"rows_per_page_select_{id(df)}"
     rows_per_page_options = [50, 100, 250, 500, 1000]
     new_rows_per_page = st.selectbox(
         "Rows per page:",
         options=rows_per_page_options,
         index=rows_per_page_options.index(st.session_state.rows_per_page) if st.session_state.rows_per_page in rows_per_page_options else 1,
-        key="rows_per_page_select"
+        key=rows_per_page_key
     )
     if new_rows_per_page != st.session_state.rows_per_page:
         st.session_state.rows_per_page = new_rows_per_page
@@ -1486,14 +1487,96 @@ def split_sql_statements(query: str) -> List[str]:
             parsed = sqlparse.split(query)
             # Filter out empty statements and strip whitespace
             statements = [stmt.strip() for stmt in parsed if stmt.strip()]
+            # Remove trailing semicolons that sqlparse might leave
+            statements = [stmt.rstrip(';').strip() for stmt in statements if stmt.rstrip(';').strip()]
             return statements
-        except Exception:
-            # Fallback to simple split if sqlparse fails
+        except Exception as e:
+            # Fallback to improved split if sqlparse fails
             pass
     
-    # Fallback: simple split by semicolon (handles most cases)
-    # Note: This may not handle semicolons inside strings/comments perfectly
-    statements = [stmt.strip() for stmt in query.split(';') if stmt.strip()]
+    # Improved fallback: handle semicolons in quotes and comments
+    statements = []
+    current = []
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+    i = 0
+    
+    while i < len(query):
+        char = query[i]
+        next_char = query[i + 1] if i + 1 < len(query) else ''
+        
+        # Handle block comments
+        if char == '/' and next_char == '*' and not in_single_quote and not in_double_quote:
+            in_block_comment = True
+            current.append(char)
+            current.append(next_char)
+            i += 2
+            continue
+        
+        if in_block_comment:
+            current.append(char)
+            if char == '*' and next_char == '/':
+                in_block_comment = False
+                current.append(next_char)
+                i += 2
+                continue
+            i += 1
+            continue
+        
+        # Handle line comments
+        if char == '-' and next_char == '-' and not in_single_quote and not in_double_quote:
+            in_line_comment = True
+            current.append(char)
+            current.append(next_char)
+            i += 2
+            # Continue until newline
+            while i < len(query) and query[i] != '\n':
+                current.append(query[i])
+                i += 1
+            if i < len(query):
+                current.append(query[i])  # Add the newline
+                in_line_comment = False
+            i += 1
+            continue
+        
+        if in_line_comment:
+            current.append(char)
+            i += 1
+            continue
+        
+        # Handle quotes
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+            current.append(char)
+            i += 1
+            continue
+        
+        if char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            current.append(char)
+            i += 1
+            continue
+        
+        # Handle semicolon (statement separator)
+        if char == ';' and not in_single_quote and not in_double_quote and not in_line_comment and not in_block_comment:
+            stmt = ''.join(current).strip()
+            if stmt:
+                statements.append(stmt)
+            current = []
+            i += 1
+            continue
+        
+        current.append(char)
+        i += 1
+    
+    # Add remaining statement (if any)
+    if current:
+        stmt = ''.join(current).strip()
+        if stmt:
+            statements.append(stmt)
+    
     return statements
 
 
@@ -1570,11 +1653,21 @@ def execute_query(query: str):
         return
     
     # Split into multiple statements
-    statements = split_sql_statements(query)
+    try:
+        statements = split_sql_statements(query)
+    except Exception as e:
+        st.error(f"❌ Failed to parse SQL statements: {e}")
+        st.info("💡 Tip: Make sure your SQL statements are properly formatted and separated by semicolons (;)")
+        return
     
     if not statements:
-        st.warning("No valid SQL statements found")
+        st.warning("No valid SQL statements found. Please check your SQL syntax.")
+        st.info("💡 Tip: SQL statements should be separated by semicolons (;)")
         return
+    
+    # Show info for multiple statements
+    if len(statements) > 1:
+        st.info(f"📋 Detected {len(statements)} SQL statements. They will be executed sequentially.")
     
     # If single statement, use original behavior for backward compatibility
     if len(statements) == 1:
@@ -1584,6 +1677,7 @@ def execute_query(query: str):
         if not result['success']:
             st.error(f"❌ Query execution failed: {result['error']}")
             st.code(single_statement, language='sql')
+            st.info("💡 Tip: Check your SQL syntax, table/column names, and ensure you're connected to the database.")
             return
         
         # Handle single statement results (original behavior)
@@ -1652,6 +1746,7 @@ def execute_query(query: str):
             else:
                 error_count += 1
                 st.error(f"❌ Statement {idx} failed: {result['error']}")
+                st.info("💡 This statement failed, but other statements will continue executing.")
     
     # Summary
     st.markdown("---")
