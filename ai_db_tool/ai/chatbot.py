@@ -15,6 +15,17 @@ try:
 except ImportError:
     Anthropic = None
 
+# Helper to get API key from Streamlit secrets or environment variables
+def _get_api_key_from_secrets(key_name: str) -> Optional[str]:
+    """Get API key from Streamlit secrets (for Streamlit Cloud) or environment variables"""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key_name in st.secrets:
+            return st.secrets[key_name]
+    except Exception:
+        pass
+    return os.getenv(key_name)
+
 
 @dataclass
 class ChatMessage:
@@ -89,7 +100,7 @@ class SQLChatbot:
             model: Model to use
             provider: AI provider ("openai" or "anthropic")
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+        self.api_key = api_key or _get_api_key_from_secrets("OPENAI_API_KEY") or _get_api_key_from_secrets("ANTHROPIC_API_KEY")
         self.model = model
         self.provider = provider
         

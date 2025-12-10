@@ -26,6 +26,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_db_tool.connectors import DatabaseManager, DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 
+# Helper function to get API key from Streamlit secrets or environment variables
+def get_api_key(key_name: str) -> Optional[str]:
+    """
+    Get API key from Streamlit secrets (for Streamlit Cloud) or environment variables (for local)
+    
+    Args:
+        key_name: Name of the API key (e.g., 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')
+        
+    Returns:
+        API key string or None if not found
+    """
+    try:
+        # Try Streamlit secrets first (for Streamlit Cloud)
+        if hasattr(st, 'secrets') and key_name in st.secrets:
+            return st.secrets[key_name]
+    except Exception:
+        pass
+    
+    # Fallback to environment variables (for local development)
+    return os.getenv(key_name)
+
 # Try to import CodeMirror editor component
 try:
     from components.codemirror_editor import codemirror_editor
@@ -885,14 +906,22 @@ def main():
                 
                 # Initialize AI components (gracefully handle missing API keys)
                 try:
-                    st.session_state.chatbot = SQLChatbot()
-                    st.session_state.query_builder = AIQueryBuilder()
+                    # Get API key from Streamlit secrets or environment variables
+                    openai_key = get_api_key("OPENAI_API_KEY")
+                    anthropic_key = get_api_key("ANTHROPIC_API_KEY")
+                    api_key = openai_key or anthropic_key
+                    
+                    # Determine provider based on which key is available
+                    provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+                    
+                    st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                    st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
                     
                     # Set schema context for chatbot if API key is available
                     if st.session_state.chatbot and hasattr(st.session_state.chatbot, 'api_key_available') and st.session_state.chatbot.api_key_available:
                         st.session_state.chatbot.set_schema_context(schema_info)
                     else:
-                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI chatbot and query generation.")
+                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
                 except Exception as e:
                     # If AI initialization fails, still allow database operations
                     st.session_state.chatbot = None
