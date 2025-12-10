@@ -59,14 +59,26 @@ class AIQueryBuilder:
         self.model = model
         self.provider = provider
         
-        if provider.lower() == "openai":
-            self.client = OpenAI(api_key=self.api_key)
-        elif provider.lower() == "anthropic":
-            if Anthropic is None:
-                raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-            self.client = Anthropic(api_key=self.api_key)
+        # Check if API key is available
+        if not self.api_key:
+            self.client = None
+            self.api_key_available = False
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            self.api_key_available = True
+            try:
+                if provider.lower() == "openai":
+                    self.client = OpenAI(api_key=self.api_key)
+                elif provider.lower() == "anthropic":
+                    if Anthropic is None:
+                        raise ImportError("anthropic package not installed. Install with: pip install anthropic")
+                    self.client = Anthropic(api_key=self.api_key)
+                else:
+                    raise ValueError(f"Unsupported provider: {provider}")
+            except Exception as e:
+                self.client = None
+                self.api_key_available = False
+                import warnings
+                warnings.warn(f"Failed to initialize AI client: {e}")
     
     def generate_query(
         self,
@@ -85,6 +97,10 @@ class AIQueryBuilder:
         Returns:
             Generated SQL query string
         """
+        # Check if AI client is available
+        if not self.client or not self.api_key_available:
+            return "-- AI Query Generation requires an API key. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable."
+        
         # Build context with schema information
         context = f"Database Type: {db_type}\n\n"
         
@@ -182,6 +198,10 @@ class AIQueryBuilder:
         Returns:
             Optimized SQL query
         """
+        # Check if AI client is available
+        if not self.client or not self.api_key_available:
+            return "-- AI Query Optimization requires an API key. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable."
+        
         context = f"Query to optimize:\n```sql\n{sql_query}\n```\n"
         
         if execution_plan:
@@ -236,6 +256,10 @@ class AIQueryBuilder:
         Returns:
             Fixed SQL query or debugging suggestions
         """
+        # Check if AI client is available
+        if not self.client or not self.api_key_available:
+            return "AI Query Debugging requires an API key. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable."
+        
         context = ""
         if schema_context:
             context = f"\n{schema_context}\n"

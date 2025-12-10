@@ -125,7 +125,7 @@ if 'chat_history' not in st.session_state:
 if 'fixed_query' not in st.session_state:
     st.session_state.fixed_query = None
 if 'layout_mode' not in st.session_state:
-    st.session_state.layout_mode = 'three_column'  # or 'tabs'
+    st.session_state.layout_mode = 'tabs'  # Default: Tabs (Classic) layout
 if 'last_quick_select' not in st.session_state:
     st.session_state.last_quick_select = "-- Select --"
 if 'show_db_info' not in st.session_state:
@@ -837,11 +837,11 @@ def main():
         st.header("📐 Layout")
         layout_mode = st.radio(
             "Choose layout:",
-            ["Three Column (Default)", "Tabs (Classic)"],
-            index=0 if st.session_state.layout_mode == 'three_column' else 1,
+            ["Tabs (Classic)", "Three Column"],
+            index=0 if st.session_state.layout_mode == 'tabs' else 1,
             key="layout_radio"
         )
-        st.session_state.layout_mode = 'three_column' if layout_mode == "Three Column (Default)" else 'tabs'
+        st.session_state.layout_mode = 'tabs' if layout_mode == "Tabs (Classic)" else 'three_column'
         st.markdown("---")
         
         # Connection section
@@ -878,17 +878,26 @@ def main():
                 # Store database type
                 st.session_state.db_type = config.db_type
                 
-                # Initialize AI components
-                st.session_state.chatbot = SQLChatbot()
-                st.session_state.query_builder = AIQueryBuilder()
-                
-                # Set schema context for chatbot with db_type awareness
+                # Get schema info first (needed for both AI and non-AI features)
                 schema_info = st.session_state.db_manager.get_database_info()
                 schema_info['db_type'] = config.db_type
-                st.session_state.chatbot.set_schema_context(schema_info)
-                
-                # Store schema for later use
                 st.session_state.schema_info = schema_info
+                
+                # Initialize AI components (gracefully handle missing API keys)
+                try:
+                    st.session_state.chatbot = SQLChatbot()
+                    st.session_state.query_builder = AIQueryBuilder()
+                    
+                    # Set schema context for chatbot if API key is available
+                    if st.session_state.chatbot and hasattr(st.session_state.chatbot, 'api_key_available') and st.session_state.chatbot.api_key_available:
+                        st.session_state.chatbot.set_schema_context(schema_info)
+                    else:
+                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI chatbot and query generation.")
+                except Exception as e:
+                    # If AI initialization fails, still allow database operations
+                    st.session_state.chatbot = None
+                    st.session_state.query_builder = None
+                    st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
             else:
                 st.error("❌ Connection failed!")
                 st.session_state.connected = False
@@ -1017,7 +1026,10 @@ def chatbot_compact():
                 if 'sql_query' in msg and msg['sql_query']:
                     st.code(msg['sql_query'], language='sql')
     else:
-        st.info("Ask questions about your database")
+        if not st.session_state.chatbot:
+            st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
+        else:
+            st.info("Ask questions about your database")
     
     # Chat input
     user_input = st.chat_input("Ask about your database...")
@@ -1279,6 +1291,12 @@ def chatbot_tab():
     """AI Chatbot interface"""
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
+    
+    # Check if chatbot is available
+    if not st.session_state.chatbot:
+        st.warning("⚠️ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
+        st.info("💡 You can still use the SQL Editor to write and execute queries manually.")
+        return
     
     # Display chat history
     for msg in st.session_state.chat_history:

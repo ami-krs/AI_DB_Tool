@@ -93,14 +93,26 @@ class SQLChatbot:
         self.model = model
         self.provider = provider
         
-        if provider.lower() == "openai":
-            self.client = OpenAI(api_key=self.api_key)
-        elif provider.lower() == "anthropic":
-            if Anthropic is None:
-                raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-            self.client = Anthropic(api_key=self.api_key)
+        # Check if API key is available
+        if not self.api_key:
+            self.client = None
+            self.api_key_available = False
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            self.api_key_available = True
+            try:
+                if provider.lower() == "openai":
+                    self.client = OpenAI(api_key=self.api_key)
+                elif provider.lower() == "anthropic":
+                    if Anthropic is None:
+                        raise ImportError("anthropic package not installed. Install with: pip install anthropic")
+                    self.client = Anthropic(api_key=self.api_key)
+                else:
+                    raise ValueError(f"Unsupported provider: {provider}")
+            except Exception as e:
+                self.client = None
+                self.api_key_available = False
+                import warnings
+                warnings.warn(f"Failed to initialize AI client: {e}")
         
         self.conversation_history: List[ChatMessage] = []
         self.schema_context: Optional[Dict[str, Any]] = None
@@ -124,6 +136,14 @@ class SQLChatbot:
         Returns:
             Dictionary with assistant response and optional SQL query
         """
+        # Check if AI client is available
+        if not self.client or not self.api_key_available:
+            return {
+                'error': 'AI features are not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.',
+                'response': 'AI chatbot requires an API key to function. Please configure your API key in the environment variables.',
+                'timestamp': datetime.now().isoformat()
+            }
+        
         # Add user message to history
         self.conversation_history.append(
             ChatMessage("user", user_message, datetime.now())
