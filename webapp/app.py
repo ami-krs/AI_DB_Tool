@@ -37,15 +37,27 @@ def get_api_key(key_name: str) -> Optional[str]:
     Returns:
         API key string or None if not found
     """
+    # Try Streamlit secrets first (for Streamlit Cloud)
     try:
-        # Try Streamlit secrets first (for Streamlit Cloud)
-        if hasattr(st, 'secrets') and key_name in st.secrets:
-            return st.secrets[key_name]
+        if hasattr(st, 'secrets'):
+            # Try to access the key - it will raise KeyError if not found
+            try:
+                value = st.secrets[key_name]
+                if value and str(value).strip():  # Make sure it's not empty
+                    return str(value).strip()
+            except (KeyError, AttributeError, TypeError):
+                # Key not found in secrets, continue to environment variables
+                pass
     except Exception:
+        # If anything goes wrong with secrets access, fall through to env vars
         pass
     
     # Fallback to environment variables (for local development)
-    return os.getenv(key_name)
+    env_value = os.getenv(key_name)
+    if env_value and str(env_value).strip():
+        return str(env_value).strip()
+    
+    return None
 
 # Try to import CodeMirror editor component
 try:
@@ -911,17 +923,28 @@ def main():
                     anthropic_key = get_api_key("ANTHROPIC_API_KEY")
                     api_key = openai_key or anthropic_key
                     
-                    # Determine provider based on which key is available
-                    provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
-                    
-                    st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
-                    st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
-                    
-                    # Set schema context for chatbot if API key is available
-                    if st.session_state.chatbot and hasattr(st.session_state.chatbot, 'api_key_available') and st.session_state.chatbot.api_key_available:
-                        st.session_state.chatbot.set_schema_context(schema_info)
-                    else:
+                    # Only show message if no API key is found at all
+                    if not api_key:
                         st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
+                        st.session_state.chatbot = None
+                        st.session_state.query_builder = None
+                    else:
+                        # Determine provider based on which key is available
+                        provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+                        
+                        st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                        st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                        
+                        # Set schema context for chatbot if client is properly initialized
+                        if (st.session_state.chatbot and 
+                            hasattr(st.session_state.chatbot, 'client') and
+                            st.session_state.chatbot.client is not None):
+                            st.session_state.chatbot.set_schema_context(schema_info)
+                        elif (st.session_state.chatbot and 
+                              hasattr(st.session_state.chatbot, 'api_key_available') and
+                              not st.session_state.chatbot.api_key_available):
+                            # API key was provided but client initialization failed
+                            st.warning("⚠️ API key found but client initialization failed. Please verify your API key is valid in Streamlit secrets.")
                 except Exception as e:
                     # If AI initialization fails, still allow database operations
                     st.session_state.chatbot = None
