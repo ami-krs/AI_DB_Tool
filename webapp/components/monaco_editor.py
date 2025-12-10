@@ -11,12 +11,29 @@ from uuid import uuid4
 
 import streamlit.components.v1 as components
 
-_COMPONENT_DIR = Path(__file__).resolve().parent / "monaco_editor_component/build"
+# Use absolute path for better compatibility with Streamlit Cloud
+_COMPONENT_DIR = Path(__file__).resolve().parent / "monaco_editor_component" / "build"
 
-_monaco_component = components.declare_component(
-    "monaco_editor",
-    path=str(_COMPONENT_DIR),
+# Check if component directory and required files exist
+_component_available = (
+    _COMPONENT_DIR.exists() and
+    (_COMPONENT_DIR / "index.html").exists() and
+    (_COMPONENT_DIR / "manifest.json").exists()
 )
+
+if not _component_available:
+    _monaco_component = None
+else:
+    try:
+        _monaco_component = components.declare_component(
+            "monaco_editor",
+            path=str(_COMPONENT_DIR),
+        )
+    except Exception as e:
+        # Log error but don't crash - app can still work with textarea
+        import warnings
+        warnings.warn(f"Failed to load Monaco component: {e}")
+        _monaco_component = None
 
 
 def monaco_editor(
@@ -32,6 +49,13 @@ def monaco_editor(
     key: Optional[str] = None,
 ) -> str:
     """Render the Monaco editor with AI autocomplete."""
+
+    if _monaco_component is None:
+        raise ImportError(
+            "Monaco editor component not found. "
+            "The component build directory may be missing. "
+            "Please ensure 'webapp/components/monaco_editor_component/build' exists."
+        )
 
     component_key = key or f"monaco_{uuid4().hex}"
 

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material.min.css"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/darcula.min.css"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/show-hint.min.css"
+      crossorigin="anonymous"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+      }
+      #root {
+        width: 100%;
+      }
+      .cm-editor-container {
+        width: 100%;
+      }
+      .CodeMirror {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        function loadScript(src) {
+          return new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.crossOrigin = 'anonymous';
+            script.onload = resolve;
+            script.onerror = function (event) {
+              reject(new Error('Failed to load script ' + src));
+            };
+            document.head.appendChild(script);
+          });
+        }
+
+        (function initStreamlitBridge() {
+          if (window.streamlitComponentLib && window.streamlitComponentLib.Streamlit) {
+            return;
+          }
+
+          var events = new EventTarget();
+          var registered = false;
+          var lastHeight;
+
+          function sendMessage(type, data) {
+            var payload = Object.assign({ isStreamlitMessage: true, type: type }, data || {});
+            window.parent.postMessage(payload, '*');
+          }
+
+          function injectTheme(theme) {
+            if (!theme) {
+              return;
+            }
+            var style = document.createElement('style');
+            style.innerHTML = `
+              :root {
+                --primary-color: ${theme.primaryColor};
+                --background-color: ${theme.backgroundColor};
+                --secondary-background-color: ${theme.secondaryBackgroundColor};
+                --text-color: ${theme.textColor};
+                --font: ${theme.font};
+              }
+
+              body {
+                background-color: var(--background-color);
+                color: var(--text-color);
+                font-family: var(--font);
+              }
+            `;
+            document.head.appendChild(style);
+          }
+
+          function onRenderMessage(data) {
+            var args = data.args || {};
+            var disabled = Boolean(data.disabled);
+            var theme = data.theme || null;
+            if (theme) {
+              injectTheme(theme);
+            }
+
+            var detail = { args: args, disabled: disabled, theme: theme };
+            events.dispatchEvent(new CustomEvent('streamlit:render', { detail: detail }));
+          }
+
+          function onMessage(event) {
+            if (!event || !event.data || event.data.type !== 'streamlit:render') {
+              return;
+            }
+            onRenderMessage(event.data);
+          }
+
+          var Streamlit = {
+            API_VERSION: 1,
+            RENDER_EVENT: 'streamlit:render',
+            EVENT_RENDER: 'streamlit:render',
+            events: events,
+            setComponentReady: function () {
+              if (!registered) {
+                window.addEventListener('message', onMessage);
+                registered = true;
+              }
+              sendMessage('streamlit:componentReady', { apiVersion: 1 });
+            },
+            setFrameHeight: function (height) {
+              if (height === undefined) {
+                height = document.body.scrollHeight;
+              }
+              if (height === lastHeight) {
+                return;
+              }
+              lastHeight = height;
+              sendMessage('streamlit:setFrameHeight', { height: height });
+            },
+            setComponentValue: function (value) {
+              sendMessage('streamlit:setComponentValue', { value: value, dataType: 'json' });
+            }
+          };
+
+          var globalLib = window.streamlitComponentLib || {};
+          globalLib.Streamlit = Streamlit;
+          window.streamlitComponentLib = globalLib;
+        })();
+
+        function debounce(fn, delay) {
+          var timer;
+          return function () {
+            var context = this;
+            var args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+              fn.apply(context, args);
+            }, delay);
+          };
+        }
+
+        function initializeComponent(CodeMirror, Streamlit) {
+          var editors = {};
+          var lastEmittedValues = {};
+          var changeTimers = {};
+          var syncTimers = {};
+
+          function sendValue(componentId, value) {
+            if (lastEmittedValues[componentId] === value) {
+              return;
+            }
+            lastEmittedValues[componentId] = value;
+            Streamlit.setComponentValue(value);
+          }
+
+          function scheduleSync(componentId, value, immediate) {
+            clearTimeout(syncTimers[componentId]);
+            if (immediate) {
+              sendValue(componentId, value);
+              return;
+            }
+            syncTimers[componentId] = setTimeout(function () {
+              sendValue(componentId, value);
+            }, 200);
+          }
+
+          function scheduleValue(componentId, value, immediate) {
+            clearTimeout(changeTimers[componentId]);
+            if (immediate) {
+              scheduleSync(componentId, value, true);
+              return;
+            }
+            changeTimers[componentId] = setTimeout(function () {
+              scheduleSync(componentId, value, false);
+            }, 200);
+          }
+
+          function fetchSuggestions(cm, args) {
+            var apiUrl = args.apiUrl;
+            if (!apiUrl) {
+              return Promise.resolve([]);
+            }
+
+            var doc = cm.getDoc();
+            var cursor = doc.getCursor();
+            var cursorOffset = doc.indexFromPos(cursor);
+
+            var payload = {
+              query: doc.getValue(),
+              cursor_position: cursorOffset,
+              database_type: args.databaseType || null,
+              schema_info: args.schemaInfo || null,
+              tables: args.tables || [],
+            };
+
+            return fetch(apiUrl + '/api/autocomplete', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            })
+              .then(function (response) {
+                return response.json();
+              })
+              .then(function (data) {
+                return Array.isArray(data.suggestions) ? data.suggestions : [];
+              })
+              .catch(function (error) {
+                console.error('Autocomplete error:', error);
+                return [];
+              });
+          }
+
+          function showHints(cm, suggestions) {
+            if (!suggestions.length) {
+              return;
+            }
+
+            CodeMirror.showHint(
+              cm,
+              function () {
+                var completions = suggestions.map(function (suggestion) {
+                  var text = suggestion.insertText || suggestion.label || '';
+                  return {
+                    text: text,
+                    displayText: suggestion.label || text,
+                    render: function (elt, self, data) {
+                      var label = document.createElement('span');
+                      label.textContent = data.displayText;
+                      elt.appendChild(label);
+                      if (suggestion.documentation) {
+                        var doc = document.createElement('span');
+                        doc.style.marginLeft = '8px';
+                        doc.style.opacity = '0.6';
+                        doc.textContent = suggestion.documentation;
+                        elt.appendChild(doc);
+                      }
+                    },
+                  };
+                });
+
+                return {
+                  list: completions,
+                  from: cm.getDoc().getCursor(),
+                  to: cm.getDoc().getCursor(),
+                };
+              },
+              { completeSingle: false }
+            );
+          }
+
+          function createEditor(args) {
+            var value = typeof args.value === 'string' ? args.value : '';
+            var height = Number(args.height) || 300;
+            var editorConfig = args.config || {};
+            var baseLanguage = (editorConfig.language || 'sql').toLowerCase();
+            var mode = baseLanguage === 'sql' ? 'text/x-sql' : baseLanguage;
+            var theme = editorConfig.theme || (args.theme === 'vs-dark' ? 'material' : 'default');
+            var lineNumbers = editorConfig.lineNumbers !== undefined ? editorConfig.lineNumbers : true;
+            var autoCloseBrackets = editorConfig.autoCloseBrackets !== undefined ? editorConfig.autoCloseBrackets : true;
+            var hintTables = (editorConfig.sql && editorConfig.sql.tables) || {};
+            var componentId = args.componentId || 'codemirror-editor';
+
+            var root = document.getElementById('root');
+            var container = document.getElementById(componentId);
+            if (!container) {
+              container = document.createElement('div');
+              container.id = componentId;
+              container.className = 'cm-editor-container';
+              root.appendChild(container);
+            }
+            container.style.height = height + 'px';
+
+            var editor = editors[componentId];
+            if (!editor) {
+              editor = CodeMirror(container, {
+                value: value,
+                mode: mode,
+                theme: theme,
+                lineNumbers: lineNumbers,
+                indentUnit: 2,
+                smartIndent: true,
+                autoCloseBrackets: autoCloseBrackets,
+                extraKeys: {
+                  'Ctrl-Space': function (cm) {
+                    fetchSuggestions(cm, args).then(function (suggestions) {
+                      showHints(cm, suggestions);
+                    });
+                  },
+                  'Cmd-Space': function (cm) {
+                    fetchSuggestions(cm, args).then(function (suggestions) {
+                      showHints(cm, suggestions);
+                    });
+                  },
+                },
+              });
+
+              editor.setOption('hintOptions', { tables: hintTables });
+
+              lastEmittedValues[componentId] = value;
+
+              editor.on('change', function (cmInstance, changeObj) {
+                if (changeObj && changeObj.origin === 'setValue') {
+                  lastEmittedValues[componentId] = cmInstance.getValue();
+                  return;
+                }
+                var newValue = cmInstance.getValue();
+                scheduleValue(componentId, newValue, false);
+              });
+
+              editor.on('blur', function (cmInstance) {
+                scheduleValue(componentId, cmInstance.getValue(), true);
+              });
+
+              var debounced = debounce(function (cmInstance) {
+                fetchSuggestions(cmInstance, args).then(function (suggestions) {
+                  showHints(cmInstance, suggestions);
+                });
+              }, 700);
+
+              editor.on('keyup', function (cmInstance, event) {
+                if (cmInstance.state.completionActive) {
+                  return;
+                }
+                var ignored = [8, 9, 13, 16, 17, 18, 27, 37, 38, 39, 40];
+                if (ignored.indexOf(event.keyCode) === -1) {
+                  debounced(cmInstance);
+                }
+              });
+
+              editors[componentId] = editor;
+            } else {
+              var shouldApplyValue = value !== lastEmittedValues[componentId];
+              if (shouldApplyValue && editor.getValue() !== value) {
+                var cursor = editor.getCursor();
+                editor.setValue(value);
+                lastEmittedValues[componentId] = value;
+                if (cursor) {
+                  editor.setCursor(cursor);
+                }
+              }
+              editor.setOption('theme', theme);
+              editor.setOption('mode', mode);
+              editor.setOption('lineNumbers', lineNumbers);
+              editor.setOption('autoCloseBrackets', autoCloseBrackets);
+              editor.setOption('hintOptions', { tables: hintTables });
+            }
+
+            Streamlit.setFrameHeight(height + 40);
+          }
+
+          Streamlit.events.addEventListener(Streamlit.EVENT_RENDER, function (event) {
+            var args = (event.detail && event.detail.args) || {};
+            createEditor(args);
+          });
+
+          Streamlit.setComponentReady();
+          Streamlit.setFrameHeight(400);
+        }
+
+        async function bootstrap() {
+          try {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/sql/sql.min.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/show-hint.min.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/sql-hint.min.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js');
+
+            var CodeMirror = window.CodeMirror;
+            var Streamlit = window.streamlitComponentLib && window.streamlitComponentLib.Streamlit;
+            if (!CodeMirror || !Streamlit) {
+              throw new Error('CodeMirror or Streamlit library not loaded.');
+            }
+
+            initializeComponent(CodeMirror, Streamlit);
+          } catch (error) {
+            console.error('Failed to load CodeMirror editor component:', error);
+          }
+        }
+
+        bootstrap();
+      })();
+    </script>
+  </body>
+</html>

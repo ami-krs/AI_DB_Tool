@@ -8,14 +8,33 @@ from uuid import uuid4
 
 import streamlit.components.v1 as components
 
-_COMPONENT_DIR = os.path.join(
-    os.path.dirname(__file__), "codemirror_editor_component", "build"
+# Use absolute path for better compatibility with Streamlit Cloud
+_COMPONENT_DIR = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__), "codemirror_editor_component", "build"
+    )
 )
 
-_codemirror_component = components.declare_component(
-    "codemirror_editor",
-    path=_COMPONENT_DIR,
+# Check if component directory and required files exist
+_component_available = (
+    os.path.exists(_COMPONENT_DIR) and
+    os.path.exists(os.path.join(_COMPONENT_DIR, "index.html")) and
+    os.path.exists(os.path.join(_COMPONENT_DIR, "manifest.json"))
 )
+
+if not _component_available:
+    _codemirror_component = None
+else:
+    try:
+        _codemirror_component = components.declare_component(
+            "codemirror_editor",
+            path=_COMPONENT_DIR,
+        )
+    except Exception as e:
+        # Log error but don't crash - app can still work with textarea
+        import warnings
+        warnings.warn(f"Failed to load CodeMirror component: {e}")
+        _codemirror_component = None
 
 
 def codemirror_editor(
@@ -31,6 +50,13 @@ def codemirror_editor(
     key: Optional[str] = None,
 ) -> str:
     """Render the CodeMirror editor with AI autocomplete."""
+
+    if _codemirror_component is None:
+        raise ImportError(
+            "CodeMirror editor component not found. "
+            "The component build directory may be missing. "
+            "Please ensure 'webapp/components/codemirror_editor_component/build' exists."
+        )
 
     component_key = key or f"codemirror_{uuid4().hex}"
 

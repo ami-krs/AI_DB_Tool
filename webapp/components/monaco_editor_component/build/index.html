@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+      }
+      #root {
+        width: 100%;
+      }
+      .monaco-container {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+       window.require = {
+        paths: {
+          vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs"
+        }
+      };
+      (function () {
+        function loadScript(src) {
+          return new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.crossOrigin = 'anonymous';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+
+        (function initStreamlitBridge() {
+          if (window.streamlitComponentLib && window.streamlitComponentLib.Streamlit) {
+            return;
+          }
+
+          var events = new EventTarget();
+          var registered = false;
+          var lastHeight;
+
+          function sendMessage(type, data) {
+            var payload = Object.assign({ isStreamlitMessage: true, type: type }, data || {});
+            window.parent.postMessage(payload, '*');
+          }
+
+          function injectTheme(theme) {
+            if (!theme) {
+              return;
+            }
+            var style = document.createElement('style');
+            style.innerHTML = `
+              :root {
+                --primary-color: ${theme.primaryColor};
+                --background-color: ${theme.backgroundColor};
+                --secondary-background-color: ${theme.secondaryBackgroundColor};
+                --text-color: ${theme.textColor};
+                --font: ${theme.font};
+              }
+
+              body {
+                background-color: var(--background-color);
+                color: var(--text-color);
+                font-family: var(--font);
+              }
+            `;
+            document.head.appendChild(style);
+          }
+
+          function onRender(data) {
+            var args = data.args || {};
+            var disabled = Boolean(data.disabled);
+            var theme = data.theme || null;
+            if (theme) {
+              injectTheme(theme);
+            }
+            var detail = { args: args, disabled: disabled, theme: theme };
+            events.dispatchEvent(new CustomEvent('streamlit:render', { detail: detail }));
+          }
+
+          function onMessage(event) {
+            if (!event || !event.data || event.data.type !== 'streamlit:render') {
+              return;
+            }
+            onRender(event.data);
+          }
+
+          var Streamlit = {
+            API_VERSION: 1,
+            RENDER_EVENT: 'streamlit:render',
+            EVENT_RENDER: 'streamlit:render',
+            events: events,
+            setComponentReady: function () {
+              if (!registered) {
+                window.addEventListener('message', onMessage);
+                registered = true;
+              }
+              sendMessage('streamlit:componentReady', { apiVersion: 1 });
+            },
+            setFrameHeight: function (height) {
+              if (height === undefined) {
+                height = document.body.scrollHeight;
+              }
+              if (height === lastHeight) {
+                return;
+              }
+              lastHeight = height;
+              sendMessage('streamlit:setFrameHeight', { height: height });
+            },
+            setComponentValue: function (value) {
+              sendMessage('streamlit:setComponentValue', { value: value, dataType: 'json' });
+            }
+          };
+
+          var globalLib = window.streamlitComponentLib || {};
+          globalLib.Streamlit = Streamlit;
+          window.streamlitComponentLib = globalLib;
+        })();
+
+        function registerAutocomplete(monaco, args) {
+          if (registerAutocomplete.registered) {
+            return;
+          }
+          registerAutocomplete.registered = true;
+
+          monaco.languages.registerCompletionItemProvider('sql', {
+            triggerCharacters: ['.', ' ', '(', ',', '='],
+            provideCompletionItems: async function (model, position) {
+              var apiUrl = args.apiUrl;
+              if (!apiUrl) {
+                return { suggestions: [] };
+              }
+
+              var text = model.getValue();
+              var cursorOffset = model.getOffsetAt(position);
+
+              var payload = {
+                query: text,
+                cursor_position: cursorOffset,
+                database_type: args.databaseType || null,
+                schema_info: args.schemaInfo || null,
+                tables: args.tables || [],
+              };
+
+              try {
+                var response = await fetch(apiUrl + '/api/autocomplete', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(payload),
+                });
+
+                var data = await response.json();
+                var suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+
+                var items = suggestions.map(function (suggestion) {
+                  var label = suggestion.label || suggestion.insertText || '';
+                  var insertText = suggestion.insertText || suggestion.label || '';
+                  var documentation = suggestion.documentation || '';
+                  var detail = suggestion.detail || '';
+                  var kindKey = (suggestion.kind || 'Text').toUpperCase();
+                  var kind =
+                    monaco.languages.CompletionItemKind[kindKey] ||
+                    monaco.languages.CompletionItemKind.Text;
+
+                  return {
+                    label: label,
+                    insertText: insertText,
+                    documentation: documentation,
+                    detail: detail,
+                    kind: kind,
+                    range: {
+                      startLineNumber: position.lineNumber,
+                      startColumn: position.column,
+                      endLineNumber: position.lineNumber,
+                      endColumn: position.column,
+                    },
+                  };
+                });
+
+                return { suggestions: items };
+              } catch (error) {
+                console.error('Autocomplete error:', error);
+                return { suggestions: [] };
+              }
+            },
+          });
+        }
+
+        var lastEmittedValues = {};
+        var changeTimers = {};
+        var syncTimers = {};
+
+        function sendValue(StreamlitInstance, componentId, value) {
+          if (lastEmittedValues[componentId] === value) {
+            return;
+          }
+          lastEmittedValues[componentId] = value;
+          StreamlitInstance.setComponentValue(value);
+        }
+
+        function scheduleSync(StreamlitInstance, componentId, value, immediate) {
+          clearTimeout(syncTimers[componentId]);
+          if (immediate) {
+            sendValue(StreamlitInstance, componentId, value);
+            return;
+          }
+          syncTimers[componentId] = setTimeout(function () {
+            sendValue(StreamlitInstance, componentId, value);
+          }, 200);
+        }
+
+        function scheduleValue(StreamlitInstance, componentId, value, immediate) {
+          clearTimeout(changeTimers[componentId]);
+          if (immediate) {
+            scheduleSync(StreamlitInstance, componentId, value, true);
+            return;
+          }
+          changeTimers[componentId] = setTimeout(function () {
+            scheduleSync(StreamlitInstance, componentId, value, false);
+          }, 200);
+        }
+
+        function renderEditor(monaco, Streamlit, args) {
+          var value = typeof args.value === 'string' ? args.value : '';
+          var height = Number(args.height) || 300;
+          var theme = args.theme || 'vs';
+          var language = args.language || 'sql';
+          var componentId = args.componentId || 'monaco-editor';
+          var root = document.getElementById('root');
+          var container = document.getElementById(componentId);
+
+          if (!container) {
+            container = document.createElement('div');
+            container.id = componentId;
+            container.className = 'monaco-container';
+            root.appendChild(container);
+          }
+          container.style.height = height + 'px';
+
+          registerAutocomplete(monaco, args);
+
+          if (!renderEditor.editors) {
+            renderEditor.editors = {};
+          }
+
+          var editor = renderEditor.editors[componentId];
+          if (!editor) {
+            editor = monaco.editor.create(container, {
+              value: value,
+              language: language,
+              theme: theme,
+              automaticLayout: true,
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              wordWrap: 'on',
+              scrollBeyondLastLine: false,
+              suggestOnTriggerCharacters: true,
+              quickSuggestions: true,
+              tabCompletion: 'on',
+            });
+
+            lastEmittedValues[componentId] = value;
+
+            editor.onDidChangeModelContent(function () {
+              var newValue = editor.getValue();
+              scheduleValue(Streamlit, componentId, newValue, false);
+            });
+
+            editor.onDidBlurEditorText(function () {
+              scheduleValue(Streamlit, componentId, editor.getValue(), true);
+            });
+
+            renderEditor.editors[componentId] = editor;
+          } else {
+            var shouldApplyValue = value !== lastEmittedValues[componentId];
+            if (shouldApplyValue && editor.getValue() !== value) {
+              var position = editor.getPosition();
+              editor.setValue(value);
+              lastEmittedValues[componentId] = value;
+              if (position) {
+                editor.setPosition(position);
+              }
+            }
+            monaco.editor.setTheme(theme);
+            if (editor.getModel()) {
+              monaco.editor.setModelLanguage(editor.getModel(), language);
+            }
+          }
+
+          Streamlit.setFrameHeight(height + 24);
+        }
+
+        async function bootstrap() {
+          try {
+            await loadScript('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.nls.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.js');
+
+            var Streamlit = window.streamlitComponentLib && window.streamlitComponentLib.Streamlit;
+            var monaco = window.monaco;
+            if (!Streamlit || !monaco) {
+              throw new Error('Monaco or Streamlit library not loaded.');
+            }
+
+            Streamlit.events.addEventListener(Streamlit.EVENT_RENDER, function (event) {
+              var args = (event.detail && event.detail.args) || {};
+              renderEditor(monaco, Streamlit, args);
+            });
+
+            Streamlit.setComponentReady();
+            Streamlit.setFrameHeight(400);
+          } catch (error) {
+            console.error('Failed to load Monaco editor component:', error);
+          }
+        }
+
+        bootstrap();
+      })();
+    </script>
+  </body>
+</html>
