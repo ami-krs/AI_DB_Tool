@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from typing import Optional, Dict, Any, List
 import os
+from datetime import datetime
 
 # Try to import sqlparse, fallback to simple split if not available
 try:
@@ -1068,6 +1069,41 @@ def chatbot_compact():
     """Compact chatbot for three column layout"""
     st.markdown("### 💬 AI Assistant")
     
+    # Example questions (only show if no chat history)
+    if not st.session_state.chat_history and st.session_state.chatbot:
+        st.markdown("**💡 Quick Start:**")
+        example_questions = [
+            ("Show me all tables", "Show me the list of all tables in the database"),
+            ("Tables >10 records", "List tables that have more than 10 records"),
+            ("Table columns", "What are the column names and data types for all tables?")
+        ]
+        
+        # Use smaller buttons in a row
+        cols = st.columns(3)
+        for idx, (display_text, full_question) in enumerate(example_questions):
+            with cols[idx]:
+                if st.button(f"💬 {display_text}", key=f"compact_example_{idx}", use_container_width=True):
+                    # Process the question
+                    st.session_state.chat_history.append({'role': 'user', 'content': full_question})
+                    with st.spinner("🤔 Thinking..."):
+                        response = st.session_state.chatbot.chat(full_question, include_sql=True)
+                    
+                    if 'error' not in response:
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response['response'],
+                            'sql_query': response.get('sql_query'),
+                            'timestamp': response['timestamp']
+                        })
+                    else:
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response.get('response', response.get('error', 'Error occurred')),
+                            'timestamp': response.get('timestamp', datetime.now().isoformat())
+                        })
+                    st.rerun()
+        st.markdown("---")
+    
     # Display chat history
     if st.session_state.chat_history:
         for msg in st.session_state.chat_history[-5:]:  # Show last 5 messages
@@ -1349,6 +1385,43 @@ def chatbot_tab():
         st.warning("⚠️ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         st.info("💡 You can still use the SQL Editor to write and execute queries manually.")
         return
+    
+    # Example questions section
+    if not st.session_state.chat_history:
+        st.markdown("### 💡 Example Questions to Get Started")
+        st.markdown("Click on any question below to get started:")
+        
+        example_questions = [
+            "Show me the list of all tables in the database",
+            "List tables that have more than 10 records",
+            "What are the column names and data types for all tables?"
+        ]
+        
+        cols = st.columns(3)
+        for idx, question in enumerate(example_questions):
+            with cols[idx]:
+                if st.button(f"❓ {question}", key=f"example_{idx}", use_container_width=True):
+                    # Add the question to chat history and process it
+                    st.session_state.chat_history.append({'role': 'user', 'content': question})
+                    with st.spinner("🤔 Thinking..."):
+                        response = st.session_state.chatbot.chat(question, include_sql=True)
+                    
+                    if 'error' not in response:
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response['response'],
+                            'sql_query': response.get('sql_query'),
+                            'timestamp': response['timestamp']
+                        })
+                    else:
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response.get('response', response.get('error', 'Error occurred')),
+                            'timestamp': response.get('timestamp', datetime.now().isoformat())
+                        })
+                    st.rerun()
+        
+        st.markdown("---")
     
     # Display chat history
     for msg in st.session_state.chat_history:
