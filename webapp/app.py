@@ -1318,21 +1318,6 @@ def render_navigation_bar():
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
-    # Create buttons for navigation (hidden, will be triggered by JavaScript)
-    button_clicked = None
-    if st.button("nav_chatbot", key="hidden_nav_chatbot", help="", use_container_width=False):
-        st.session_state.active_section = 'chatbot'
-        st.rerun()
-    if st.button("nav_sql_editor", key="hidden_nav_sql_editor", help="", use_container_width=False):
-        st.session_state.active_section = 'sql_editor'
-        st.rerun()
-    if st.button("nav_data_explorer", key="hidden_nav_data_explorer", help="", use_container_width=False):
-        st.session_state.active_section = 'data_explorer'
-        st.rerun()
-    if st.button("nav_visualizations", key="hidden_nav_visualizations", help="", use_container_width=False):
-        st.session_state.active_section = 'visualizations'
-        st.rerun()
-    
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
     <style>
@@ -1398,15 +1383,6 @@ def render_navigation_bar():
         color: #0d7377;
         font-weight: 600;
     }}
-    /* Hide the navigation buttons */
-    button[data-testid*="hidden_nav"] {{
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        width: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }}
     </style>
     <div class="nav-wrapper">
         <div class="nav-dropdown">
@@ -1428,38 +1404,10 @@ def render_navigation_bar():
     </div>
     <script>
     function navigateToSection(section) {{
-        // Store section in sessionStorage
-        sessionStorage.setItem('nav_section', section);
-        
-        // Try to find and click the corresponding hidden button
-        const buttonMap = {{
-            'chatbot': 'hidden_nav_chatbot',
-            'sql_editor': 'hidden_nav_sql_editor',
-            'data_explorer': 'hidden_nav_data_explorer',
-            'visualizations': 'hidden_nav_visualizations'
-        }};
-        
-        const buttonKey = buttonMap[section];
-        if (!buttonKey) return;
-        
-        // Find button by data-testid
-        let buttons = document.querySelectorAll('button');
-        for (let btn of buttons) {{
-            const testId = btn.getAttribute('data-testid') || '';
-            if (testId.includes(buttonKey)) {{
-                // Trigger click
-                btn.dispatchEvent(new MouseEvent('click', {{
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                }}));
-                btn.click();
-                return;
-            }}
-        }}
-        
-        // Fallback: reload page with query param
-        window.location.href = '?section=' + section;
+        // Use query parameters for navigation (most reliable method)
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('section', section);
+        window.location.href = currentUrl.toString();
     }}
     </script>
     """, unsafe_allow_html=True)
