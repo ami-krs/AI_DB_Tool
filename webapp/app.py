@@ -424,6 +424,8 @@ if 'show_chatbot' not in st.session_state:
     st.session_state.show_chatbot = True  # Show chatbot by default
 if 'show_connection' not in st.session_state:
     st.session_state.show_connection = True  # Show connection section by default
+if 'active_section' not in st.session_state:
+    st.session_state.active_section = 'chatbot'  # Default to AI Chatbot
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False  # Light mode by default
 if 'current_page' not in st.session_state:
@@ -1274,15 +1276,159 @@ def main():
         if st.session_state.layout_mode == 'three_column':
             three_column_layout()
         else:
-            # Classic layout - all sections in one unified view
-            # All sections displayed vertically in a single tab
-            chatbot_tab()
-            st.markdown("---")
-            sql_editor_tab()
-            st.markdown("---")
-            data_explorer_tab()
-            st.markdown("---")
-            visualizations_tab()
+            # Classic layout with dropdown navigation
+            render_navigation_bar()
+            
+            # Render active section based on selection
+            if st.session_state.active_section == 'chatbot':
+                chatbot_tab()
+            elif st.session_state.active_section == 'sql_editor':
+                sql_editor_tab()
+            elif st.session_state.active_section == 'data_explorer':
+                data_explorer_tab()
+            elif st.session_state.active_section == 'visualizations':
+                visualizations_tab()
+
+
+def render_navigation_bar():
+    """Render dropdown navigation bar with hover menu at the top"""
+    
+    # Get current section label
+    section_labels = {
+        'chatbot': '💬 AI SQL Assistant',
+        'sql_editor': '📝 Smart SQL Editor',
+        'data_explorer': '🔍 Data Explorer',
+        'visualizations': '📊 Data Visualizations'
+    }
+    
+    current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
+    
+    # Create hidden buttons for navigation
+    col1, col2, col3, col4 = st.columns(4)
+    nav_buttons = {}
+    with col1:
+        if st.button("💬", key="nav_btn_chatbot", use_container_width=True, help="AI SQL Assistant"):
+            st.session_state.active_section = 'chatbot'
+            st.rerun()
+    with col2:
+        if st.button("📝", key="nav_btn_sql", use_container_width=True, help="Smart SQL Editor"):
+            st.session_state.active_section = 'sql_editor'
+            st.rerun()
+    with col3:
+        if st.button("🔍", key="nav_btn_explorer", use_container_width=True, help="Data Explorer"):
+            st.session_state.active_section = 'data_explorer'
+            st.rerun()
+    with col4:
+        if st.button("📊", key="nav_btn_viz", use_container_width=True, help="Data Visualizations"):
+            st.session_state.active_section = 'visualizations'
+            st.rerun()
+    
+    # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
+    st.markdown(f"""
+    <style>
+    .nav-wrapper {{
+        margin-bottom: 1.5rem;
+        position: relative;
+    }}
+    .nav-dropdown {{
+        position: relative;
+        display: inline-block;
+    }}
+    .nav-main-btn {{
+        background-color: #0d7377;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }}
+    .nav-main-btn:hover {{
+        background-color: #14a085;
+    }}
+    .nav-dropdown-menu {{
+        display: none;
+        position: absolute;
+        background-color: white;
+        min-width: 240px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1000;
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+        border: 1px solid rgba(0,0,0,0.1);
+        overflow: hidden;
+        top: 100%;
+        left: 0;
+    }}
+    .nav-dropdown:hover .nav-dropdown-menu {{
+        display: block;
+    }}
+    .nav-menu-item {{
+        color: #333;
+        padding: 0.875rem 1.25rem;
+        display: block;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        text-decoration: none;
+    }}
+    .nav-menu-item:last-child {{
+        border-bottom: none;
+    }}
+    .nav-menu-item:hover {{
+        background-color: #f0f7f8;
+        color: #0d7377;
+    }}
+    .nav-menu-item.active {{
+        background-color: #e8f4f5;
+        color: #0d7377;
+        font-weight: 600;
+    }}
+    </style>
+    <div class="nav-wrapper">
+        <div class="nav-dropdown">
+            <button class="nav-main-btn">
+                <span>{current_label}</span>
+                <span style="font-size:0.8rem;">▼</span>
+            </button>
+            <div class="nav-dropdown-menu">
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" 
+                     data-section="chatbot" onclick="triggerNavigation('nav_btn_chatbot')">💬 AI SQL Assistant</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" 
+                     data-section="sql_editor" onclick="triggerNavigation('nav_btn_sql')">📝 Smart SQL Editor</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" 
+                     data-section="data_explorer" onclick="triggerNavigation('nav_btn_explorer')">🔍 Data Explorer</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" 
+                     data-section="visualizations" onclick="triggerNavigation('nav_btn_viz')">📊 Data Visualizations</div>
+            </div>
+        </div>
+    </div>
+    <script>
+    function triggerNavigation(buttonKey) {{
+        // Find the button by its key attribute
+        const buttons = document.querySelectorAll('button[data-testid]');
+        buttons.forEach(btn => {{
+            const testId = btn.getAttribute('data-testid');
+            if (testId && testId.includes(buttonKey)) {{
+                btn.click();
+                return;
+            }}
+        }});
+    }}
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Hide the icon buttons (they're just for JavaScript to trigger)
+    st.markdown("""
+    <style>
+    button[data-testid*="nav_btn"] {
+        display: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def three_column_layout():
