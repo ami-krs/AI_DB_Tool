@@ -111,6 +111,7 @@ st.markdown("""
     .main .block-container {
         padding-top: 0 !important;
         padding-bottom: 2rem !important;
+        margin-top: 0 !important;
     }
     
     /* Remove all space above title */
@@ -118,25 +119,29 @@ st.markdown("""
         margin-top: 0 !important;
         padding-top: 0 !important;
         margin-bottom: 0.5rem !important;
+        line-height: 1.2 !important;
     }
     
     /* Minimize Streamlit header to absolute minimum */
     header[data-testid="stHeader"] {
+        display: none !important;
         height: 0 !important;
         min-height: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
-        visibility: collapse !important;
+        visibility: hidden !important;
         overflow: hidden !important;
+        position: absolute !important;
     }
     
     /* Remove padding in the app header area */
     .stApp > header {
+        display: none !important;
         height: 0 !important;
         min-height: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
-        visibility: collapse !important;
+        visibility: hidden !important;
         overflow: hidden !important;
     }
     
@@ -147,6 +152,7 @@ st.markdown("""
     
     /* Remove any top margin from header content */
     header[data-testid="stHeader"] > div {
+        display: none !important;
         padding: 0 !important;
         margin: 0 !important;
         height: 0 !important;
@@ -161,17 +167,59 @@ st.markdown("""
     /* Remove any top spacing from the main app container */
     .stApp {
         padding-top: 0 !important;
+        margin-top: 0 !important;
     }
     
     /* Remove spacing from the main content area */
     section[data-testid="stMain"] {
         padding-top: 0 !important;
+        margin-top: 0 !important;
     }
     
     /* Target the first vertical block to remove top spacing */
     div[data-testid="stVerticalBlock"]:first-child {
         padding-top: 0 !important;
         margin-top: 0 !important;
+    }
+    
+    /* Target all vertical blocks in main area */
+    .main div[data-testid="stVerticalBlock"] {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Remove spacing from element containers */
+    .element-container {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Target the container that holds the title specifically */
+    .main .block-container > div > div[data-testid="stVerticalBlock"]:first-child > div:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Remove any gap/padding from Streamlit's layout containers */
+    .stApp > div[data-testid="stAppViewContainer"] {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Target the view container */
+    div[data-testid="stAppViewContainer"] {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Remove spacing from sidebar that might affect layout */
+    section[data-testid="stSidebar"] {
+        padding-top: 0 !important;
+    }
+    
+    /* Negative margin hack if needed - use with caution */
+    .main .block-container > div:first-child > div:first-child {
+        margin-top: -1rem !important;
     }
     
     /* Force better column display in dataframes */
@@ -273,6 +321,80 @@ st.markdown("""
         scroll-behavior: smooth !important;
     }
 </style>
+<script>
+    // Aggressively remove all top spacing
+    function removeTopSpacing() {
+        // Hide header completely
+        const header = document.querySelector('header[data-testid="stHeader"]');
+        if (header) {
+            header.style.display = 'none';
+            header.style.height = '0';
+            header.style.visibility = 'hidden';
+        }
+        
+        // Remove padding from main container
+        const blockContainer = document.querySelector('.main .block-container');
+        if (blockContainer) {
+            blockContainer.style.paddingTop = '0';
+            blockContainer.style.marginTop = '0';
+        }
+        
+        // Remove padding from main section
+        const mainSection = document.querySelector('section[data-testid="stMain"]');
+        if (mainSection) {
+            mainSection.style.paddingTop = '0';
+            mainSection.style.marginTop = '0';
+        }
+        
+        // Remove spacing from first vertical block
+        const firstVerticalBlock = document.querySelector('.main div[data-testid="stVerticalBlock"]:first-child');
+        if (firstVerticalBlock) {
+            firstVerticalBlock.style.paddingTop = '0';
+            firstVerticalBlock.style.marginTop = '0';
+        }
+        
+        // Target the title directly
+        const title = document.querySelector('.main h1');
+        if (title) {
+            title.style.marginTop = '0';
+            title.style.paddingTop = '0';
+            // Also target parent containers
+            let parent = title.parentElement;
+            for (let i = 0; i < 5 && parent; i++) {
+                if (parent.classList && parent.classList.contains('block-container')) break;
+                parent.style.paddingTop = '0';
+                parent.style.marginTop = '0';
+                parent = parent.parentElement;
+            }
+        }
+        
+        // Remove spacing from app view container
+        const appView = document.querySelector('div[data-testid="stAppViewContainer"]');
+        if (appView) {
+            appView.style.paddingTop = '0';
+            appView.style.marginTop = '0';
+        }
+    }
+    
+    // Run on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', removeTopSpacing);
+    } else {
+        removeTopSpacing();
+    }
+    
+    // Run after delays to catch dynamically loaded content
+    setTimeout(removeTopSpacing, 100);
+    setTimeout(removeTopSpacing, 500);
+    setTimeout(removeTopSpacing, 1000);
+    
+    // Also observe for changes
+    const observer = new MutationObserver(removeTopSpacing);
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+</script>
 """, unsafe_allow_html=True)
 
 # Initialize session state
