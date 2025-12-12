@@ -1017,27 +1017,45 @@ def main():
         
         db_type = st.selectbox(
             "Database Type",
-            ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"]
+            ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
+            index=4  # Default to sqlite (index 4)
         )
         
         with st.form("connection_form"):
-            host = st.text_input("Host", value="localhost")
-            port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
-            database = st.text_input("Database Name")
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
+            if db_type == "sqlite":
+                database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)")
+                host = ""
+                port = 0  # SQLite doesn't use ports
+                username = ""
+                password = ""
+            else:
+                host = st.text_input("Host", value="localhost")
+                port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
+                database = st.text_input("Database Name")
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
             
             connect_button = st.form_submit_button("Connect", type="primary")
         
         if connect_button:
-            config = DatabaseConfig(
-                db_type=db_type,
-                host=host,
-                port=int(port),
-                database=database,
-                username=username,
-                password=password,
-            )
+            if db_type == "sqlite":
+                config = DatabaseConfig(
+                    db_type=db_type,
+                    host="",
+                    port=0,
+                    database=database,  # For SQLite, database field contains the file path
+                    username="",
+                    password="",
+                )
+            else:
+                config = DatabaseConfig(
+                    db_type=db_type,
+                    host=host,
+                    port=int(port),
+                    database=database,
+                    username=username,
+                    password=password,
+                )
             
             if st.session_state.db_manager.connect(config):
                 st.success("✅ Connected successfully!")
