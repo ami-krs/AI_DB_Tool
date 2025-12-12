@@ -1322,17 +1322,17 @@ def render_navigation_bar():
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
     # Create hidden buttons that can be triggered by JavaScript
-    # These will be completely hidden using CSS
-    if st.button("", key="nav_section_chatbot"):
+    # Use non-breaking space so buttons render but are hidden
+    if st.button("\u00A0", key="nav_section_chatbot"):
         st.session_state.active_section = 'chatbot'
         st.rerun()
-    if st.button("", key="nav_section_sql_editor"):
+    if st.button("\u00A0", key="nav_section_sql_editor"):
         st.session_state.active_section = 'sql_editor'
         st.rerun()
-    if st.button("", key="nav_section_data_explorer"):
+    if st.button("\u00A0", key="nav_section_data_explorer"):
         st.session_state.active_section = 'data_explorer'
         st.rerun()
-    if st.button("", key="nav_section_visualizations"):
+    if st.button("\u00A0", key="nav_section_visualizations"):
         st.session_state.active_section = 'visualizations'
         st.rerun()
     
@@ -1350,6 +1350,14 @@ def render_navigation_bar():
         position: absolute !important;
         left: -9999px !important;
         opacity: 0 !important;
+        overflow: hidden !important;
+    }
+    /* Hide parent containers of hidden buttons */
+    div:has(button[data-testid*="nav_section_"]) {
+        display: none !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
