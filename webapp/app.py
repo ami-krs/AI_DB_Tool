@@ -1301,27 +1301,37 @@ def render_navigation_bar():
         'visualizations': '📊 Data Visualizations'
     }
     
+    # Handle navigation via query parameters (fallback method)
+    try:
+        query_params = st.query_params
+        if 'section' in query_params:
+            section = query_params['section']
+            if section in section_labels:
+                st.session_state.active_section = section
+                # Clear query param to avoid re-triggering
+                params = dict(query_params)
+                del params['section']
+                st.query_params = params
+                st.rerun()
+    except:
+        pass  # Query params might not be available in older Streamlit versions
+    
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
-    # Create hidden buttons for navigation
-    col1, col2, col3, col4 = st.columns(4)
-    nav_buttons = {}
-    with col1:
-        if st.button("💬", key="nav_btn_chatbot", use_container_width=True, help="AI SQL Assistant"):
-            st.session_state.active_section = 'chatbot'
-            st.rerun()
-    with col2:
-        if st.button("📝", key="nav_btn_sql", use_container_width=True, help="Smart SQL Editor"):
-            st.session_state.active_section = 'sql_editor'
-            st.rerun()
-    with col3:
-        if st.button("🔍", key="nav_btn_explorer", use_container_width=True, help="Data Explorer"):
-            st.session_state.active_section = 'data_explorer'
-            st.rerun()
-    with col4:
-        if st.button("📊", key="nav_btn_viz", use_container_width=True, help="Data Visualizations"):
-            st.session_state.active_section = 'visualizations'
-            st.rerun()
+    # Create buttons for navigation (hidden, will be triggered by JavaScript)
+    button_clicked = None
+    if st.button("nav_chatbot", key="hidden_nav_chatbot", help="", use_container_width=False):
+        st.session_state.active_section = 'chatbot'
+        st.rerun()
+    if st.button("nav_sql_editor", key="hidden_nav_sql_editor", help="", use_container_width=False):
+        st.session_state.active_section = 'sql_editor'
+        st.rerun()
+    if st.button("nav_data_explorer", key="hidden_nav_data_explorer", help="", use_container_width=False):
+        st.session_state.active_section = 'data_explorer'
+        st.rerun()
+    if st.button("nav_visualizations", key="hidden_nav_visualizations", help="", use_container_width=False):
+        st.session_state.active_section = 'visualizations'
+        st.rerun()
     
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
@@ -1374,6 +1384,7 @@ def render_navigation_bar():
         cursor: pointer;
         border-bottom: 1px solid rgba(0,0,0,0.05);
         text-decoration: none;
+        transition: background-color 0.2s;
     }}
     .nav-menu-item:last-child {{
         border-bottom: none;
@@ -1387,6 +1398,15 @@ def render_navigation_bar():
         color: #0d7377;
         font-weight: 600;
     }}
+    /* Hide the navigation buttons */
+    button[data-testid*="hidden_nav"] {{
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }}
     </style>
     <div class="nav-wrapper">
         <div class="nav-dropdown">
@@ -1396,38 +1416,52 @@ def render_navigation_bar():
             </button>
             <div class="nav-dropdown-menu">
                 <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" 
-                     data-section="chatbot" onclick="triggerNavigation('nav_btn_chatbot')">💬 AI SQL Assistant</div>
+                     onclick="navigateToSection('chatbot')">💬 AI SQL Assistant</div>
                 <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" 
-                     data-section="sql_editor" onclick="triggerNavigation('nav_btn_sql')">📝 Smart SQL Editor</div>
+                     onclick="navigateToSection('sql_editor')">📝 Smart SQL Editor</div>
                 <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" 
-                     data-section="data_explorer" onclick="triggerNavigation('nav_btn_explorer')">🔍 Data Explorer</div>
+                     onclick="navigateToSection('data_explorer')">🔍 Data Explorer</div>
                 <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" 
-                     data-section="visualizations" onclick="triggerNavigation('nav_btn_viz')">📊 Data Visualizations</div>
+                     onclick="navigateToSection('visualizations')">📊 Data Visualizations</div>
             </div>
         </div>
     </div>
     <script>
-    function triggerNavigation(buttonKey) {{
-        // Find the button by its key attribute
-        const buttons = document.querySelectorAll('button[data-testid]');
-        buttons.forEach(btn => {{
-            const testId = btn.getAttribute('data-testid');
-            if (testId && testId.includes(buttonKey)) {{
+    function navigateToSection(section) {{
+        // Store section in sessionStorage
+        sessionStorage.setItem('nav_section', section);
+        
+        // Try to find and click the corresponding hidden button
+        const buttonMap = {{
+            'chatbot': 'hidden_nav_chatbot',
+            'sql_editor': 'hidden_nav_sql_editor',
+            'data_explorer': 'hidden_nav_data_explorer',
+            'visualizations': 'hidden_nav_visualizations'
+        }};
+        
+        const buttonKey = buttonMap[section];
+        if (!buttonKey) return;
+        
+        // Find button by data-testid
+        let buttons = document.querySelectorAll('button');
+        for (let btn of buttons) {{
+            const testId = btn.getAttribute('data-testid') || '';
+            if (testId.includes(buttonKey)) {{
+                // Trigger click
+                btn.dispatchEvent(new MouseEvent('click', {{
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }}));
                 btn.click();
                 return;
             }}
-        }});
+        }}
+        
+        // Fallback: reload page with query param
+        window.location.href = '?section=' + section;
     }}
     </script>
-    """, unsafe_allow_html=True)
-    
-    # Hide the icon buttons (they're just for JavaScript to trigger)
-    st.markdown("""
-    <style>
-    button[data-testid*="nav_btn"] {
-        display: none !important;
-    }
-    </style>
     """, unsafe_allow_html=True)
 
 
