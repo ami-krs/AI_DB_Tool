@@ -422,6 +422,8 @@ if 'show_db_info' not in st.session_state:
     st.session_state.show_db_info = False  # Minimize by default
 if 'show_chatbot' not in st.session_state:
     st.session_state.show_chatbot = True  # Show chatbot by default
+if 'show_connection' not in st.session_state:
+    st.session_state.show_connection = True  # Show connection section by default
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False  # Light mode by default
 if 'current_page' not in st.session_state:
@@ -1134,32 +1136,49 @@ def main():
         st.session_state.layout_mode = 'tabs' if layout_mode == "Tabs (Classic)" else 'three_column'
         st.markdown("---")
         
-        # Connection section
-        st.header("🔌 Database Connection")
+        # Connection section header with toggle button
+        col_header, col_toggle = st.columns([4, 1])
+        with col_header:
+            st.header("🔌 Database Connection")
+        with col_toggle:
+            toggle_label = "🔽" if st.session_state.show_connection else "▶️"
+            if st.button(toggle_label, key="toggle_connection", help="Toggle connection section"):
+                st.session_state.show_connection = not st.session_state.show_connection
+                st.rerun()
         
-        db_type = st.selectbox(
-            "Database Type",
-            ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
-            index=4  # Default to sqlite (index 4)
-        )
+        # Connection section with conditional display
+        connect_button = False
+        db_type = None
+        database = None
+        host = None
+        port = None
+        username = None
+        password = None
         
-        with st.form("connection_form"):
-            if db_type == "sqlite":
-                database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)")
-                host = ""
-                port = 0  # SQLite doesn't use ports
-                username = ""
-                password = ""
-            else:
-                host = st.text_input("Host", value="localhost")
-                port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
-                database = st.text_input("Database Name")
-                username = st.text_input("Username")
-                password = st.text_input("Password", type="password")
+        if st.session_state.show_connection:
+            db_type = st.selectbox(
+                "Database Type",
+                ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
+                index=4  # Default to sqlite (index 4)
+            )
             
-            connect_button = st.form_submit_button("Connect", type="primary")
+            with st.form("connection_form"):
+                if db_type == "sqlite":
+                    database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)")
+                    host = ""
+                    port = 0  # SQLite doesn't use ports
+                    username = ""
+                    password = ""
+                else:
+                    host = st.text_input("Host", value="localhost")
+                    port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
+                    database = st.text_input("Database Name")
+                    username = st.text_input("Username")
+                    password = st.text_input("Password", type="password")
+                
+                connect_button = st.form_submit_button("Connect", type="primary")
         
-        if connect_button:
+        if connect_button and st.session_state.show_connection:
             if db_type == "sqlite":
                 config = DatabaseConfig(
                     db_type=db_type,
