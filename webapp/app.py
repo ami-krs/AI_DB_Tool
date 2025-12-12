@@ -161,6 +161,73 @@ st.markdown("""
     .element-container {
         width: 100% !important;
     }
+    
+    /* Scrollable chat container - targets container with chat messages */
+    #chat-history-scrollable {
+        max-height: 60vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 1rem !important;
+        margin-bottom: 1rem !important;
+        border: 1px solid rgba(250, 250, 250, 0.2) !important;
+        border-radius: 0.5rem !important;
+        background-color: rgba(0, 0, 0, 0.02) !important;
+        scroll-behavior: smooth !important;
+    }
+    
+    /* Compact chat container for sidebar */
+    #chat-history-scrollable-compact {
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+        border: 1px solid rgba(250, 250, 250, 0.2) !important;
+        border-radius: 0.5rem !important;
+        background-color: rgba(0, 0, 0, 0.02) !important;
+        scroll-behavior: smooth !important;
+    }
+    
+    /* Custom scrollbar styling */
+    #chat-history-scrollable::-webkit-scrollbar,
+    #chat-history-scrollable-compact::-webkit-scrollbar,
+    #chat-messages-scrollable-wrapper::-webkit-scrollbar,
+    #chat-messages-scrollable-wrapper-compact::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    #chat-history-scrollable::-webkit-scrollbar-track,
+    #chat-history-scrollable-compact::-webkit-scrollbar-track,
+    #chat-messages-scrollable-wrapper::-webkit-scrollbar-track,
+    #chat-messages-scrollable-wrapper-compact::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+    }
+    
+    #chat-history-scrollable::-webkit-scrollbar-thumb,
+    #chat-history-scrollable-compact::-webkit-scrollbar-thumb,
+    #chat-messages-scrollable-wrapper::-webkit-scrollbar-thumb,
+    #chat-messages-scrollable-wrapper-compact::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+    
+    #chat-history-scrollable::-webkit-scrollbar-thumb:hover,
+    #chat-history-scrollable-compact::-webkit-scrollbar-thumb:hover,
+    #chat-messages-scrollable-wrapper::-webkit-scrollbar-thumb:hover,
+    #chat-messages-scrollable-wrapper-compact::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Alternative approach: Target the vertical block container that holds chat messages */
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stChatMessage"]) {
+        max-height: 60vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 1rem !important;
+        margin-bottom: 1rem !important;
+        scroll-behavior: smooth !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1127,9 +1194,12 @@ def chatbot_compact():
                     st.rerun()
         st.markdown("---")
     
+    # Add marker before chat messages for compact layout
+    st.markdown('<div id="chat-container-start-compact"></div>', unsafe_allow_html=True)
+    
     # Display chat history
     if st.session_state.chat_history:
-        for msg in st.session_state.chat_history[-5:]:  # Show last 5 messages
+        for msg in st.session_state.chat_history[-10:]:  # Show last 10 messages (increased from 5)
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
@@ -1141,6 +1211,78 @@ def chatbot_compact():
             st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
         else:
             st.info("Ask questions about your database")
+    
+    # Add marker after chat messages and JavaScript to wrap them for compact layout
+    st.markdown("""
+    <div id="chat-container-end-compact"></div>
+    <script>
+        (function() {
+            function wrapCompactChatMessages() {
+                const startMarker = document.getElementById('chat-container-start-compact');
+                const endMarker = document.getElementById('chat-container-end-compact');
+                if (!startMarker || !endMarker) return;
+                
+                // Check if wrapper already exists
+                if (document.getElementById('chat-messages-scrollable-wrapper-compact')) return;
+                
+                // Find parent container
+                let parent = startMarker.parentElement;
+                if (!parent) return;
+                
+                // Create wrapper div
+                const wrapper = document.createElement('div');
+                wrapper.id = 'chat-messages-scrollable-wrapper-compact';
+                wrapper.style.cssText = `
+                    max-height: 50vh;
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    padding: 0.5rem;
+                    margin-bottom: 0.5rem;
+                    border: 1px solid rgba(250, 250, 250, 0.2);
+                    border-radius: 0.5rem;
+                    background-color: rgba(0, 0, 0, 0.02);
+                    scroll-behavior: smooth;
+                `;
+                
+                // Collect all nodes between markers
+                let node = startMarker.nextSibling;
+                const nodesToMove = [];
+                while (node && node !== endMarker) {
+                    nodesToMove.push(node);
+                    node = node.nextSibling;
+                }
+                
+                // Move nodes into wrapper
+                nodesToMove.forEach(n => wrapper.appendChild(n));
+                
+                // Insert wrapper after start marker
+                startMarker.parentNode.insertBefore(wrapper, startMarker.nextSibling);
+                
+                // Auto-scroll to bottom
+                wrapper.scrollTop = wrapper.scrollHeight;
+            }
+            
+            // Run immediately and after delays
+            wrapCompactChatMessages();
+            setTimeout(wrapCompactChatMessages, 100);
+            setTimeout(wrapCompactChatMessages, 500);
+            
+            // Also observe for changes
+            const observer = new MutationObserver(function() {
+                wrapCompactChatMessages();
+                const wrapper = document.getElementById('chat-messages-scrollable-wrapper-compact');
+                if (wrapper) {
+                    wrapper.scrollTop = wrapper.scrollHeight;
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        })();
+    </script>
+    """, unsafe_allow_html=True)
     
     # Chat input
     user_input = st.chat_input("Ask about your database...")
@@ -1446,19 +1588,97 @@ def chatbot_tab():
         
         st.markdown("---")
     
-    # Display chat history
-    for msg in st.session_state.chat_history:
-        if msg['role'] == 'user':
-            st.chat_message("user").write(msg['content'])
-        else:
-            st.chat_message("assistant").write(msg['content'])
-            if 'sql_query' in msg and msg['sql_query']:
-                with st.expander("View Generated SQL"):
-                    st.code(msg['sql_query'], language='sql')
-                    if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
-                        execute_generated_query(msg['sql_query'])
+    # Add marker before chat messages
+    st.markdown('<div id="chat-container-start"></div>', unsafe_allow_html=True)
     
-    # Chat input
+    # Display chat history
+    if st.session_state.chat_history:
+        for msg in st.session_state.chat_history:
+            if msg['role'] == 'user':
+                st.chat_message("user").write(msg['content'])
+            else:
+                st.chat_message("assistant").write(msg['content'])
+                if 'sql_query' in msg and msg['sql_query']:
+                    with st.expander("View Generated SQL"):
+                        st.code(msg['sql_query'], language='sql')
+                        if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
+                            execute_generated_query(msg['sql_query'])
+    else:
+        st.info("💬 Start chatting by typing a message below!")
+    
+    # Add marker after chat messages and JavaScript to wrap them
+    st.markdown("""
+    <div id="chat-container-end"></div>
+    <script>
+        (function() {
+            function wrapChatMessages() {
+                const startMarker = document.getElementById('chat-container-start');
+                const endMarker = document.getElementById('chat-container-end');
+                if (!startMarker || !endMarker) return;
+                
+                // Check if wrapper already exists
+                if (document.getElementById('chat-messages-scrollable-wrapper')) return;
+                
+                // Find parent container
+                let parent = startMarker.parentElement;
+                if (!parent) return;
+                
+                // Create wrapper div
+                const wrapper = document.createElement('div');
+                wrapper.id = 'chat-messages-scrollable-wrapper';
+                wrapper.style.cssText = `
+                    max-height: 60vh;
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    padding: 1rem;
+                    margin-bottom: 1rem;
+                    border: 1px solid rgba(250, 250, 250, 0.2);
+                    border-radius: 0.5rem;
+                    background-color: rgba(0, 0, 0, 0.02);
+                    scroll-behavior: smooth;
+                `;
+                
+                // Collect all nodes between markers
+                let node = startMarker.nextSibling;
+                const nodesToMove = [];
+                while (node && node !== endMarker) {
+                    nodesToMove.push(node);
+                    node = node.nextSibling;
+                }
+                
+                // Move nodes into wrapper
+                nodesToMove.forEach(n => wrapper.appendChild(n));
+                
+                // Insert wrapper after start marker
+                startMarker.parentNode.insertBefore(wrapper, startMarker.nextSibling);
+                
+                // Auto-scroll to bottom
+                wrapper.scrollTop = wrapper.scrollHeight;
+            }
+            
+            // Run immediately and after delays
+            wrapChatMessages();
+            setTimeout(wrapChatMessages, 100);
+            setTimeout(wrapChatMessages, 500);
+            
+            // Also observe for changes
+            const observer = new MutationObserver(function() {
+                wrapChatMessages();
+                const wrapper = document.getElementById('chat-messages-scrollable-wrapper');
+                if (wrapper) {
+                    wrapper.scrollTop = wrapper.scrollHeight;
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        })();
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Chat input (outside scrollable container, stays at bottom)
     user_input = st.chat_input("Ask me anything about your database...")
     
     if user_input and st.session_state.chatbot:
