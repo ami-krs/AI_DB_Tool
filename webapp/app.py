@@ -107,27 +107,71 @@ st.set_page_config(
 # Custom CSS for better table display
 st.markdown("""
 <style>
-    /* Reduce top padding/margin for the main container */
+    /* Completely remove top padding/margin for the main container */
     .main .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0 !important;
         padding-bottom: 2rem !important;
     }
     
-    /* Reduce space above title */
+    /* Remove all space above title */
     h1 {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Minimize Streamlit header to absolute minimum */
+    header[data-testid="stHeader"] {
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        visibility: collapse !important;
+        overflow: hidden !important;
+    }
+    
+    /* Remove padding in the app header area */
+    .stApp > header {
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        visibility: collapse !important;
+        overflow: hidden !important;
+    }
+    
+    /* Hide Streamlit menu button if present */
+    button[kind="header"] {
+        display: none !important;
+    }
+    
+    /* Remove any top margin from header content */
+    header[data-testid="stHeader"] > div {
+        padding: 0 !important;
+        margin: 0 !important;
+        height: 0 !important;
+    }
+    
+    /* Remove top margin from first element in main content */
+    .main .block-container > div:first-child {
         margin-top: 0 !important;
         padding-top: 0 !important;
     }
     
-    /* Reduce default Streamlit header height if visible */
-    header[data-testid="stHeader"] {
-        height: 3rem !important;
+    /* Remove any top spacing from the main app container */
+    .stApp {
+        padding-top: 0 !important;
     }
     
-    /* Reduce padding in the app header area */
-    .stApp > header {
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
+    /* Remove spacing from the main content area */
+    section[data-testid="stMain"] {
+        padding-top: 0 !important;
+    }
+    
+    /* Target the first vertical block to remove top spacing */
+    div[data-testid="stVerticalBlock"]:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
     }
     
     /* Force better column display in dataframes */
