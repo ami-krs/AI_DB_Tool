@@ -1136,21 +1136,12 @@ def main():
         st.session_state.layout_mode = 'tabs' if layout_mode == "Tabs (Classic)" else 'three_column'
         st.markdown("---")
         
-        # Connection section header with toggle button - ALWAYS VISIBLE
-        # Use a single row with header and button side by side
-        header_col, button_col = st.columns([4, 1])
-        with header_col:
-            st.markdown("### 🔌 Database Connection")
-        with button_col:
-            # Always render the toggle button - make it clear and visible
-            if st.session_state.show_connection:
-                if st.button("🔽", key="toggle_connection", help="Click to minimize connection section", use_container_width=True):
-                    st.session_state.show_connection = False
-                    st.rerun()
-            else:
-                if st.button("▶️", key="toggle_connection", help="Click to show connection section", use_container_width=True):
-                    st.session_state.show_connection = True
-                    st.rerun()
+        # Connection section with simple button toggle - button always visible on its own line
+        # Toggle button on its own line - always visible
+        button_label = "🔽 Minimize Connection" if st.session_state.show_connection else "▶️ Show Connection"
+        if st.button(button_label, key="connection_toggle", use_container_width=True):
+            st.session_state.show_connection = not st.session_state.show_connection
+            st.rerun()
         
         # Connection section with conditional display
         connect_button = False
@@ -1162,6 +1153,7 @@ def main():
         password = None
         
         if st.session_state.show_connection:
+            st.markdown("### 🔌 Database Connection")
             db_type = st.selectbox(
                 "Database Type",
                 ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
