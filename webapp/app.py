@@ -1301,7 +1301,7 @@ def render_navigation_bar():
         'visualizations': '📊 Data Visualizations'
     }
     
-    # Handle navigation via query parameters
+    # Handle navigation via query parameters first (before rendering dropdown)
     try:
         if hasattr(st, 'query_params'):
             query_params = st.query_params
@@ -1316,51 +1316,10 @@ def render_navigation_bar():
                     st.query_params = new_params
                     st.rerun()
     except Exception as e:
-        # If query_params doesn't work, try alternative approach
+        # If query_params doesn't work, continue with default
         pass
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
-    
-    # Create hidden buttons that can be triggered by JavaScript
-    # Use non-breaking space so buttons render but are hidden
-    if st.button("\u00A0", key="nav_section_chatbot"):
-        st.session_state.active_section = 'chatbot'
-        st.rerun()
-    if st.button("\u00A0", key="nav_section_sql_editor"):
-        st.session_state.active_section = 'sql_editor'
-        st.rerun()
-    if st.button("\u00A0", key="nav_section_data_explorer"):
-        st.session_state.active_section = 'data_explorer'
-        st.rerun()
-    if st.button("\u00A0", key="nav_section_visualizations"):
-        st.session_state.active_section = 'visualizations'
-        st.rerun()
-    
-    # Add CSS to hide the navigation buttons
-    st.markdown("""
-    <style>
-    /* Hide navigation section buttons completely */
-    button[data-testid*="nav_section_"] {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        width: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        position: absolute !important;
-        left: -9999px !important;
-        opacity: 0 !important;
-        overflow: hidden !important;
-    }
-    /* Hide parent containers of hidden buttons */
-    div:has(button[data-testid*="nav_section_"]) {
-        display: none !important;
-        height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
     
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
@@ -1448,54 +1407,10 @@ def render_navigation_bar():
     </div>
     <script>
     function navigateToSection(section) {{
-        console.log('Navigating to section:', section);
-        
-        // Map section names to button keys
-        const buttonMap = {{
-            'chatbot': 'nav_section_chatbot',
-            'sql_editor': 'nav_section_sql_editor',
-            'data_explorer': 'nav_section_data_explorer',
-            'visualizations': 'nav_section_visualizations'
-        }};
-        
-        const buttonKey = buttonMap[section];
-        if (!buttonKey) {{
-            console.error('Invalid section:', section);
-            return;
-        }}
-        
-        // Try to find and click the button
-        setTimeout(function() {{
-            // Method 1: Find by data-testid with key
-            let buttons = document.querySelectorAll('button[data-testid*="' + buttonKey + '"]');
-            if (buttons.length > 0) {{
-                console.log('Found button by data-testid');
-                buttons[0].click();
-                return;
-            }}
-            
-            // Method 2: Find all buttons and check data-testid
-            buttons = document.querySelectorAll('button');
-            for (let btn of buttons) {{
-                const testId = btn.getAttribute('data-testid') || '';
-                if (testId.includes(buttonKey)) {{
-                    console.log('Found button:', testId);
-                    btn.focus();
-                    btn.click();
-                    // Also dispatch events
-                    btn.dispatchEvent(new MouseEvent('mousedown', {{bubbles: true, cancelable: true}}));
-                    btn.dispatchEvent(new MouseEvent('mouseup', {{bubbles: true, cancelable: true}}));
-                    btn.dispatchEvent(new MouseEvent('click', {{bubbles: true, cancelable: true}}));
-                    return;
-                }}
-            }}
-            
-            // Method 3: Fallback to query parameter
-            console.log('Button not found, using query param fallback');
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('section', section);
-            window.location.href = currentUrl.toString();
-        }}, 50);
+        // Use query parameters for navigation - most reliable method
+        const currentUrl = window.location.href.split('?')[0]; // Get base URL without query params
+        const newUrl = currentUrl + '?section=' + section;
+        window.location.href = newUrl;
     }}
     </script>
     """, unsafe_allow_html=True)
