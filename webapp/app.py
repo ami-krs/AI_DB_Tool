@@ -1301,22 +1301,58 @@ def render_navigation_bar():
         'visualizations': '📊 Data Visualizations'
     }
     
-    # Handle navigation via query parameters (fallback method)
+    # Handle navigation via query parameters
     try:
-        query_params = st.query_params
-        if 'section' in query_params:
-            section = query_params['section']
-            if section in section_labels:
-                st.session_state.active_section = section
-                # Clear query param to avoid re-triggering
-                params = dict(query_params)
-                del params['section']
-                st.query_params = params
-                st.rerun()
-    except:
-        pass  # Query params might not be available in older Streamlit versions
+        if hasattr(st, 'query_params'):
+            query_params = st.query_params
+            if query_params and 'section' in query_params:
+                section = query_params.get('section')
+                if section and section in section_labels:
+                    st.session_state.active_section = section
+                    # Clear query param to avoid re-triggering on rerun
+                    new_params = dict(query_params)
+                    if 'section' in new_params:
+                        del new_params['section']
+                    st.query_params = new_params
+                    st.rerun()
+    except Exception as e:
+        # If query_params doesn't work, try alternative approach
+        pass
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
+    
+    # Create hidden buttons that can be triggered by JavaScript
+    # These will be completely hidden using CSS
+    if st.button("", key="nav_section_chatbot"):
+        st.session_state.active_section = 'chatbot'
+        st.rerun()
+    if st.button("", key="nav_section_sql_editor"):
+        st.session_state.active_section = 'sql_editor'
+        st.rerun()
+    if st.button("", key="nav_section_data_explorer"):
+        st.session_state.active_section = 'data_explorer'
+        st.rerun()
+    if st.button("", key="nav_section_visualizations"):
+        st.session_state.active_section = 'visualizations'
+        st.rerun()
+    
+    # Add CSS to hide the navigation buttons
+    st.markdown("""
+    <style>
+    /* Hide navigation section buttons completely */
+    button[data-testid*="nav_section_"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
@@ -1404,10 +1440,54 @@ def render_navigation_bar():
     </div>
     <script>
     function navigateToSection(section) {{
-        // Use query parameters for navigation (most reliable method)
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('section', section);
-        window.location.href = currentUrl.toString();
+        console.log('Navigating to section:', section);
+        
+        // Map section names to button keys
+        const buttonMap = {{
+            'chatbot': 'nav_section_chatbot',
+            'sql_editor': 'nav_section_sql_editor',
+            'data_explorer': 'nav_section_data_explorer',
+            'visualizations': 'nav_section_visualizations'
+        }};
+        
+        const buttonKey = buttonMap[section];
+        if (!buttonKey) {{
+            console.error('Invalid section:', section);
+            return;
+        }}
+        
+        // Try to find and click the button
+        setTimeout(function() {{
+            // Method 1: Find by data-testid with key
+            let buttons = document.querySelectorAll('button[data-testid*="' + buttonKey + '"]');
+            if (buttons.length > 0) {{
+                console.log('Found button by data-testid');
+                buttons[0].click();
+                return;
+            }}
+            
+            // Method 2: Find all buttons and check data-testid
+            buttons = document.querySelectorAll('button');
+            for (let btn of buttons) {{
+                const testId = btn.getAttribute('data-testid') || '';
+                if (testId.includes(buttonKey)) {{
+                    console.log('Found button:', testId);
+                    btn.focus();
+                    btn.click();
+                    // Also dispatch events
+                    btn.dispatchEvent(new MouseEvent('mousedown', {{bubbles: true, cancelable: true}}));
+                    btn.dispatchEvent(new MouseEvent('mouseup', {{bubbles: true, cancelable: true}}));
+                    btn.dispatchEvent(new MouseEvent('click', {{bubbles: true, cancelable: true}}));
+                    return;
+                }}
+            }}
+            
+            // Method 3: Fallback to query parameter
+            console.log('Button not found, using query param fallback');
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('section', section);
+            window.location.href = currentUrl.toString();
+        }}, 50);
     }}
     </script>
     """, unsafe_allow_html=True)
