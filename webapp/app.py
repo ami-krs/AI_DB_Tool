@@ -107,6 +107,29 @@ st.set_page_config(
 # Custom CSS for better table display
 st.markdown("""
 <style>
+    /* Reduce top padding/margin for the main container */
+    .main .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+    }
+    
+    /* Reduce space above title */
+    h1 {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    
+    /* Reduce default Streamlit header height if visible */
+    header[data-testid="stHeader"] {
+        height: 3rem !important;
+    }
+    
+    /* Reduce padding in the app header area */
+    .stApp > header {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    
     /* Force better column display in dataframes */
     div[data-testid="stDataFrame"] {
         width: 100% !important;
