@@ -1274,25 +1274,15 @@ def main():
         if st.session_state.layout_mode == 'three_column':
             three_column_layout()
         else:
-            # Classic tabs layout
-            tab1, tab2, tab3, tab4 = st.tabs([
-                "💬 AI Chatbot",
-                "📝 SQL Editor",
-                "🔍 Data Explorer",
-                "📊 Visualizations"
-            ])
-            
-            with tab1:
-                chatbot_tab()
-            
-            with tab2:
-                sql_editor_tab()
-            
-            with tab3:
-                data_explorer_tab()
-            
-            with tab4:
-                visualizations_tab()
+            # Classic layout - all sections in one unified view
+            # All sections displayed vertically in a single tab
+            chatbot_tab()
+            st.markdown("---")
+            sql_editor_tab()
+            st.markdown("---")
+            data_explorer_tab()
+            st.markdown("---")
+            visualizations_tab()
 
 
 def three_column_layout():
