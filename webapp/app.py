@@ -1442,24 +1442,38 @@ def render_navigation_bar():
     </div>
     <script>
     (function() {{
-        // Handle menu item clicks
-        document.addEventListener('click', function(e) {{
-            const menuItem = e.target.closest('.nav-menu-item');
-            if (menuItem && menuItem.dataset.section) {{
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const section = menuItem.dataset.section;
-                const currentUrl = window.location.href.split('?')[0];
-                const newUrl = currentUrl + '?section=' + section;
-                
-                // Update URL without reload using history API, then trigger Streamlit rerun
-                window.history.pushState({{section: section}}, '', newUrl);
-                
-                // Trigger Streamlit rerun by updating the URL
-                window.location.href = newUrl;
-            }}
-        }});
+        // Wait for DOM to be ready
+        function initNavigation() {{
+            // Handle menu item clicks
+            const menuItems = document.querySelectorAll('.nav-menu-item');
+            menuItems.forEach(function(item) {{
+                item.addEventListener('click', function(e) {{
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const section = this.dataset.section;
+                    if (section) {{
+                        // Get base URL without query params
+                        const baseUrl = window.location.origin + window.location.pathname;
+                        const newUrl = baseUrl + '?section=' + section;
+                        
+                        // Navigate to new URL - Streamlit will detect query param and rerun
+                        window.location.href = newUrl;
+                    }}
+                }});
+            }});
+        }}
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', initNavigation);
+        }} else {{
+            initNavigation();
+        }}
+        
+        // Also try after a delay to catch dynamically added elements
+        setTimeout(initNavigation, 100);
+        setTimeout(initNavigation, 500);
     }})();
     </script>
     """, unsafe_allow_html=True)
