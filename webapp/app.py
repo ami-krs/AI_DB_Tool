@@ -1315,7 +1315,13 @@ def main():
         with col2:
             st.markdown("#### 🤖 AI Database Tool")
     else:
-        st.title("🤖 AI Database Tool")
+        # Header with title and navigation dropdown
+        header_col1, header_col2 = st.columns([3, 1])
+        with header_col1:
+            st.title("🤖 AI Database Tool")
+        with header_col2:
+            if st.session_state.connected:
+                render_navigation_bar()
         st.markdown("Intelligent database management with AI-powered SQL generation")
     
     if not st.session_state.connected:
@@ -1325,10 +1331,7 @@ def main():
         if st.session_state.layout_mode == 'three_column':
             three_column_layout()
         else:
-            # Classic layout with dropdown navigation
-            render_navigation_bar()
-            
-            # Render active section based on selection
+            # Classic layout - render active section based on selection
             if st.session_state.active_section == 'chatbot':
                 chatbot_tab()
             elif st.session_state.active_section == 'sql_editor':
@@ -1357,9 +1360,9 @@ def render_navigation_bar():
     st.markdown(f"""
     <style>
     .nav-wrapper {{
-        margin-bottom: 1.5rem;
         position: relative;
         display: inline-block;
+        margin-top: 0.5rem;
     }}
     .nav-dropdown {{
         position: relative;
@@ -1368,16 +1371,17 @@ def render_navigation_bar():
     .nav-main-btn {{
         background-color: #0d7377;
         color: white !important;
-        padding: 0.75rem 1.5rem;
+        padding: 0.5rem 1rem;
         border: none;
         border-radius: 0.5rem;
         cursor: pointer;
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: 600;
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.4rem;
         text-decoration: none;
+        white-space: nowrap;
     }}
     .nav-main-btn:hover {{
         background-color: #14a085;
@@ -1386,7 +1390,8 @@ def render_navigation_bar():
         display: none;
         position: absolute;
         background-color: white;
-        min-width: 240px;
+        width: max-content;
+        min-width: fit-content;
         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
         z-index: 1000;
         border-radius: 0.5rem;
@@ -1394,19 +1399,20 @@ def render_navigation_bar():
         border: 1px solid rgba(0,0,0,0.1);
         overflow: hidden;
         top: 100%;
-        left: 0;
+        right: 0;
     }}
     .nav-dropdown:hover .nav-dropdown-menu {{
         display: block;
     }}
     .nav-menu-item {{
         color: #333;
-        padding: 0.875rem 1.25rem;
+        padding: 0.75rem 1rem;
         display: block;
         cursor: pointer;
         border-bottom: 1px solid rgba(0,0,0,0.05);
         text-decoration: none;
         transition: background-color 0.2s;
+        white-space: nowrap;
     }}
     .nav-menu-item:last-child {{
         border-bottom: none;
