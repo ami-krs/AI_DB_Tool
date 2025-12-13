@@ -1467,7 +1467,7 @@ def render_navigation_bar():
             btn.style.left = '-9999px';
             btn.style.opacity = '0';
             btn.style.pointerEvents = 'none';
-        });
+        }});
         
         // Hide parent containers
         buttons.forEach(btn => {{
