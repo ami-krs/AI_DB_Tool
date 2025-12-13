@@ -1433,49 +1433,13 @@ def render_navigation_bar():
                 <span style="font-size:0.8rem;">▼</span>
             </span>
             <div class="nav-dropdown-menu">
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" data-section="chatbot">💬 AI SQL Assistant</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" data-section="sql_editor">📝 Smart SQL Editor</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" data-section="data_explorer">🔍 Data Explorer</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" data-section="visualizations">📊 Data Visualizations</div>
+                <a href="?section=chatbot" class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}">💬 AI SQL Assistant</a>
+                <a href="?section=sql_editor" class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}">📝 Smart SQL Editor</a>
+                <a href="?section=data_explorer" class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}">🔍 Data Explorer</a>
+                <a href="?section=visualizations" class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}">📊 Data Visualizations</a>
             </div>
         </div>
     </div>
-    <script>
-    (function() {{
-        // Wait for DOM to be ready
-        function initNavigation() {{
-            // Handle menu item clicks
-            const menuItems = document.querySelectorAll('.nav-menu-item');
-            menuItems.forEach(function(item) {{
-                item.addEventListener('click', function(e) {{
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const section = this.dataset.section;
-                    if (section) {{
-                        // Get base URL without query params
-                        const baseUrl = window.location.origin + window.location.pathname;
-                        const newUrl = baseUrl + '?section=' + section;
-                        
-                        // Navigate to new URL - Streamlit will detect query param and rerun
-                        window.location.href = newUrl;
-                    }}
-                }});
-            }});
-        }}
-        
-        // Initialize when DOM is ready
-        if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', initNavigation);
-        }} else {{
-            initNavigation();
-        }}
-        
-        // Also try after a delay to catch dynamically added elements
-        setTimeout(initNavigation, 100);
-        setTimeout(initNavigation, 500);
-    }})();
-    </script>
     """, unsafe_allow_html=True)
 
 
