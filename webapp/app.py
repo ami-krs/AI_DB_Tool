@@ -1352,23 +1352,70 @@ def render_navigation_bar():
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
-    # Create hidden buttons for each section (these will be triggered by JavaScript)
-    # These buttons are completely hidden but functional
-    # Use empty containers to place buttons, then hide them with CSS
-    if st.button("", key="nav_btn_chatbot"):
-        st.session_state.active_section = 'chatbot'
-        st.rerun()
-    if st.button("", key="nav_btn_sql_editor"):
-        st.session_state.active_section = 'sql_editor'
-        st.rerun()
-    if st.button("", key="nav_btn_data_explorer"):
-        st.session_state.active_section = 'data_explorer'
-        st.rerun()
-    if st.button("", key="nav_btn_visualizations"):
-        st.session_state.active_section = 'visualizations'
+    # Use Streamlit radio buttons styled as a dropdown navigation
+    # This is more reliable than JavaScript-based solutions
+    options = list(section_labels.keys())
+    labels = [section_labels[k] for k in options]
+    
+    # Get current index
+    try:
+        current_index = options.index(st.session_state.active_section)
+    except ValueError:
+        current_index = 0
+    
+    # Create styled navigation using radio buttons
+    st.markdown("""
+    <style>
+    /* Style the radio button navigation */
+    div[data-testid="stRadio"] > label {
+        display: none !important;
+    }
+    div[data-testid="stRadio"] > div {
+        background-color: #f0f2f6;
+        border-radius: 0.5rem;
+        padding: 0.25rem;
+        display: inline-flex;
+        gap: 0.25rem;
+    }
+    div[data-testid="stRadio"] > div > label {
+        background-color: transparent;
+        color: #666;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+        border: 2px solid transparent;
+    }
+    div[data-testid="stRadio"] > div > label:hover {
+        background-color: #e8eaf0;
+        color: #0d7377;
+    }
+    div[data-testid="stRadio"] > div > label[data-baseweb="radio"] {
+        background-color: #0d7377 !important;
+        color: white !important;
+        font-weight: 600 !important;
+        border-color: #0d7377 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Use selectbox styled to look like a button dropdown
+    selected_option = st.selectbox(
+        "Navigation",
+        options=labels,
+        index=current_index,
+        key="nav_selectbox",
+        label_visibility="collapsed"
+    )
+    
+    # Update active section if selection changed
+    selected_section = options[labels.index(selected_option)] if selected_option in labels else options[0]
+    if selected_section != st.session_state.active_section:
+        st.session_state.active_section = selected_section
         st.rerun()
     
-    # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
+    # Create a visual dropdown-style button that opens the selectbox
     st.markdown(f"""
     <style>
     .nav-wrapper {{
