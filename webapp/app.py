@@ -320,6 +320,29 @@ st.markdown("""
         margin-bottom: 1rem !important;
         scroll-behavior: smooth !important;
     }
+    
+    /* Hide navigation buttons completely */
+    button[data-testid*="nav_btn_"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+    }
+    /* Hide parent containers of navigation buttons */
+    div:has(> button[data-testid*="nav_btn_"]) {
+        display: none !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        visibility: hidden !important;
+    }
 </style>
 <script>
     // Aggressively remove all top spacing
@@ -1345,32 +1368,9 @@ def render_navigation_bar():
         st.session_state.active_section = 'visualizations'
         st.rerun()
     
-    # Hide the navigation buttons completely (applied after buttons are created)
-    
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
     <style>
-    /* Hide all navigation buttons completely */
-    button[data-testid*="nav_btn_"] {{
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        width: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        position: absolute !important;
-        left: -9999px !important;
-        opacity: 0 !important;
-        overflow: hidden !important;
-    }}
-    /* Hide parent containers of hidden buttons */
-    div:has(button[data-testid*="nav_btn_"]) {{
-        display: none !important;
-        height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }}
-    
     .nav-wrapper {{
         margin-bottom: 1.5rem;
         position: relative;
@@ -1453,6 +1453,44 @@ def render_navigation_bar():
         </div>
     </div>
     <script>
+    // Function to hide navigation buttons (run on load and after changes)
+    function hideNavButtons() {{
+        const buttons = document.querySelectorAll('button[data-testid*="nav_btn_"]');
+        buttons.forEach(btn => {{
+            btn.style.display = 'none';
+            btn.style.visibility = 'hidden';
+            btn.style.height = '0';
+            btn.style.width = '0';
+            btn.style.padding = '0';
+            btn.style.margin = '0';
+            btn.style.position = 'absolute';
+            btn.style.left = '-9999px';
+            btn.style.opacity = '0';
+            btn.style.pointerEvents = 'none';
+        });
+        
+        // Hide parent containers
+        buttons.forEach(btn => {{
+            let parent = btn.parentElement;
+            if (parent) {{
+                parent.style.display = 'none';
+                parent.style.height = '0';
+                parent.style.padding = '0';
+                parent.style.margin = '0';
+                parent.style.visibility = 'hidden';
+            }}
+        }});
+    }}
+    
+    // Hide buttons immediately and on changes
+    hideNavButtons();
+    setTimeout(hideNavButtons, 100);
+    setTimeout(hideNavButtons, 500);
+    
+    // Watch for new buttons
+    const observer = new MutationObserver(hideNavButtons);
+    observer.observe(document.body, {{ childList: true, subtree: true }});
+    
     function navigateToSection(section) {{
         console.log('Navigating to section:', section);
         
@@ -1470,36 +1508,48 @@ def render_navigation_bar():
             return;
         }}
         
-        // Try multiple methods to find and click the button
+        // Try to find and click the button
         setTimeout(function() {{
-            // Method 1: Try exact match on data-testid
-            let button = document.querySelector('button[data-testid*="' + buttonKey + '"]');
-            if (button) {{
-                console.log('Found button by exact match:', button.getAttribute('data-testid'));
-                button.click();
-                return;
-            }}
+            // Search all buttons (even hidden ones)
+            const allButtons = document.querySelectorAll('button');
+            let targetButton = null;
             
-            // Method 2: Search all buttons for matching key
-            const allButtons = document.querySelectorAll('button[data-testid]');
             for (let btn of allButtons) {{
                 const testId = btn.getAttribute('data-testid') || '';
                 if (testId.includes(buttonKey)) {{
-                    console.log('Found button by search:', testId);
-                    // Trigger click with events
-                    btn.focus();
-                    const clickEvent = new MouseEvent('click', {{
-                        bubbles: true,
-                        cancelable: true,
-                        view: window
-                    }});
-                    btn.dispatchEvent(clickEvent);
-                    btn.click();
-                    return;
+                    targetButton = btn;
+                    console.log('Found button:', testId);
+                    break;
                 }}
             }}
             
-            // Method 3: Fallback to query parameter (reload page)
+            if (targetButton) {{
+                // Temporarily make button visible and clickable for the click
+                const originalDisplay = targetButton.style.display;
+                const originalVisibility = targetButton.style.visibility;
+                const originalPointerEvents = targetButton.style.pointerEvents;
+                
+                targetButton.style.display = 'block';
+                targetButton.style.visibility = 'visible';
+                targetButton.style.pointerEvents = 'auto';
+                targetButton.style.position = 'fixed';
+                targetButton.style.left = '0';
+                targetButton.style.top = '0';
+                targetButton.style.opacity = '0';
+                
+                // Click the button
+                targetButton.focus();
+                targetButton.click();
+                
+                // Restore original styles immediately
+                targetButton.style.display = originalDisplay;
+                targetButton.style.visibility = originalVisibility;
+                targetButton.style.pointerEvents = originalPointerEvents;
+                
+                return;
+            }}
+            
+            // Fallback to query parameter (reload page)
             console.log('Button not found, using query param fallback for:', section);
             const currentUrl = window.location.href.split('?')[0];
             window.location.href = currentUrl + '?section=' + section;
