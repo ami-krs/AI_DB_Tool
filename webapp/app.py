@@ -1415,194 +1415,33 @@ def render_navigation_bar():
         st.session_state.active_section = selected_section
         st.rerun()
     
-    # Create a visual dropdown-style button that opens the selectbox
-    st.markdown(f"""
+    # Style selectbox to look like a dropdown button
+    st.markdown("""
     <style>
-    .nav-wrapper {{
-        margin-bottom: 1.5rem;
-        position: relative;
-    }}
-    .nav-dropdown {{
-        position: relative;
-        display: inline-block;
-    }}
-    .nav-main-btn {{
-        background-color: #0d7377;
+    /* Style selectbox to look like a navigation dropdown button */
+    div[data-testid="stSelectbox"] > div > div {
+        background-color: #0d7377 !important;
+        border-radius: 0.5rem !important;
+        padding: 0.75rem 1.5rem !important;
         color: white !important;
-        padding: 0.75rem 1.5rem;
-        border: none;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        font-size: 1rem;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-    }}
-    .nav-main-btn:hover {{
-        background-color: #14a085;
-    }}
-    .nav-dropdown-menu {{
-        display: none;
-        position: absolute;
-        background-color: white;
-        min-width: 240px;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-        z-index: 1000;
-        border-radius: 0.5rem;
-        margin-top: 0.5rem;
-        border: 1px solid rgba(0,0,0,0.1);
-        overflow: hidden;
-        top: 100%;
-        left: 0;
-    }}
-    .nav-dropdown:hover .nav-dropdown-menu {{
-        display: block;
-    }}
-    .nav-menu-item {{
-        color: #333;
-        padding: 0.875rem 1.25rem;
-        display: block;
-        cursor: pointer;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        text-decoration: none;
-        transition: background-color 0.2s;
-    }}
-    .nav-menu-item:last-child {{
-        border-bottom: none;
-    }}
-    .nav-menu-item:hover {{
-        background-color: #f0f7f8;
-        color: #0d7377;
-    }}
-    .nav-menu-item.active {{
-        background-color: #e8f4f5;
-        color: #0d7377;
-        font-weight: 600;
-    }}
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        cursor: pointer !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: background-color 0.2s !important;
+        margin-bottom: 1.5rem !important;
+    }
+    div[data-testid="stSelectbox"] > div > div:hover {
+        background-color: #14a085 !important;
+    }
+    div[data-testid="stSelectbox"] > div > div > div {
+        color: white !important;
+    }
+    div[data-testid="stSelectbox"] > div > div > div > svg {
+        fill: white !important;
+    }
     </style>
-    <div class="nav-wrapper">
-        <div class="nav-dropdown">
-            <button class="nav-main-btn">
-                <span>{current_label}</span>
-                <span style="font-size:0.8rem;">▼</span>
-            </button>
-            <div class="nav-dropdown-menu">
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" 
-                     onclick="navigateToSection('chatbot')">💬 AI SQL Assistant</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" 
-                     onclick="navigateToSection('sql_editor')">📝 Smart SQL Editor</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" 
-                     onclick="navigateToSection('data_explorer')">🔍 Data Explorer</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" 
-                     onclick="navigateToSection('visualizations')">📊 Data Visualizations</div>
-            </div>
-        </div>
-    </div>
-    <script>
-    // Function to hide navigation buttons (run on load and after changes)
-    function hideNavButtons() {{
-        const buttons = document.querySelectorAll('button[data-testid*="nav_btn_"]');
-        buttons.forEach(btn => {{
-            btn.style.display = 'none';
-            btn.style.visibility = 'hidden';
-            btn.style.height = '0';
-            btn.style.width = '0';
-            btn.style.padding = '0';
-            btn.style.margin = '0';
-            btn.style.position = 'absolute';
-            btn.style.left = '-9999px';
-            btn.style.opacity = '0';
-            btn.style.pointerEvents = 'none';
-        }});
-        
-        // Hide parent containers
-        buttons.forEach(btn => {{
-            let parent = btn.parentElement;
-            if (parent) {{
-                parent.style.display = 'none';
-                parent.style.height = '0';
-                parent.style.padding = '0';
-                parent.style.margin = '0';
-                parent.style.visibility = 'hidden';
-            }}
-        }});
-    }}
-    
-    // Hide buttons immediately and on changes
-    hideNavButtons();
-    setTimeout(hideNavButtons, 100);
-    setTimeout(hideNavButtons, 500);
-    
-    // Watch for new buttons
-    const observer = new MutationObserver(hideNavButtons);
-    observer.observe(document.body, {{ childList: true, subtree: true }});
-    
-    function navigateToSection(section) {{
-        console.log('Navigating to section:', section);
-        
-        // Map section names to button keys
-        const buttonMap = {{
-            'chatbot': 'nav_btn_chatbot',
-            'sql_editor': 'nav_btn_sql_editor',
-            'data_explorer': 'nav_btn_data_explorer',
-            'visualizations': 'nav_btn_visualizations'
-        }};
-        
-        const buttonKey = buttonMap[section];
-        if (!buttonKey) {{
-            console.error('Invalid section:', section);
-            return;
-        }}
-        
-        // Try to find and click the button
-        setTimeout(function() {{
-            // Search all buttons (even hidden ones)
-            const allButtons = document.querySelectorAll('button');
-            let targetButton = null;
-            
-            for (let btn of allButtons) {{
-                const testId = btn.getAttribute('data-testid') || '';
-                if (testId.includes(buttonKey)) {{
-                    targetButton = btn;
-                    console.log('Found button:', testId);
-                    break;
-                }}
-            }}
-            
-            if (targetButton) {{
-                // Temporarily make button visible and clickable for the click
-                const originalDisplay = targetButton.style.display;
-                const originalVisibility = targetButton.style.visibility;
-                const originalPointerEvents = targetButton.style.pointerEvents;
-                
-                targetButton.style.display = 'block';
-                targetButton.style.visibility = 'visible';
-                targetButton.style.pointerEvents = 'auto';
-                targetButton.style.position = 'fixed';
-                targetButton.style.left = '0';
-                targetButton.style.top = '0';
-                targetButton.style.opacity = '0';
-                
-                // Click the button
-                targetButton.focus();
-                targetButton.click();
-                
-                // Restore original styles immediately
-                targetButton.style.display = originalDisplay;
-                targetButton.style.visibility = originalVisibility;
-                targetButton.style.pointerEvents = originalPointerEvents;
-                
-                return;
-            }}
-            
-            // Fallback to query parameter (reload page)
-            console.log('Button not found, using query param fallback for:', section);
-            const currentUrl = window.location.href.split('?')[0];
-            window.location.href = currentUrl + '?section=' + section;
-        }}, 50);
-    }}
-    </script>
     """, unsafe_allow_html=True)
 
 
