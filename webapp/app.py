@@ -1054,6 +1054,32 @@ def inject_keyboard_shortcuts():
 def main():
     """Main application"""
     
+    # Handle navigation via query parameters at the top level (most reliable)
+    section_labels = {
+        'chatbot': '💬 AI SQL Assistant',
+        'sql_editor': '📝 Smart SQL Editor',
+        'data_explorer': '🔍 Data Explorer',
+        'visualizations': '📊 Data Visualizations'
+    }
+    
+    try:
+        if hasattr(st, 'query_params'):
+            query_params = st.query_params
+            if query_params and 'section' in query_params:
+                section = query_params.get('section')
+                # Handle both string and list formats
+                if isinstance(section, list):
+                    section = section[0] if section else None
+                if section and section in section_labels:
+                    if st.session_state.active_section != section:
+                        st.session_state.active_section = section
+                        # Clear the query param to avoid re-triggering
+                        new_params = {k: v for k, v in query_params.items() if k != 'section'}
+                        st.query_params = new_params
+                        st.rerun()
+    except Exception as e:
+        pass  # Continue if query params don't work
+    
     # Inject dark mode CSS (must be called early)
     inject_dark_mode_css()
     
@@ -1301,29 +1327,50 @@ def render_navigation_bar():
         'visualizations': '📊 Data Visualizations'
     }
     
-    # Handle navigation via query parameters first (before rendering dropdown)
-    try:
-        if hasattr(st, 'query_params'):
-            query_params = st.query_params
-            if query_params and 'section' in query_params:
-                section = query_params.get('section')
-                if section and section in section_labels:
-                    st.session_state.active_section = section
-                    # Clear query param to avoid re-triggering on rerun
-                    new_params = dict(query_params)
-                    if 'section' in new_params:
-                        del new_params['section']
-                    st.query_params = new_params
-                    st.rerun()
-    except Exception as e:
-        # If query_params doesn't work, continue with default
-        pass
-    
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
+    
+    # Create hidden buttons for each section (these will be triggered by JavaScript)
+    # These buttons are completely hidden but functional
+    # Use empty containers to place buttons, then hide them with CSS
+    if st.button("", key="nav_btn_chatbot"):
+        st.session_state.active_section = 'chatbot'
+        st.rerun()
+    if st.button("", key="nav_btn_sql_editor"):
+        st.session_state.active_section = 'sql_editor'
+        st.rerun()
+    if st.button("", key="nav_btn_data_explorer"):
+        st.session_state.active_section = 'data_explorer'
+        st.rerun()
+    if st.button("", key="nav_btn_visualizations"):
+        st.session_state.active_section = 'visualizations'
+        st.rerun()
+    
+    # Hide the navigation buttons completely (applied after buttons are created)
     
     # Create navigation bar with hover dropdown using HTML/CSS/JavaScript
     st.markdown(f"""
     <style>
+    /* Hide all navigation buttons completely */
+    button[data-testid*="nav_btn_"] {{
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+    }}
+    /* Hide parent containers of hidden buttons */
+    div:has(button[data-testid*="nav_btn_"]) {{
+        display: none !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }}
+    
     .nav-wrapper {{
         margin-bottom: 1.5rem;
         position: relative;
@@ -1407,10 +1454,56 @@ def render_navigation_bar():
     </div>
     <script>
     function navigateToSection(section) {{
-        // Use query parameters for navigation - most reliable method
-        const currentUrl = window.location.href.split('?')[0]; // Get base URL without query params
-        const newUrl = currentUrl + '?section=' + section;
-        window.location.href = newUrl;
+        console.log('Navigating to section:', section);
+        
+        // Map section names to button keys
+        const buttonMap = {{
+            'chatbot': 'nav_btn_chatbot',
+            'sql_editor': 'nav_btn_sql_editor',
+            'data_explorer': 'nav_btn_data_explorer',
+            'visualizations': 'nav_btn_visualizations'
+        }};
+        
+        const buttonKey = buttonMap[section];
+        if (!buttonKey) {{
+            console.error('Invalid section:', section);
+            return;
+        }}
+        
+        // Try multiple methods to find and click the button
+        setTimeout(function() {{
+            // Method 1: Try exact match on data-testid
+            let button = document.querySelector('button[data-testid*="' + buttonKey + '"]');
+            if (button) {{
+                console.log('Found button by exact match:', button.getAttribute('data-testid'));
+                button.click();
+                return;
+            }}
+            
+            // Method 2: Search all buttons for matching key
+            const allButtons = document.querySelectorAll('button[data-testid]');
+            for (let btn of allButtons) {{
+                const testId = btn.getAttribute('data-testid') || '';
+                if (testId.includes(buttonKey)) {{
+                    console.log('Found button by search:', testId);
+                    // Trigger click with events
+                    btn.focus();
+                    const clickEvent = new MouseEvent('click', {{
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    }});
+                    btn.dispatchEvent(clickEvent);
+                    btn.click();
+                    return;
+                }}
+            }}
+            
+            // Method 3: Fallback to query parameter (reload page)
+            console.log('Button not found, using query param fallback for:', section);
+            const currentUrl = window.location.href.split('?')[0];
+            window.location.href = currentUrl + '?section=' + section;
+        }}, 50);
     }}
     </script>
     """, unsafe_allow_html=True)
