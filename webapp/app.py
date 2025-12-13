@@ -1355,8 +1355,7 @@ def render_navigation_bar():
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
-    # Create hover dropdown menu using pure HTML/CSS with query parameter navigation
-    # This avoids the need for hidden buttons or complex JavaScript
+    # Create hover dropdown menu with JavaScript to handle navigation without page reload
     st.markdown(f"""
     <style>
     .nav-wrapper {{
@@ -1434,13 +1433,35 @@ def render_navigation_bar():
                 <span style="font-size:0.8rem;">▼</span>
             </span>
             <div class="nav-dropdown-menu">
-                <a href="?section=chatbot" class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}">💬 AI SQL Assistant</a>
-                <a href="?section=sql_editor" class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}">📝 Smart SQL Editor</a>
-                <a href="?section=data_explorer" class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}">🔍 Data Explorer</a>
-                <a href="?section=visualizations" class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}">📊 Data Visualizations</a>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" data-section="chatbot">💬 AI SQL Assistant</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" data-section="sql_editor">📝 Smart SQL Editor</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" data-section="data_explorer">🔍 Data Explorer</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" data-section="visualizations">📊 Data Visualizations</div>
             </div>
         </div>
     </div>
+    <script>
+    (function() {{
+        // Handle menu item clicks
+        document.addEventListener('click', function(e) {{
+            const menuItem = e.target.closest('.nav-menu-item');
+            if (menuItem && menuItem.dataset.section) {{
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const section = menuItem.dataset.section;
+                const currentUrl = window.location.href.split('?')[0];
+                const newUrl = currentUrl + '?section=' + section;
+                
+                // Update URL without reload using history API, then trigger Streamlit rerun
+                window.history.pushState({{section: section}}, '', newUrl);
+                
+                // Trigger Streamlit rerun by updating the URL
+                window.location.href = newUrl;
+            }}
+        }});
+    }})();
+    </script>
     """, unsafe_allow_html=True)
 
 
