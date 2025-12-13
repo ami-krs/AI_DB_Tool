@@ -1433,13 +1433,27 @@ def render_navigation_bar():
                 <span style="font-size:0.8rem;">▼</span>
             </span>
             <div class="nav-dropdown-menu">
-                <a href="?section=chatbot" class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}">💬 AI SQL Assistant</a>
-                <a href="?section=sql_editor" class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}">📝 Smart SQL Editor</a>
-                <a href="?section=data_explorer" class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}">🔍 Data Explorer</a>
-                <a href="?section=visualizations" class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}">📊 Data Visualizations</a>
+                <a href="?section=chatbot" onclick="return handleNavClick(event, 'chatbot')" class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}">💬 AI SQL Assistant</a>
+                <a href="?section=sql_editor" onclick="return handleNavClick(event, 'sql_editor')" class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}">📝 Smart SQL Editor</a>
+                <a href="?section=data_explorer" onclick="return handleNavClick(event, 'data_explorer')" class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}">🔍 Data Explorer</a>
+                <a href="?section=visualizations" onclick="return handleNavClick(event, 'visualizations')" class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}">📊 Data Visualizations</a>
             </div>
         </div>
     </div>
+    <script>
+    function handleNavClick(event, section) {{
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Get current URL without query params
+        const baseUrl = window.location.origin + window.location.pathname;
+        const newUrl = baseUrl + '?section=' + section;
+        
+        // Navigate to new URL in the same window
+        window.location.href = newUrl;
+        return false;
+    }}
+    </script>
     """, unsafe_allow_html=True)
 
 
