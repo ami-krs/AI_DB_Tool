@@ -1352,96 +1352,89 @@ def render_navigation_bar():
     
     current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
     
-    # Use Streamlit radio buttons styled as a dropdown navigation
-    # This is more reliable than JavaScript-based solutions
-    options = list(section_labels.keys())
-    labels = [section_labels[k] for k in options]
-    
-    # Get current index
-    try:
-        current_index = options.index(st.session_state.active_section)
-    except ValueError:
-        current_index = 0
-    
-    # Create styled navigation using radio buttons
-    st.markdown("""
+    # Create hover dropdown menu using pure HTML/CSS with query parameter navigation
+    # This avoids the need for hidden buttons or complex JavaScript
+    st.markdown(f"""
     <style>
-    /* Style the radio button navigation */
-    div[data-testid="stRadio"] > label {
-        display: none !important;
-    }
-    div[data-testid="stRadio"] > div {
-        background-color: #f0f2f6;
+    .nav-wrapper {{
+        margin-bottom: 1.5rem;
+        position: relative;
+        display: inline-block;
+    }}
+    .nav-dropdown {{
+        position: relative;
+        display: inline-block;
+    }}
+    .nav-main-btn {{
+        background-color: #0d7377;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+        border: none;
         border-radius: 0.5rem;
-        padding: 0.25rem;
-        display: inline-flex;
-        gap: 0.25rem;
-    }
-    div[data-testid="stRadio"] > div > label {
-        background-color: transparent;
-        color: #666;
-        padding: 0.5rem 1rem;
-        border-radius: 0.375rem;
         cursor: pointer;
-        transition: all 0.2s;
-        font-weight: 500;
-        border: 2px solid transparent;
-    }
-    div[data-testid="stRadio"] > div > label:hover {
-        background-color: #e8eaf0;
+        font-size: 1rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+    }}
+    .nav-main-btn:hover {{
+        background-color: #14a085;
+    }}
+    .nav-dropdown-menu {{
+        display: none;
+        position: absolute;
+        background-color: white;
+        min-width: 240px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1000;
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+        border: 1px solid rgba(0,0,0,0.1);
+        overflow: hidden;
+        top: 100%;
+        left: 0;
+    }}
+    .nav-dropdown:hover .nav-dropdown-menu {{
+        display: block;
+    }}
+    .nav-menu-item {{
+        color: #333;
+        padding: 0.875rem 1.25rem;
+        display: block;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }}
+    .nav-menu-item:last-child {{
+        border-bottom: none;
+    }}
+    .nav-menu-item:hover {{
+        background-color: #f0f7f8;
         color: #0d7377;
-    }
-    div[data-testid="stRadio"] > div > label[data-baseweb="radio"] {
-        background-color: #0d7377 !important;
-        color: white !important;
-        font-weight: 600 !important;
-        border-color: #0d7377 !important;
-    }
+    }}
+    .nav-menu-item.active {{
+        background-color: #e8f4f5;
+        color: #0d7377;
+        font-weight: 600;
+    }}
     </style>
-    """, unsafe_allow_html=True)
-    
-    # Use selectbox styled to look like a button dropdown
-    selected_option = st.selectbox(
-        "Navigation",
-        options=labels,
-        index=current_index,
-        key="nav_selectbox",
-        label_visibility="collapsed"
-    )
-    
-    # Update active section if selection changed
-    selected_section = options[labels.index(selected_option)] if selected_option in labels else options[0]
-    if selected_section != st.session_state.active_section:
-        st.session_state.active_section = selected_section
-        st.rerun()
-    
-    # Style selectbox to look like a dropdown button
-    st.markdown("""
-    <style>
-    /* Style selectbox to look like a navigation dropdown button */
-    div[data-testid="stSelectbox"] > div > div {
-        background-color: #0d7377 !important;
-        border-radius: 0.5rem !important;
-        padding: 0.75rem 1.5rem !important;
-        color: white !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        cursor: pointer !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-        transition: background-color 0.2s !important;
-        margin-bottom: 1.5rem !important;
-    }
-    div[data-testid="stSelectbox"] > div > div:hover {
-        background-color: #14a085 !important;
-    }
-    div[data-testid="stSelectbox"] > div > div > div {
-        color: white !important;
-    }
-    div[data-testid="stSelectbox"] > div > div > div > svg {
-        fill: white !important;
-    }
-    </style>
+    <div class="nav-wrapper">
+        <div class="nav-dropdown">
+            <span class="nav-main-btn">
+                <span>{current_label}</span>
+                <span style="font-size:0.8rem;">▼</span>
+            </span>
+            <div class="nav-dropdown-menu">
+                <a href="?section=chatbot" class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}">💬 AI SQL Assistant</a>
+                <a href="?section=sql_editor" class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}">📝 Smart SQL Editor</a>
+                <a href="?section=data_explorer" class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}">🔍 Data Explorer</a>
+                <a href="?section=visualizations" class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}">📊 Data Visualizations</a>
+            </div>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
 
