@@ -602,14 +602,100 @@ st.markdown("""
     setTimeout(ensureSidebarToggleVisible, 500);
     setTimeout(ensureSidebarToggleVisible, 1000);
     
-    // Also observe for dynamically added buttons
-    const sidebarToggleObserver = new MutationObserver(ensureSidebarToggleVisible);
-    sidebarToggleObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class', 'aria-label', 'data-testid']
-    });
+        // Also observe for dynamically added buttons
+        const sidebarToggleObserver = new MutationObserver(ensureSidebarToggleVisible);
+        sidebarToggleObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'aria-label', 'data-testid']
+        });
+        
+        // Create a fallback custom toggle button if native one isn't found
+        function createFallbackToggleButton() {
+            // Check if we already created one
+            if (document.getElementById('custom-sidebar-toggle')) {
+                return;
+            }
+            
+            // Check if sidebar exists
+            const sidebar = document.querySelector('[data-testid="stSidebar"]');
+            if (!sidebar) return;
+            
+            // Check if native button exists
+            const nativeButton = document.querySelector('button[aria-label*="sidebar" i]') ||
+                                 document.querySelector('[data-testid*="sidebar" i] button') ||
+                                 document.querySelector('button[kind="header"]');
+            
+            if (nativeButton && window.getComputedStyle(nativeButton).display !== 'none') {
+                return; // Native button exists and is visible
+            }
+            
+            // Create custom toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.id = 'custom-sidebar-toggle';
+            toggleButton.innerHTML = '☰';
+            toggleButton.setAttribute('aria-label', 'Toggle sidebar');
+            toggleButton.style.cssText = `
+                position: fixed;
+                top: 0.5rem;
+                left: 0;
+                z-index: 9999;
+                background-color: #0d7377;
+                color: white;
+                border: none;
+                border-radius: 0 0.5rem 0.5rem 0;
+                padding: 0.5rem;
+                cursor: pointer;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                transition: background-color 0.2s;
+                min-width: 40px;
+                min-height: 40px;
+                font-size: 1.2rem;
+            `;
+            
+            toggleButton.addEventListener('mouseenter', function() {
+                this.style.backgroundColor = '#14a085';
+            });
+            
+            toggleButton.addEventListener('mouseleave', function() {
+                this.style.backgroundColor = '#0d7377';
+            });
+            
+            toggleButton.addEventListener('click', function() {
+                // Try to find and click native button first
+                const nativeBtn = document.querySelector('button[aria-label*="sidebar" i]') ||
+                                  document.querySelector('[data-testid*="sidebar" i] button');
+                if (nativeBtn) {
+                    nativeBtn.click();
+                } else {
+                    // Fallback: try to toggle sidebar directly
+                    const sidebarEl = document.querySelector('[data-testid="stSidebar"]');
+                    if (sidebarEl) {
+                        // Toggle visibility
+                        const isVisible = window.getComputedStyle(sidebarEl).display !== 'none';
+                        sidebarEl.style.display = isVisible ? 'none' : 'flex';
+                    }
+                }
+            });
+            
+            document.body.appendChild(toggleButton);
+        }
+        
+        // Try to create fallback button
+        setTimeout(createFallbackToggleButton, 500);
+        setTimeout(createFallbackToggleButton, 1000);
+        setTimeout(createFallbackToggleButton, 2000);
+        
+        // Also observe for sidebar changes
+        const sidebarObserver = new MutationObserver(function() {
+            ensureSidebarToggleVisible();
+            createFallbackToggleButton();
+        });
+        sidebarObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
 </script>
 """, unsafe_allow_html=True)
 
