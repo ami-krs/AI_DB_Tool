@@ -290,6 +290,31 @@ st.markdown("""
         opacity: 1 !important;
     }
     
+    /* Ensure custom sidebar toggle button is always visible */
+    #custom-sidebar-toggle {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 0.5rem !important;
+        left: 0 !important;
+        z-index: 99999 !important;
+        background-color: #0d7377 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0 0.5rem 0.5rem 0 !important;
+        padding: 0.5rem !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        font-size: 1.2rem !important;
+    }
+    
+    #custom-sidebar-toggle:hover {
+        background-color: #14a085 !important;
+    }
+    
     /* Negative margin hack if needed - use with caution */
     .main .block-container > div:first-child > div:first-child {
         margin-top: -1rem !important;
