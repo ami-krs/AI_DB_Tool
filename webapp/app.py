@@ -1206,6 +1206,7 @@ def main():
         'visualizations': '📊 Data Visualizations'
     }
     
+    # Check query parameters first, before anything else
     try:
         if hasattr(st, 'query_params'):
             query_params = st.query_params
@@ -1214,15 +1215,22 @@ def main():
                 # Handle both string and list formats
                 if isinstance(section, list):
                     section = section[0] if section else None
+                elif isinstance(section, str):
+                    section = section.strip()
+                
                 if section and section in section_labels:
+                    # Update active section if different
                     if st.session_state.active_section != section:
                         st.session_state.active_section = section
-                        # Clear the query param to avoid re-triggering
-                        new_params = {k: v for k, v in query_params.items() if k != 'section'}
+                        # Clear the query param after updating
+                        new_params = dict(query_params)
+                        if 'section' in new_params:
+                            del new_params['section']
                         st.query_params = new_params
                         st.rerun()
     except Exception as e:
-        pass  # Continue if query params don't work
+        # Continue if query params don't work
+        pass
     
     # Inject dark mode CSS (must be called early)
     inject_dark_mode_css()
