@@ -1292,9 +1292,19 @@ def main():
     # Inject keyboard shortcuts (must be called early)
     inject_keyboard_shortcuts()
     
-    # Sidebar - minimal content (only theme toggle)
+    # Sidebar
     with st.sidebar:
         st.title("🤖 AI Database Tool")
+        
+        # Database details display
+        render_db_details()
+        
+        st.markdown("---")
+        
+        # Settings dropdown
+        render_settings_dropdown()
+        
+        st.markdown("---")
         
         # Dark mode toggle
         col1, col2 = st.columns([3, 1])
@@ -1312,22 +1322,14 @@ def main():
                 st.rerun()
     
     # Main content area
-    # Top-left section: DB details and Settings dropdown
-    top_col1, top_col2, top_col3 = st.columns([2, 6, 2])
-    with top_col1:
-        render_db_details()
-        render_settings_dropdown()
-    
     # Header
     if st.session_state.layout_mode == 'three_column' and st.session_state.connected:
         # Minimized header for three column layout when connected
-        with top_col2:
-            st.markdown("#### 🤖 AI Database Tool")
+        st.markdown("#### 🤖 AI Database Tool")
     else:
         # Header with title
-        with top_col2:
-            st.markdown("#### 🤖 AI Database Tool")
-            st.markdown("Intelligent database management with AI-powered SQL generation")
+        st.markdown("#### 🤖 AI Database Tool")
+        st.markdown("Intelligent database management with AI-powered SQL generation")
         
         # Navigation dropdown below subtitle on the left
         if st.session_state.connected:
