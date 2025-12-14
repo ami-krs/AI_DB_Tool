@@ -1491,12 +1491,39 @@ def render_navigation_bar():
     </div>
     <script>
     (function() {{
+        console.log('Navigation script loaded');
+        
         // Use event delegation to handle clicks on menu items
-        document.addEventListener('click', function(e) {{
-            const menuItem = e.target.closest('.nav-menu-item[data-section]');
+        function handleNavClick(e) {{
+            console.log('Click detected on:', e.target);
+            
+            // Try multiple ways to find the menu item
+            let menuItem = e.target.closest('.nav-menu-item[data-section]');
+            
+            // If closest didn't work, check if target itself is a menu item
+            if (!menuItem && e.target.classList.contains('nav-menu-item')) {{
+                menuItem = e.target;
+            }}
+            
+            // Check parent elements
+            if (!menuItem) {{
+                let parent = e.target.parentElement;
+                let depth = 0;
+                while (parent && depth < 5) {{
+                    if (parent.classList && parent.classList.contains('nav-menu-item') && parent.hasAttribute('data-section')) {{
+                        menuItem = parent;
+                        break;
+                    }}
+                    parent = parent.parentElement;
+                    depth++;
+                }}
+            }}
+            
             if (menuItem) {{
+                console.log('Menu item found:', menuItem);
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 
                 const section = menuItem.getAttribute('data-section');
                 if (section) {{
@@ -1507,9 +1534,24 @@ def render_navigation_bar():
                     console.log('Navigating to URL:', newUrl);
                     // Navigate in the same window
                     window.location.href = newUrl;
+                    return false;
+                }} else {{
+                    console.log('No data-section attribute found');
                 }}
+            }} else {{
+                console.log('No menu item found for click');
             }}
-        }});
+        }}
+        
+        // Attach listener with capture phase to catch events early
+        document.addEventListener('click', handleNavClick, true);
+        
+        // Also try attaching to body after a delay
+        setTimeout(function() {{
+            if (document.body) {{
+                document.body.addEventListener('click', handleNavClick, true);
+            }}
+        }}, 100);
     }})();
     </script>
     """, unsafe_allow_html=True)
