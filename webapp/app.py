@@ -1292,55 +1292,9 @@ def main():
     # Inject keyboard shortcuts (must be called early)
     inject_keyboard_shortcuts()
     
-    # Sidebar
+    # Sidebar - minimal content (only theme toggle)
     with st.sidebar:
         st.title("🤖 AI Database Tool")
-        
-        # Smart Editor selection
-        st.markdown("---")
-        st.markdown("**⚡ Smart Editor:**")
-
-        editor_options = [("textarea", "Streamlit Text Area (Default)")]
-        if CODEMIRROR_AVAILABLE:
-            editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
-        if MONACO_EDITOR_AVAILABLE:
-            editor_options.append(("monaco", "Monaco (VS Code Experience)"))
-
-        valid_modes = [value for value, _ in editor_options]
-        if st.session_state.editor_mode not in valid_modes:
-            st.session_state.editor_mode = "textarea"
-
-        current_index = valid_modes.index(st.session_state.editor_mode)
-        option_labels = [label for _, label in editor_options]
-
-        selected_label = st.selectbox(
-            "SQL Editor Mode",
-            option_labels,
-            index=current_index,
-            key="editor_mode_select",
-            help="Choose which SQL editor to use in the workspace."
-        )
-
-        selected_mode = next(value for value, label in editor_options if label == selected_label)
-        if selected_mode != st.session_state.editor_mode:
-            st.session_state.editor_mode = selected_mode
-            st.session_state.use_codemirror_editor = selected_mode != "textarea"
-            st.rerun()
-
-        if st.session_state.editor_mode in ("codemirror", "monaco"):
-            api_url = st.text_input(
-                "API Server URL",
-                value=st.session_state.api_server_url,
-                autocomplete="url",
-                help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
-            )
-            if api_url != st.session_state.api_server_url:
-                st.session_state.api_server_url = api_url
-                st.rerun()
-
-            st.info("💡 Start the API server: `python webapp/api_server.py`")
-        elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
-            st.info("Install the optional smart editor components to enable AI autocomplete.")
         
         # Dark mode toggle
         col1, col2 = st.columns([3, 1])
@@ -1356,151 +1310,24 @@ def main():
             if dark_mode_toggle != st.session_state.dark_mode:
                 st.session_state.dark_mode = dark_mode_toggle
                 st.rerun()
-        
-        st.markdown("---")
-        
-        # Layout toggle
-        st.header("📐 Layout")
-        layout_mode = st.radio(
-            "Choose layout:",
-            ["Tabs (Classic)", "Three Column"],
-            index=0 if st.session_state.layout_mode == 'tabs' else 1,
-            key="layout_radio"
-        )
-        st.session_state.layout_mode = 'tabs' if layout_mode == "Tabs (Classic)" else 'three_column'
-        st.markdown("---")
-        
-        # Connection section with simple button toggle - button always visible on its own line
-        # Toggle button on its own line - always visible
-        button_label = "🔽 Minimize Connection" if st.session_state.show_connection else "▶️ Show Connection"
-        if st.button(button_label, key="connection_toggle", use_container_width=True):
-            st.session_state.show_connection = not st.session_state.show_connection
-            st.rerun()
-        
-        # Connection section with conditional display
-        connect_button = False
-        db_type = None
-        database = None
-        host = None
-        port = None
-        username = None
-        password = None
-        
-        if st.session_state.show_connection:
-            st.markdown("### 🔌 Database Connection")
-            db_type = st.selectbox(
-                "Database Type",
-                ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
-                index=4  # Default to sqlite (index 4)
-            )
-            
-            with st.form("connection_form"):
-                if db_type == "sqlite":
-                    database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)", autocomplete="off")
-                    host = ""
-                    port = 0  # SQLite doesn't use ports
-                    username = ""
-                    password = ""
-                else:
-                    host = st.text_input("Host", value="localhost", autocomplete="url")
-                    port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
-                    database = st.text_input("Database Name", autocomplete="off")
-                    username = st.text_input("Username", autocomplete="username")
-                    password = st.text_input("Password", type="password", autocomplete="current-password")
-                
-                connect_button = st.form_submit_button("Connect", type="primary")
-        
-        if connect_button and st.session_state.show_connection:
-            if db_type == "sqlite":
-                config = DatabaseConfig(
-                    db_type=db_type,
-                    host="",
-                    port=0,
-                    database=database,  # For SQLite, database field contains the file path
-                    username="",
-                    password="",
-                )
-            else:
-                config = DatabaseConfig(
-                    db_type=db_type,
-                    host=host,
-                    port=int(port),
-                    database=database,
-                    username=username,
-                    password=password,
-                )
-            
-            if st.session_state.db_manager.connect(config):
-                st.success("✅ Connected successfully!")
-                st.session_state.connected = True
-                
-                # Store database type
-                st.session_state.db_type = config.db_type
-                
-                # Get schema info first (needed for both AI and non-AI features)
-                schema_info = st.session_state.db_manager.get_database_info()
-                schema_info['db_type'] = config.db_type
-                st.session_state.schema_info = schema_info
-                
-                # Initialize AI components (gracefully handle missing API keys)
-                try:
-                    # Get API key from Streamlit secrets or environment variables
-                    openai_key = get_api_key("OPENAI_API_KEY")
-                    anthropic_key = get_api_key("ANTHROPIC_API_KEY")
-                    api_key = openai_key or anthropic_key
-                    
-                    # Only show message if no API key is found at all
-                    if not api_key:
-                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
-                        st.session_state.chatbot = None
-                        st.session_state.query_builder = None
-                    else:
-                        # Determine provider based on which key is available
-                        provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
-                        
-                        st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
-                        st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
-                        
-                        # Set schema context for chatbot if client is properly initialized
-                        if (st.session_state.chatbot and 
-                            hasattr(st.session_state.chatbot, 'client') and
-                            st.session_state.chatbot.client is not None):
-                            st.session_state.chatbot.set_schema_context(schema_info)
-                        elif (st.session_state.chatbot and 
-                              hasattr(st.session_state.chatbot, 'api_key_available') and
-                              not st.session_state.chatbot.api_key_available):
-                            # API key was provided but client initialization failed
-                            st.warning("⚠️ API key found but client initialization failed. Please verify your API key is valid in Streamlit secrets.")
-                except Exception as e:
-                    # If AI initialization fails, still allow database operations
-                    st.session_state.chatbot = None
-                    st.session_state.query_builder = None
-                    st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
-            else:
-                st.error("❌ Connection failed!")
-                st.session_state.connected = False
-        
-        if st.session_state.connected:
-            if st.button("Disconnect"):
-                st.session_state.db_manager.disconnect()
-                st.session_state.connected = False
-                st.session_state.chatbot = None
-                st.session_state.query_builder = None
-                st.success("Disconnected")
-                st.rerun()
-        
-        #st.markdown("---")
     
     # Main content area
+    # Top-left section: DB details and Settings dropdown
+    top_col1, top_col2, top_col3 = st.columns([2, 6, 2])
+    with top_col1:
+        render_db_details()
+        render_settings_dropdown()
+    
+    # Header
     if st.session_state.layout_mode == 'three_column' and st.session_state.connected:
         # Minimized header for three column layout when connected
-        col1, col2, col3 = st.columns([1, 8, 1])
-        with col2:
+        with top_col2:
             st.markdown("#### 🤖 AI Database Tool")
     else:
         # Header with title
-        st.markdown("#### 🤖 AI Database Tool")
-        st.markdown("Intelligent database management with AI-powered SQL generation")
+        with top_col2:
+            st.markdown("#### 🤖 AI Database Tool")
+            st.markdown("Intelligent database management with AI-powered SQL generation")
         
         # Navigation dropdown below subtitle on the left
         if st.session_state.connected:
@@ -1524,6 +1351,313 @@ def main():
                 data_explorer_tab()
             elif st.session_state.active_section == 'visualizations':
                 visualizations_tab()
+
+
+def render_db_details():
+    """Render connected database details by default in top-left"""
+    if st.session_state.connected and st.session_state.db_manager:
+        try:
+            schema_info = st.session_state.get('schema_info', {})
+            db_type = st.session_state.db_type or 'unknown'
+            db_name = schema_info.get('database_name', 'unknown')
+            
+            # Format database name for display
+            if db_type == 'sqlite':
+                # Show just the filename for SQLite
+                if '/' in db_name:
+                    db_name = db_name.split('/')[-1]
+                display_name = db_name
+            else:
+                display_name = db_name
+            
+            total_tables = schema_info.get('total_tables', 0)
+            
+            # Display in a compact info box
+            st.info(f"🔌 **{db_type.upper()}** | {display_name} | {total_tables} tables")
+        except Exception:
+            st.info("🔌 **Connected**")
+    else:
+        st.info("🔌 **Not Connected**")
+
+
+def render_settings_dropdown():
+    """Render settings dropdown (Smart Editor, Layout, Database Connection) using Streamlit selectbox"""
+    
+    # Use a selectbox styled as a dropdown button for settings
+    settings_options = {
+        "⚙️ Settings": None,
+        "⚡ Smart Editor": "editor",
+        "📐 Layout": "layout",
+        "🔌 Database Connection": "connection"
+    }
+    
+    option_labels = list(settings_options.keys())
+    
+    # Initialize active_setting if not exists
+    if 'active_setting' not in st.session_state:
+        st.session_state.active_setting = None
+    
+    # Determine current index (0 if no active setting)
+    try:
+        current_setting_label = next(k for k, v in settings_options.items() if v == st.session_state.active_setting)
+        current_index = option_labels.index(current_setting_label)
+    except (StopIteration, ValueError):
+        current_index = 0
+    
+    selected_label = st.selectbox(
+        "Settings",
+        options=option_labels,
+        index=current_index,
+        key="settings_dropdown_selectbox",
+        label_visibility="collapsed"
+    )
+    
+    selected_setting = settings_options.get(selected_label)
+    
+    # If "⚙️ Settings" (None) is selected, close the active setting
+    if selected_setting is None:
+        if st.session_state.active_setting is not None:
+            st.session_state.active_setting = None
+            st.rerun()
+    # If a setting is selected, update active_setting
+    elif selected_setting and selected_setting != st.session_state.active_setting:
+        st.session_state.active_setting = selected_setting
+        st.rerun()
+    
+    # Render the active setting in an expander
+    if st.session_state.active_setting:
+        setting_labels = {
+            "editor": "⚡ Smart Editor",
+            "layout": "📐 Layout",
+            "connection": "🔌 Database Connection"
+        }
+        setting_label = setting_labels.get(st.session_state.active_setting, "Settings")
+        with st.expander(setting_label, expanded=True):
+            render_setting_content(st.session_state.active_setting)
+    
+    # Style the selectbox to look like a button
+    st.markdown("""
+    <style>
+    div[data-testid="stSelectbox"]:has(> label[for*="settings_dropdown"]) > div > div {
+        background-color: #0d7377 !important;
+        border-radius: 0.5rem !important;
+        padding: 0.5rem 1rem !important;
+        color: white !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        cursor: pointer !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: background-color 0.2s !important;
+        min-width: fit-content !important;
+        width: max-content !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="settings_dropdown"]) > div > div:hover {
+        background-color: #14a085 !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="settings_dropdown"]) > div > div > div {
+        color: white !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="settings_dropdown"]) > div > div > div > svg {
+        fill: white !important;
+    }
+    </style>
+    <script>
+    (function() {
+        function styleSettingsSelectbox() {
+            const selectboxes = document.querySelectorAll('div[data-testid="stSelectbox"]');
+            selectboxes.forEach(function(selectbox) {
+                const label = selectbox.querySelector('label');
+                if (label && label.getAttribute('for') && label.getAttribute('for').includes('settings_dropdown')) {
+                    selectbox.classList.add('settings-selectbox-styled');
+                }
+            });
+        }
+        styleSettingsSelectbox();
+        setTimeout(styleSettingsSelectbox, 100);
+        setTimeout(styleSettingsSelectbox, 500);
+        const observer = new MutationObserver(styleSettingsSelectbox);
+        observer.observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+
+
+def render_setting_content(setting_type):
+    """Render the content for a specific setting type"""
+    if setting_type == 'editor':
+        render_smart_editor_setting()
+    elif setting_type == 'layout':
+        render_layout_setting()
+    elif setting_type == 'connection':
+        render_connection_setting()
+
+
+def render_smart_editor_setting():
+    """Render Smart Editor selection"""
+    editor_options = [("textarea", "Streamlit Text Area (Default)")]
+    if CODEMIRROR_AVAILABLE:
+        editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
+    if MONACO_EDITOR_AVAILABLE:
+        editor_options.append(("monaco", "Monaco (VS Code Experience)"))
+
+    valid_modes = [value for value, _ in editor_options]
+    if st.session_state.editor_mode not in valid_modes:
+        st.session_state.editor_mode = "textarea"
+
+    current_index = valid_modes.index(st.session_state.editor_mode)
+    option_labels = [label for _, label in editor_options]
+
+    selected_label = st.selectbox(
+        "SQL Editor Mode",
+        option_labels,
+        index=current_index,
+        key="editor_mode_select_popup",
+        help="Choose which SQL editor to use in the workspace."
+    )
+
+    selected_mode = next(value for value, label in editor_options if label == selected_label)
+    if selected_mode != st.session_state.editor_mode:
+        st.session_state.editor_mode = selected_mode
+        st.session_state.use_codemirror_editor = selected_mode != "textarea"
+        st.session_state.active_setting = None
+        st.rerun()
+
+    if st.session_state.editor_mode in ("codemirror", "monaco"):
+        api_url = st.text_input(
+            "API Server URL",
+            value=st.session_state.api_server_url,
+            autocomplete="url",
+            help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
+        )
+        if api_url != st.session_state.api_server_url:
+            st.session_state.api_server_url = api_url
+            st.rerun()
+        st.info("💡 Start the API server: `python webapp/api_server.py`")
+    elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
+        st.info("Install the optional smart editor components to enable AI autocomplete.")
+
+
+def render_layout_setting():
+    """Render Layout selection"""
+    layout_mode = st.radio(
+        "Choose layout:",
+        ["Tabs (Classic)", "Three Column"],
+        index=0 if st.session_state.layout_mode == 'tabs' else 1,
+        key="layout_radio_popup"
+    )
+    new_layout_mode = 'tabs' if layout_mode == "Tabs (Classic)" else 'three_column'
+    if new_layout_mode != st.session_state.layout_mode:
+        st.session_state.layout_mode = new_layout_mode
+        st.session_state.active_setting = None
+        st.rerun()
+
+
+def render_connection_setting():
+    """Render Database Connection form"""
+    db_type = st.selectbox(
+        "Database Type",
+        ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
+        index=4,  # Default to sqlite
+        key="db_type_popup"
+    )
+    
+    with st.form("connection_form_popup"):
+        if db_type == "sqlite":
+            database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file", autocomplete="off", key="db_file_popup")
+            host = ""
+            port = 0
+            username = ""
+            password = ""
+        else:
+            host = st.text_input("Host", value="localhost", autocomplete="url", key="host_popup")
+            port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306, key="port_popup")
+            database = st.text_input("Database Name", autocomplete="off", key="database_popup")
+            username = st.text_input("Username", autocomplete="username", key="username_popup")
+            password = st.text_input("Password", type="password", autocomplete="current-password", key="password_popup")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            connect_button = st.form_submit_button("Connect", type="primary", use_container_width=True)
+        with col2:
+            if st.session_state.connected:
+                disconnect_button = st.form_submit_button("Disconnect", use_container_width=True)
+            else:
+                disconnect_button = False
+        
+        # Handle form submission inside the form context
+        if connect_button:
+            handle_connection(db_type, host, port, database, username, password)
+        
+        if disconnect_button and st.session_state.connected:
+            st.session_state.db_manager.disconnect()
+            st.session_state.connected = False
+            st.session_state.chatbot = None
+            st.session_state.query_builder = None
+            st.success("Disconnected")
+            st.session_state.active_setting = None
+            st.rerun()
+
+
+def handle_connection(db_type, host, port, database, username, password):
+    """Handle database connection logic"""
+    if db_type == "sqlite":
+        config = DatabaseConfig(
+            db_type=db_type,
+            host="",
+            port=0,
+            database=database,
+            username="",
+            password="",
+        )
+    else:
+        config = DatabaseConfig(
+            db_type=db_type,
+            host=host,
+            port=int(port),
+            database=database,
+            username=username,
+            password=password,
+        )
+    
+    if st.session_state.db_manager.connect(config):
+        st.success("✅ Connected successfully!")
+        st.session_state.connected = True
+        st.session_state.db_type = config.db_type
+        
+        schema_info = st.session_state.db_manager.get_database_info()
+        schema_info['db_type'] = config.db_type
+        st.session_state.schema_info = schema_info
+        
+        # Initialize AI components
+        try:
+            openai_key = get_api_key("OPENAI_API_KEY")
+            anthropic_key = get_api_key("ANTHROPIC_API_KEY")
+            api_key = openai_key or anthropic_key
+            
+            if not api_key:
+                st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
+                st.session_state.chatbot = None
+                st.session_state.query_builder = None
+            else:
+                provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+                st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                
+                if (st.session_state.chatbot and 
+                    hasattr(st.session_state.chatbot, 'client') and
+                    st.session_state.chatbot.client is not None):
+                    st.session_state.chatbot.set_schema_context(schema_info)
+        except Exception as e:
+            st.session_state.chatbot = None
+            st.session_state.query_builder = None
+            st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
+        
+        st.session_state.active_setting = None
+        st.rerun()
+    else:
+        st.error("❌ Connection failed!")
+        st.session_state.connected = False
 
 
 def render_navigation_bar():
