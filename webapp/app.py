@@ -1562,13 +1562,11 @@ def render_navigation_bar():
         st.rerun()
     
     # Style the selectbox to look like a compact dropdown button
+    # Use JavaScript to find and style the selectbox since CSS :has() might not work
     st.markdown("""
     <style>
     /* Style selectbox to look like a navigation dropdown button */
-    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) {
-        margin-bottom: 0.5rem;
-    }
-    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div {
+    .nav-selectbox-styled > div > div {
         background-color: #0d7377 !important;
         border-radius: 0.5rem !important;
         padding: 0.5rem 1rem !important;
@@ -1582,16 +1580,34 @@ def render_navigation_bar():
         min-width: fit-content !important;
         width: max-content !important;
     }
-    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div:hover {
+    .nav-selectbox-styled > div > div:hover {
         background-color: #14a085 !important;
     }
-    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div > div {
+    .nav-selectbox-styled > div > div > div {
         color: white !important;
     }
-    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div > div > svg {
+    .nav-selectbox-styled > div > div > div > svg {
         fill: white !important;
     }
     </style>
+    <script>
+    (function() {
+        function styleNavSelectbox() {
+            const selectboxes = document.querySelectorAll('div[data-testid="stSelectbox"]');
+            selectboxes.forEach(function(selectbox) {
+                const label = selectbox.querySelector('label');
+                if (label && label.getAttribute('for') && label.getAttribute('for').includes('nav_dropdown')) {
+                    selectbox.classList.add('nav-selectbox-styled');
+                }
+            });
+        }
+        styleNavSelectbox();
+        setTimeout(styleNavSelectbox, 100);
+        setTimeout(styleNavSelectbox, 500);
+        const observer = new MutationObserver(styleNavSelectbox);
+        observer.observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
     """, unsafe_allow_html=True)
 
 
