@@ -1226,12 +1226,15 @@ def main():
                     # Update active section if different
                     if st.session_state.active_section != section:
                         st.session_state.active_section = section
-                        # Clear the query param after updating
+                        # Don't clear query param immediately - let it persist for one render cycle
+                        # This ensures the section update is processed
+                        st.rerun()
+                    else:
+                        # If section is already set, clear the query param to avoid re-triggering
                         new_params = dict(query_params)
                         if 'section' in new_params:
                             del new_params['section']
                         st.query_params = new_params
-                        st.rerun()
     except Exception as e:
         # Continue if query params don't work
         pass
