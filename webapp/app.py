@@ -1489,7 +1489,7 @@ def main():
                 st.success("Disconnected")
                 st.rerun()
         
-        st.markdown("---")
+        #st.markdown("---")
     
     # Main content area
     if st.session_state.layout_mode == 'three_column' and st.session_state.connected:
