@@ -1126,6 +1126,53 @@ def main():
     </script>
     """, unsafe_allow_html=True)
     
+    # Add id and name attributes to form fields
+    st.markdown("""
+    <script>
+    (function() {
+        function setFormFieldAttributes() {
+            // Find all input fields
+            const inputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="number"], input[type="email"], input[type="url"], textarea');
+            
+            inputs.forEach(function(input, index) {
+                // Skip if already has id
+                if (input.id) return;
+                
+                // Get label to determine appropriate id/name
+                const container = input.closest('[data-testid*="stTextInput"], [data-testid*="stTextArea"], [data-testid*="stNumberInput"]');
+                let fieldName = 'field_' + index;
+                
+                if (container) {
+                    const label = container.querySelector('label');
+                    if (label && label.textContent) {
+                        // Create id from label text
+                        fieldName = label.textContent.toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '_')
+                            .replace(/^_+|_+$/g, '')
+                            .substring(0, 50) || 'field_' + index;
+                    }
+                }
+                
+                // Set id and name attributes
+                const uniqueId = fieldName + '_' + Date.now() + '_' + index;
+                input.id = uniqueId;
+                input.name = fieldName;
+            });
+        }
+        
+        // Run on load and after delays
+        setFormFieldAttributes();
+        setTimeout(setFormFieldAttributes, 100);
+        setTimeout(setFormFieldAttributes, 500);
+        setTimeout(setFormFieldAttributes, 1000);
+        
+        // Also observe for dynamically added inputs
+        const observer = new MutationObserver(setFormFieldAttributes);
+        observer.observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+    
     # Add navigation dropdown JavaScript
     st.markdown("""
     <script>
