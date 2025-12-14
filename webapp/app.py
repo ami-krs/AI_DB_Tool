@@ -1432,24 +1432,36 @@ def render_navigation_bar():
                 <span>{current_label}</span>
                 <span style="font-size:0.8rem;">▼</span>
             </span>
-            <div class="nav-dropdown-menu">
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" onclick="navigateTo('chatbot')">💬 AI SQL Assistant</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" onclick="navigateTo('sql_editor')">📝 Smart SQL Editor</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" onclick="navigateTo('data_explorer')">🔍 Data Explorer</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" onclick="navigateTo('visualizations')">📊 Data Visualizations</div>
+            <div class="nav-dropdown-menu" id="nav-dropdown-menu">
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" data-section="chatbot">💬 AI SQL Assistant</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" data-section="sql_editor">📝 Smart SQL Editor</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" data-section="data_explorer">🔍 Data Explorer</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" data-section="visualizations">📊 Data Visualizations</div>
             </div>
         </div>
     </div>
     <script>
-    function navigateTo(section) {{
-        console.log('Navigating to section:', section);
-        // Get current URL without query params
-        const baseUrl = window.location.origin + window.location.pathname;
-        const newUrl = baseUrl + '?section=' + section;
-        console.log('Navigating to URL:', newUrl);
-        // Navigate in the same window
-        window.location.href = newUrl;
-    }}
+    (function() {{
+        // Use event delegation to handle clicks on menu items
+        document.addEventListener('click', function(e) {{
+            const menuItem = e.target.closest('.nav-menu-item[data-section]');
+            if (menuItem) {{
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const section = menuItem.getAttribute('data-section');
+                if (section) {{
+                    console.log('Navigating to section:', section);
+                    // Get current URL without query params
+                    const baseUrl = window.location.origin + window.location.pathname;
+                    const newUrl = baseUrl + '?section=' + section;
+                    console.log('Navigating to URL:', newUrl);
+                    // Navigate in the same window
+                    window.location.href = newUrl;
+                }}
+            }}
+        }});
+    }})();
     </script>
     """, unsafe_allow_html=True)
 
