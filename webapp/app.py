@@ -145,8 +145,8 @@ st.markdown("""
         overflow: hidden !important;
     }
     
-    /* Hide Streamlit menu button if present */
-    button[kind="header"] {
+    /* Hide Streamlit menu button if present, but allow sidebar toggle */
+    button[kind="header"]:not([aria-label*="sidebar"]):not([aria-label*="Sidebar"]):not([data-testid*="sidebar"]):not([data-testid*="Collapse"]) {
         display: none !important;
     }
     
@@ -215,6 +215,79 @@ st.markdown("""
     /* Remove spacing from sidebar that might affect layout */
     section[data-testid="stSidebar"] {
         padding-top: 0 !important;
+    }
+    
+    /* Ensure sidebar collapse/expand button is always visible */
+    button[data-testid="baseButton-header"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 0.5rem !important;
+        left: 0 !important;
+        z-index: 999 !important;
+        background-color: #0d7377 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0 0.5rem 0.5rem 0 !important;
+        padding: 0.5rem !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+        transition: background-color 0.2s !important;
+    }
+    
+    button[data-testid="baseButton-header"]:hover {
+        background-color: #14a085 !important;
+    }
+    
+    /* Alternative selector for sidebar toggle */
+    button[kind="header"][data-testid*="header"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 0.5rem !important;
+        left: 0 !important;
+        z-index: 999 !important;
+        background-color: #0d7377 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0 0.5rem 0.5rem 0 !important;
+        padding: 0.5rem !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+    
+    button[kind="header"][data-testid*="header"]:hover {
+        background-color: #14a085 !important;
+    }
+    
+    /* Streamlit's sidebar collapse button */
+    .stApp > button {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 0.5rem !important;
+        left: 0 !important;
+        z-index: 999 !important;
+        background-color: #0d7377 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0 0.5rem 0.5rem 0 !important;
+        padding: 0.5rem !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* Ensure sidebar toggle arrow is visible */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebarCollapseButton"] button,
+    button[aria-label*="Close"],
+    button[aria-label*="open"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
     
     /* Negative margin hack if needed - use with caution */
@@ -416,6 +489,77 @@ st.markdown("""
     observer.observe(document.body, {
         childList: true,
         subtree: true
+    });
+    
+    // Ensure sidebar toggle button is always visible
+    function ensureSidebarToggleVisible() {
+        // Find all potential sidebar toggle buttons
+        const selectors = [
+            'button[data-testid*="stSidebarCollapse"]',
+            'button[aria-label*="close sidebar"]',
+            'button[aria-label*="open sidebar"]',
+            'button[aria-label*="Close sidebar"]',
+            'button[aria-label*="Open sidebar"]',
+            'button[kind="header"]',
+            '.stApp > button[data-testid]',
+            '[data-testid="baseButton-header"]'
+        ];
+        
+        selectors.forEach(selector => {
+            const buttons = document.querySelectorAll(selector);
+            buttons.forEach(button => {
+                // Check if this is likely the sidebar toggle button
+                const ariaLabel = button.getAttribute('aria-label') || '';
+                const testId = button.getAttribute('data-testid') || '';
+                
+                if (ariaLabel.toLowerCase().includes('sidebar') || 
+                    ariaLabel.toLowerCase().includes('menu') ||
+                    testId.includes('sidebar') ||
+                    testId.includes('Collapse') ||
+                    testId.includes('header')) {
+                    
+                    // Make it visible and position it correctly
+                    button.style.display = 'flex';
+                    button.style.visibility = 'visible';
+                    button.style.opacity = '1';
+                    button.style.position = 'fixed';
+                    button.style.top = '0.5rem';
+                    button.style.left = '0';
+                    button.style.zIndex = '999';
+                    button.style.backgroundColor = '#0d7377';
+                    button.style.color = 'white';
+                    button.style.border = 'none';
+                    button.style.borderRadius = '0 0.5rem 0.5rem 0';
+                    button.style.padding = '0.5rem';
+                    button.style.cursor = 'pointer';
+                    button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    button.style.transition = 'background-color 0.2s';
+                    
+                    // Add hover effect
+                    button.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#14a085';
+                    });
+                    button.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '#0d7377';
+                    });
+                }
+            });
+        });
+    }
+    
+    // Run immediately and after delays
+    ensureSidebarToggleVisible();
+    setTimeout(ensureSidebarToggleVisible, 100);
+    setTimeout(ensureSidebarToggleVisible, 500);
+    setTimeout(ensureSidebarToggleVisible, 1000);
+    
+    // Also observe for dynamically added buttons
+    const sidebarToggleObserver = new MutationObserver(ensureSidebarToggleVisible);
+    sidebarToggleObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class', 'aria-label', 'data-testid']
     });
 </script>
 """, unsafe_allow_html=True)
