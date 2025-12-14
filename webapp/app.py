@@ -1077,6 +1077,55 @@ def inject_keyboard_shortcuts():
 def main():
     """Main application"""
     
+    # Add autocomplete attributes to form fields via JavaScript
+    st.markdown("""
+    <script>
+    (function() {
+        function setAutocompleteAttributes() {
+            // Find password inputs and set autocomplete
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            passwordInputs.forEach(input => {
+                if (!input.getAttribute('autocomplete')) {
+                    input.setAttribute('autocomplete', 'current-password');
+                }
+            });
+            
+            // Find text inputs and set appropriate autocomplete based on label
+            const textInputs = document.querySelectorAll('input[type="text"]');
+            textInputs.forEach(input => {
+                if (!input.getAttribute('autocomplete')) {
+                    const label = input.closest('[data-testid*="stTextInput"]')?.querySelector('label');
+                    if (label) {
+                        const labelText = label.textContent.toLowerCase();
+                        if (labelText.includes('username') || labelText.includes('user')) {
+                            input.setAttribute('autocomplete', 'username');
+                        } else if (labelText.includes('host') || labelText.includes('url')) {
+                            input.setAttribute('autocomplete', 'url');
+                        } else if (labelText.includes('email')) {
+                            input.setAttribute('autocomplete', 'email');
+                        } else {
+                            input.setAttribute('autocomplete', 'off');
+                        }
+                    } else {
+                        input.setAttribute('autocomplete', 'off');
+                    }
+                }
+            });
+        }
+        
+        // Run on load and after delays
+        setAutocompleteAttributes();
+        setTimeout(setAutocompleteAttributes, 100);
+        setTimeout(setAutocompleteAttributes, 500);
+        setTimeout(setAutocompleteAttributes, 1000);
+        
+        // Also observe for dynamically added inputs
+        const observer = new MutationObserver(setAutocompleteAttributes);
+        observer.observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+    
     # Handle navigation via query parameters at the top level (most reliable)
     section_labels = {
         'chatbot': '💬 AI SQL Assistant',
