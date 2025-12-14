@@ -1720,9 +1720,14 @@ def chatbot_compact():
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
-                st.chat_message("assistant").write(msg['content'])
+                # Show explanation in collapsed expander by default
+                with st.expander("💡 View Explanation", expanded=False):
+                    st.chat_message("assistant").write(msg['content'])
+                
+                # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
-                    st.code(msg['sql_query'], language='sql')
+                    with st.expander("📝 Generated SQL", expanded=True):
+                        st.code(msg['sql_query'], language='sql')
     else:
         if not st.session_state.chatbot:
             st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
@@ -2114,9 +2119,13 @@ def chatbot_tab():
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
-                st.chat_message("assistant").write(msg['content'])
+                # Show explanation in collapsed expander by default
+                with st.expander("💡 View Explanation", expanded=False):
+                    st.chat_message("assistant").write(msg['content'])
+                
+                # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
-                    with st.expander("View Generated SQL"):
+                    with st.expander("📝 Generated SQL", expanded=True):
                         st.code(msg['sql_query'], language='sql')
                         if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
                             execute_generated_query(msg['sql_query'])
