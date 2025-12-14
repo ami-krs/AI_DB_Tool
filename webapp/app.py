@@ -1212,18 +1212,18 @@ def main():
             )
             
             with st.form("connection_form"):
-            if db_type == "sqlite":
-                database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)", autocomplete="off")
-                host = ""
-                port = 0  # SQLite doesn't use ports
-                username = ""
-                password = ""
-            else:
-                host = st.text_input("Host", value="localhost", autocomplete="url")
-                port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
-                database = st.text_input("Database Name", autocomplete="off")
-                username = st.text_input("Username", autocomplete="username")
-                password = st.text_input("Password", type="password", autocomplete="current-password")
+                if db_type == "sqlite":
+                    database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file (e.g., /tmp/test_db.sqlite)", autocomplete="off")
+                    host = ""
+                    port = 0  # SQLite doesn't use ports
+                    username = ""
+                    password = ""
+                else:
+                    host = st.text_input("Host", value="localhost", autocomplete="url")
+                    port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306)
+                    database = st.text_input("Database Name", autocomplete="off")
+                    username = st.text_input("Username", autocomplete="username")
+                    password = st.text_input("Password", type="password", autocomplete="current-password")
                 
                 connect_button = st.form_submit_button("Connect", type="primary")
         
