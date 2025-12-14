@@ -493,58 +493,107 @@ st.markdown("""
     
     // Ensure sidebar toggle button is always visible
     function ensureSidebarToggleVisible() {
-        // Find all potential sidebar toggle buttons
-        const selectors = [
-            'button[data-testid*="stSidebarCollapse"]',
-            'button[aria-label*="close sidebar"]',
-            'button[aria-label*="open sidebar"]',
-            'button[aria-label*="Close sidebar"]',
-            'button[aria-label*="Open sidebar"]',
-            'button[kind="header"]',
-            '.stApp > button[data-testid]',
-            '[data-testid="baseButton-header"]'
-        ];
+        // Find all buttons first
+        const allButtons = document.querySelectorAll('button');
+        let sidebarToggleButton = null;
         
-        selectors.forEach(selector => {
-            const buttons = document.querySelectorAll(selector);
-            buttons.forEach(button => {
-                // Check if this is likely the sidebar toggle button
-                const ariaLabel = button.getAttribute('aria-label') || '';
-                const testId = button.getAttribute('data-testid') || '';
-                
-                if (ariaLabel.toLowerCase().includes('sidebar') || 
-                    ariaLabel.toLowerCase().includes('menu') ||
-                    testId.includes('sidebar') ||
-                    testId.includes('Collapse') ||
-                    testId.includes('header')) {
-                    
-                    // Make it visible and position it correctly
-                    button.style.display = 'flex';
-                    button.style.visibility = 'visible';
-                    button.style.opacity = '1';
-                    button.style.position = 'fixed';
-                    button.style.top = '0.5rem';
-                    button.style.left = '0';
-                    button.style.zIndex = '999';
-                    button.style.backgroundColor = '#0d7377';
-                    button.style.color = 'white';
-                    button.style.border = 'none';
-                    button.style.borderRadius = '0 0.5rem 0.5rem 0';
-                    button.style.padding = '0.5rem';
-                    button.style.cursor = 'pointer';
-                    button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-                    button.style.transition = 'background-color 0.2s';
-                    
-                    // Add hover effect
-                    button.addEventListener('mouseenter', function() {
-                        this.style.backgroundColor = '#14a085';
-                    });
-                    button.addEventListener('mouseleave', function() {
-                        this.style.backgroundColor = '#0d7377';
-                    });
+        // Try to find the sidebar toggle button using various methods
+        for (let button of allButtons) {
+            const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+            const testId = (button.getAttribute('data-testid') || '').toLowerCase();
+            const kind = button.getAttribute('kind') || '';
+            const className = button.className || '';
+            
+            // Check multiple conditions to identify sidebar toggle
+            const isSidebarToggle = 
+                ariaLabel.includes('sidebar') ||
+                ariaLabel.includes('menu') ||
+                testId.includes('sidebar') ||
+                testId.includes('collapse') ||
+                (kind === 'header' && (ariaLabel.includes('sidebar') || testId.includes('header'))) ||
+                (testId.includes('basebutton') && testId.includes('header')) ||
+                // Check if button is positioned where sidebar toggle would be
+                (button.style && (
+                    button.style.left === '0px' ||
+                    button.style.position === 'fixed'
+                ) && button.offsetLeft < 100);
+            
+            if (isSidebarToggle) {
+                sidebarToggleButton = button;
+                break;
+            }
+        }
+        
+        // Also check for Streamlit's specific sidebar toggle elements
+        if (!sidebarToggleButton) {
+            // Try Streamlit's specific selectors
+            const collapseButton = document.querySelector('[data-testid="stSidebarCollapseButton"]');
+            if (collapseButton) {
+                sidebarToggleButton = collapseButton.querySelector('button') || collapseButton;
+            }
+        }
+        
+        // If still not found, look for buttons with specific SVG icons (chevron/arrow)
+        if (!sidebarToggleButton) {
+            for (let button of allButtons) {
+                const svg = button.querySelector('svg');
+                if (svg) {
+                    const svgPath = svg.innerHTML || '';
+                    // Sidebar toggle typically has chevron/arrow icons
+                    if (svgPath.includes('chevron') || 
+                        svgPath.includes('arrow') ||
+                        svgPath.includes('M9') || // Common path for chevrons
+                        svgPath.includes('path d=')) {
+                        // Check if it's positioned near the left edge
+                        const rect = button.getBoundingClientRect();
+                        if (rect.left < 100 && rect.top < 100) {
+                            sidebarToggleButton = button;
+                            break;
+                        }
+                    }
                 }
+            }
+        }
+        
+        // Style the found button
+        if (sidebarToggleButton) {
+            sidebarToggleButton.style.display = 'flex';
+            sidebarToggleButton.style.visibility = 'visible';
+            sidebarToggleButton.style.opacity = '1';
+            sidebarToggleButton.style.position = 'fixed';
+            sidebarToggleButton.style.top = '0.5rem';
+            sidebarToggleButton.style.left = '0';
+            sidebarToggleButton.style.zIndex = '9999';
+            sidebarToggleButton.style.backgroundColor = '#0d7377';
+            sidebarToggleButton.style.color = 'white';
+            sidebarToggleButton.style.border = 'none';
+            sidebarToggleButton.style.borderRadius = '0 0.5rem 0.5rem 0';
+            sidebarToggleButton.style.padding = '0.5rem';
+            sidebarToggleButton.style.cursor = 'pointer';
+            sidebarToggleButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            sidebarToggleButton.style.transition = 'background-color 0.2s';
+            sidebarToggleButton.style.minWidth = '40px';
+            sidebarToggleButton.style.minHeight = '40px';
+            
+            // Ensure SVG icons inside are white
+            const svgIcons = sidebarToggleButton.querySelectorAll('svg');
+            svgIcons.forEach(svg => {
+                svg.style.fill = 'white';
+                svg.style.color = 'white';
             });
-        });
+            
+            // Remove existing listeners to avoid duplicates, then add hover effect
+            const newButton = sidebarToggleButton.cloneNode(true);
+            sidebarToggleButton.parentNode.replaceChild(newButton, sidebarToggleButton);
+            sidebarToggleButton = newButton;
+            
+            sidebarToggleButton.addEventListener('mouseenter', function() {
+                this.style.backgroundColor = '#14a085';
+            });
+            sidebarToggleButton.addEventListener('mouseleave', function() {
+                this.style.backgroundColor = '#0d7377';
+            });
+        }
     }
     
     // Run immediately and after delays
