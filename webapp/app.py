@@ -611,49 +611,54 @@ st.markdown("""
             attributeFilter: ['style', 'class', 'aria-label', 'data-testid']
         });
         
-        // Create a fallback custom toggle button if native one isn't found
-        function createFallbackToggleButton() {
-            // Check if we already created one
-            if (document.getElementById('custom-sidebar-toggle')) {
-                return;
+        // Always create a custom toggle button that's guaranteed to be visible
+        function createCustomSidebarToggle() {
+            // Remove existing custom button if present
+            const existing = document.getElementById('custom-sidebar-toggle');
+            if (existing) {
+                existing.remove();
             }
             
             // Check if sidebar exists
             const sidebar = document.querySelector('[data-testid="stSidebar"]');
-            if (!sidebar) return;
-            
-            // Check if native button exists
-            const nativeButton = document.querySelector('button[aria-label*="sidebar" i]') ||
-                                 document.querySelector('[data-testid*="sidebar" i] button') ||
-                                 document.querySelector('button[kind="header"]');
-            
-            if (nativeButton && window.getComputedStyle(nativeButton).display !== 'none') {
-                return; // Native button exists and is visible
+            if (!sidebar) {
+                // Retry if sidebar not ready
+                setTimeout(createCustomSidebarToggle, 100);
+                return;
             }
             
-            // Create custom toggle button
+            // Create custom toggle button - always visible
             const toggleButton = document.createElement('button');
             toggleButton.id = 'custom-sidebar-toggle';
             toggleButton.innerHTML = '☰';
             toggleButton.setAttribute('aria-label', 'Toggle sidebar');
-            toggleButton.style.cssText = `
-                position: fixed;
-                top: 0.5rem;
-                left: 0;
-                z-index: 9999;
-                background-color: #0d7377;
-                color: white;
-                border: none;
-                border-radius: 0 0.5rem 0.5rem 0;
-                padding: 0.5rem;
-                cursor: pointer;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                transition: background-color 0.2s;
-                min-width: 40px;
-                min-height: 40px;
-                font-size: 1.2rem;
-            `;
+            toggleButton.setAttribute('type', 'button');
             
+            // Style the button
+            Object.assign(toggleButton.style, {
+                position: 'fixed',
+                top: '0.5rem',
+                left: '0',
+                zIndex: '99999',
+                backgroundColor: '#0d7377',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0 0.5rem 0.5rem 0',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                transition: 'background-color 0.2s',
+                minWidth: '40px',
+                minHeight: '40px',
+                fontSize: '1.2rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                visibility: 'visible',
+                opacity: '1'
+            });
+            
+            // Hover effects
             toggleButton.addEventListener('mouseenter', function() {
                 this.style.backgroundColor = '#14a085';
             });
@@ -662,40 +667,106 @@ st.markdown("""
                 this.style.backgroundColor = '#0d7377';
             });
             
-            toggleButton.addEventListener('click', function() {
-                // Try to find and click native button first
-                const nativeBtn = document.querySelector('button[aria-label*="sidebar" i]') ||
-                                  document.querySelector('[data-testid*="sidebar" i] button');
-                if (nativeBtn) {
-                    nativeBtn.click();
-                } else {
-                    // Fallback: try to toggle sidebar directly
+            // Click handler - try multiple methods to toggle sidebar
+            toggleButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Method 1: Try to find and click Streamlit's native toggle button
+                const selectors = [
+                    'button[aria-label*="close sidebar" i]',
+                    'button[aria-label*="open sidebar" i]',
+                    'button[aria-label*="Close sidebar" i]',
+                    'button[aria-label*="Open sidebar" i]',
+                    '[data-testid*="stSidebarCollapse"] button',
+                    '[data-testid*="stSidebarCollapseButton"]',
+                    'button[kind="header"]'
+                ];
+                
+                let clicked = false;
+                for (let selector of selectors) {
+                    const btn = document.querySelector(selector);
+                    if (btn && btn.offsetParent !== null) { // Check if visible
+                        btn.click();
+                        clicked = true;
+                        break;
+                    }
+                }
+                
+                // Method 2: If native button not found, try to toggle sidebar directly via Streamlit's API
+                if (!clicked) {
+                    // Send message to Streamlit to toggle sidebar
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'streamlit:setComponentValue',
+                            key: 'sidebar',
+                            value: 'toggle'
+                        }, '*');
+                    }
+                    
+                    // Fallback: Try to manipulate sidebar CSS directly
                     const sidebarEl = document.querySelector('[data-testid="stSidebar"]');
                     if (sidebarEl) {
-                        // Toggle visibility
-                        const isVisible = window.getComputedStyle(sidebarEl).display !== 'none';
-                        sidebarEl.style.display = isVisible ? 'none' : 'flex';
+                        const computedStyle = window.getComputedStyle(sidebarEl);
+                        const isVisible = computedStyle.display !== 'none' && 
+                                         computedStyle.visibility !== 'hidden' &&
+                                         sidebarEl.offsetWidth > 0;
+                        
+                        // Try to trigger Streamlit's sidebar toggle by dispatching events
+                        const event = new CustomEvent('sidebar-toggle', { bubbles: true });
+                        document.dispatchEvent(event);
+                        
+                        // As last resort, try CSS manipulation (this may not work with Streamlit's state)
+                        // But we'll try it anyway
+                        if (!isVisible) {
+                            sidebarEl.style.display = '';
+                            sidebarEl.style.visibility = '';
+                        }
                     }
                 }
             });
             
+            // Always append to body
             document.body.appendChild(toggleButton);
         }
         
-        // Try to create fallback button
-        setTimeout(createFallbackToggleButton, 500);
-        setTimeout(createFallbackToggleButton, 1000);
-        setTimeout(createFallbackToggleButton, 2000);
+        // Create toggle button immediately and retry if needed
+        createCustomSidebarToggle();
+        setTimeout(createCustomSidebarToggle, 100);
+        setTimeout(createCustomSidebarToggle, 500);
+        setTimeout(createCustomSidebarToggle, 1000);
+        setTimeout(createCustomSidebarToggle, 2000);
         
-        // Also observe for sidebar changes
+        // Observe for sidebar changes and ensure button is always visible
         const sidebarObserver = new MutationObserver(function() {
+            // Ensure custom button exists
+            if (!document.getElementById('custom-sidebar-toggle')) {
+                createCustomSidebarToggle();
+            }
+            // Also try to style native button
             ensureSidebarToggleVisible();
-            createFallbackToggleButton();
         });
+        
         sidebarObserver.observe(document.body, {
             childList: true,
-            subtree: true
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'data-testid']
         });
+        
+        // Also watch for sidebar specifically
+        const sidebarElement = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebarElement) {
+            const sidebarMutationObserver = new MutationObserver(function() {
+                if (!document.getElementById('custom-sidebar-toggle')) {
+                    createCustomSidebarToggle();
+                }
+            });
+            sidebarMutationObserver.observe(sidebarElement, {
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
 </script>
 """, unsafe_allow_html=True)
 
