@@ -2120,8 +2120,8 @@ def chatbot_tab():
                         st.code(msg['sql_query'], language='sql')
                         if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
                             execute_generated_query(msg['sql_query'])
-    else:
-        st.info("💬 Start chatting by typing a message below!")
+    # else:
+    #     st.info("💬 Start chatting by typing a message below!")
     
     # Add marker after chat messages and JavaScript to wrap them
     st.markdown("""
