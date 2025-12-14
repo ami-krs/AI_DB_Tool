@@ -2070,13 +2070,13 @@ def chatbot_tab():
     
     # Example questions section
     if not st.session_state.chat_history:
-        st.markdown("### 💡 Example Questions to Get Started")
-        st.markdown("Click on any question below to get started:")
+        #st.markdown("### 💡 Example Questions to Get Started")
+        #st.markdown("Click on any question below to get started:")
         
         example_questions = [
-            "Show me the list of all tables in the database",
-            "List tables that have more than 10 records",
-            "What are the column names and data types for all tables?"
+            "list of all tables in the database",
+            "Tables with more than 10 records",
+            "Column names and data types for all tables?"
         ]
         
         cols = st.columns(3)
