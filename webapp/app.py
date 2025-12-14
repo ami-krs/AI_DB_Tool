@@ -1527,7 +1527,7 @@ def main():
 
 
 def render_navigation_bar():
-    """Render dropdown navigation bar with hover menu at the top"""
+    """Render dropdown navigation bar using Streamlit selectbox styled as dropdown"""
     
     # Get current section label
     section_labels = {
@@ -1537,93 +1537,61 @@ def render_navigation_bar():
         'visualizations': '📊 Data Visualizations'
     }
     
-    current_label = section_labels.get(st.session_state.active_section, '💬 AI SQL Assistant')
+    # Get options and current index
+    options = list(section_labels.keys())
+    labels = [section_labels[k] for k in options]
     
-    # Create hover dropdown menu with JavaScript to handle navigation without page reload
-    st.markdown(f"""
+    try:
+        current_index = options.index(st.session_state.active_section)
+    except ValueError:
+        current_index = 0
+    
+    # Use Streamlit selectbox - this is reliable and works with Streamlit's state
+    selected_label = st.selectbox(
+        "Select Section",
+        options=labels,
+        index=current_index,
+        key="nav_dropdown_selectbox",
+        label_visibility="collapsed"
+    )
+    
+    # Update active section if selection changed
+    selected_section = options[labels.index(selected_label)] if selected_label in labels else options[0]
+    if selected_section != st.session_state.active_section:
+        st.session_state.active_section = selected_section
+        st.rerun()
+    
+    # Style the selectbox to look like a compact dropdown button
+    st.markdown("""
     <style>
-    .nav-wrapper {{
-        position: relative;
-        display: inline-block;
-        margin-top: 0.5rem;
-    }}
-    .nav-dropdown {{
-        position: relative;
-        display: inline-block;
-    }}
-    .nav-main-btn {{
-        background-color: #0d7377;
+    /* Style selectbox to look like a navigation dropdown button */
+    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) {
+        margin-bottom: 0.5rem;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div {
+        background-color: #0d7377 !important;
+        border-radius: 0.5rem !important;
+        padding: 0.5rem 1rem !important;
         color: white !important;
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        text-decoration: none;
-        white-space: nowrap;
-    }}
-    .nav-main-btn:hover {{
-        background-color: #14a085;
-    }}
-    .nav-dropdown-menu {{
-        display: none;
-        position: absolute;
-        background-color: white;
-        width: max-content;
-        min-width: fit-content;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-        z-index: 1000;
-        border-radius: 0.5rem;
-        margin-top: 0.5rem;
-        border: 1px solid rgba(0,0,0,0.1);
-        overflow: hidden;
-        top: 100%;
-        right: 0;
-    }}
-    .nav-dropdown:hover .nav-dropdown-menu {{
-        display: block;
-    }}
-    .nav-menu-item {{
-        color: #333;
-        padding: 0.75rem 1rem;
-        display: block;
-        cursor: pointer;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        text-decoration: none;
-        transition: background-color 0.2s;
-        white-space: nowrap;
-    }}
-    .nav-menu-item:last-child {{
-        border-bottom: none;
-    }}
-    .nav-menu-item:hover {{
-        background-color: #f0f7f8;
-        color: #0d7377;
-    }}
-    .nav-menu-item.active {{
-        background-color: #e8f4f5;
-        color: #0d7377;
-        font-weight: 600;
-    }}
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        cursor: pointer !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: background-color 0.2s !important;
+        min-width: fit-content !important;
+        width: max-content !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div:hover {
+        background-color: #14a085 !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div > div {
+        color: white !important;
+    }
+    div[data-testid="stSelectbox"]:has(> label[for*="nav_dropdown"]) > div > div > div > svg {
+        fill: white !important;
+    }
     </style>
-    <div class="nav-wrapper">
-        <div class="nav-dropdown">
-            <span class="nav-main-btn">
-                <span>{current_label}</span>
-                <span style="font-size:0.8rem;">▼</span>
-            </span>
-            <div class="nav-dropdown-menu" id="nav-dropdown-menu">
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" data-section="chatbot">💬 AI SQL Assistant</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" data-section="sql_editor">📝 Smart SQL Editor</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" data-section="data_explorer">🔍 Data Explorer</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" data-section="visualizations">📊 Data Visualizations</div>
-            </div>
-        </div>
-    </div>
     """, unsafe_allow_html=True)
 
 
