@@ -638,50 +638,45 @@ st.markdown("""
         
         // Always create a custom toggle button that's guaranteed to be visible
         function createCustomSidebarToggle() {
+            console.log('Creating custom sidebar toggle button...');
+            
             // Remove existing custom button if present
             const existing = document.getElementById('custom-sidebar-toggle');
             if (existing) {
+                console.log('Removing existing custom button');
                 existing.remove();
             }
             
-            // Check if sidebar exists
-            const sidebar = document.querySelector('[data-testid="stSidebar"]');
-            if (!sidebar) {
-                // Retry if sidebar not ready
-                setTimeout(createCustomSidebarToggle, 100);
-                return;
-            }
-            
-            // Create custom toggle button - always visible
+            // Create custom toggle button - always visible, don't wait for sidebar
             const toggleButton = document.createElement('button');
             toggleButton.id = 'custom-sidebar-toggle';
             toggleButton.innerHTML = '☰';
             toggleButton.setAttribute('aria-label', 'Toggle sidebar');
             toggleButton.setAttribute('type', 'button');
+            toggleButton.setAttribute('title', 'Toggle Sidebar');
             
-            // Style the button
-            Object.assign(toggleButton.style, {
-                position: 'fixed',
-                top: '0.5rem',
-                left: '0',
-                zIndex: '99999',
-                backgroundColor: '#0d7377',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0 0.5rem 0.5rem 0',
-                padding: '0.5rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                transition: 'background-color 0.2s',
-                minWidth: '40px',
-                minHeight: '40px',
-                fontSize: '1.2rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                visibility: 'visible',
-                opacity: '1'
-            });
+            // Style the button with inline styles to ensure they're applied
+            toggleButton.style.position = 'fixed';
+            toggleButton.style.top = '0.5rem';
+            toggleButton.style.left = '0';
+            toggleButton.style.zIndex = '99999';
+            toggleButton.style.backgroundColor = '#0d7377';
+            toggleButton.style.color = 'white';
+            toggleButton.style.border = 'none';
+            toggleButton.style.borderRadius = '0 0.5rem 0.5rem 0';
+            toggleButton.style.padding = '0.5rem';
+            toggleButton.style.cursor = 'pointer';
+            toggleButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            toggleButton.style.transition = 'background-color 0.2s';
+            toggleButton.style.minWidth = '40px';
+            toggleButton.style.minHeight = '40px';
+            toggleButton.style.fontSize = '1.2rem';
+            toggleButton.style.display = 'flex';
+            toggleButton.style.alignItems = 'center';
+            toggleButton.style.justifyContent = 'center';
+            toggleButton.style.visibility = 'visible';
+            toggleButton.style.opacity = '1';
+            toggleButton.style.pointerEvents = 'auto';
             
             // Hover effects
             toggleButton.addEventListener('mouseenter', function() {
@@ -751,22 +746,56 @@ st.markdown("""
                 }
             });
             
-            // Always append to body
-            document.body.appendChild(toggleButton);
+            // Always append to body or main container
+            const targetContainer = document.body || document.documentElement;
+            targetContainer.appendChild(toggleButton);
+            console.log('Custom sidebar toggle button created and appended');
+            
+            // Verify it's visible
+            setTimeout(function() {
+                const btn = document.getElementById('custom-sidebar-toggle');
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    console.log('Button position:', rect.left, rect.top, 'Visible:', rect.width > 0 && rect.height > 0);
+                } else {
+                    console.error('Button was not found after creation!');
+                }
+            }, 100);
         }
         
-        // Create toggle button immediately and retry if needed
-        createCustomSidebarToggle();
+        // Create toggle button immediately when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                createCustomSidebarToggle();
+            });
+        } else {
+            createCustomSidebarToggle();
+        }
+        
+        // Also retry multiple times to ensure it's created
         setTimeout(createCustomSidebarToggle, 100);
+        setTimeout(createCustomSidebarToggle, 300);
         setTimeout(createCustomSidebarToggle, 500);
         setTimeout(createCustomSidebarToggle, 1000);
         setTimeout(createCustomSidebarToggle, 2000);
+        setTimeout(createCustomSidebarToggle, 3000);
         
         // Observe for sidebar changes and ensure button is always visible
-        const sidebarObserver = new MutationObserver(function() {
-            // Ensure custom button exists
-            if (!document.getElementById('custom-sidebar-toggle')) {
+        const sidebarObserver = new MutationObserver(function(mutations) {
+            // Check if custom button exists
+            let customButton = document.getElementById('custom-sidebar-toggle');
+            if (!customButton) {
+                console.log('Custom button missing, recreating...');
                 createCustomSidebarToggle();
+            } else {
+                // Ensure it's still visible
+                const rect = customButton.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    console.log('Button exists but not visible, fixing...');
+                    customButton.style.display = 'flex';
+                    customButton.style.visibility = 'visible';
+                    customButton.style.opacity = '1';
+                }
             }
             // Also try to style native button
             ensureSidebarToggleVisible();
@@ -780,18 +809,24 @@ st.markdown("""
         });
         
         // Also watch for sidebar specifically
-        const sidebarElement = document.querySelector('[data-testid="stSidebar"]');
-        if (sidebarElement) {
-            const sidebarMutationObserver = new MutationObserver(function() {
-                if (!document.getElementById('custom-sidebar-toggle')) {
-                    createCustomSidebarToggle();
-                }
-            });
-            sidebarMutationObserver.observe(sidebarElement, {
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
+        function watchSidebar() {
+            const sidebarElement = document.querySelector('[data-testid="stSidebar"]');
+            if (sidebarElement) {
+                const sidebarMutationObserver = new MutationObserver(function() {
+                    if (!document.getElementById('custom-sidebar-toggle')) {
+                        createCustomSidebarToggle();
+                    }
+                });
+                sidebarMutationObserver.observe(sidebarElement, {
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+            } else {
+                // Retry if sidebar not found yet
+                setTimeout(watchSidebar, 500);
+            }
         }
+        watchSidebar();
 </script>
 """, unsafe_allow_html=True)
 
