@@ -1158,9 +1158,13 @@ def main():
                     
                     if (section) {
                         const baseUrl = window.location.origin + window.location.pathname;
-                        const newUrl = baseUrl + '?section=' + section;
+                        // Preserve any existing query params
+                        const currentParams = new URLSearchParams(window.location.search);
+                        currentParams.set('section', section);
+                        const newUrl = baseUrl + '?' + currentParams.toString();
                         console.log('Navigating to:', newUrl);
-                        window.location.href = newUrl;
+                        // Use window.location.replace to avoid adding to history
+                        window.location.replace(newUrl);
                     }
                 }, false);
                 
