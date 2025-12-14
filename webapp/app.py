@@ -1491,67 +1491,68 @@ def render_navigation_bar():
     </div>
     <script>
     (function() {{
-        console.log('Navigation script loaded');
+        console.log('Navigation script loading...');
         
-        // Use event delegation to handle clicks on menu items
-        function handleNavClick(e) {{
-            console.log('Click detected on:', e.target);
+        function attachListeners() {{
+            console.log('Attempting to attach listeners...');
+            const menuItems = document.querySelectorAll('.nav-menu-item[data-section]');
+            console.log('Found menu items:', menuItems.length);
             
-            // Try multiple ways to find the menu item
-            let menuItem = e.target.closest('.nav-menu-item[data-section]');
-            
-            // If closest didn't work, check if target itself is a menu item
-            if (!menuItem && e.target.classList.contains('nav-menu-item')) {{
-                menuItem = e.target;
-            }}
-            
-            // Check parent elements
-            if (!menuItem) {{
-                let parent = e.target.parentElement;
-                let depth = 0;
-                while (parent && depth < 5) {{
-                    if (parent.classList && parent.classList.contains('nav-menu-item') && parent.hasAttribute('data-section')) {{
-                        menuItem = parent;
-                        break;
-                    }}
-                    parent = parent.parentElement;
-                    depth++;
-                }}
-            }}
-            
-            if (menuItem) {{
-                console.log('Menu item found:', menuItem);
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+            menuItems.forEach(function(item, index) {{
+                console.log('Attaching listener to menu item', index, item);
                 
-                const section = menuItem.getAttribute('data-section');
-                if (section) {{
-                    console.log('Navigating to section:', section);
-                    // Get current URL without query params
-                    const baseUrl = window.location.origin + window.location.pathname;
-                    const newUrl = baseUrl + '?section=' + section;
-                    console.log('Navigating to URL:', newUrl);
-                    // Navigate in the same window
-                    window.location.href = newUrl;
-                    return false;
-                }} else {{
-                    console.log('No data-section attribute found');
-                }}
-            }} else {{
-                console.log('No menu item found for click');
-            }}
+                // Remove any existing listeners by cloning
+                const newItem = item.cloneNode(true);
+                item.parentNode.replaceChild(newItem, item);
+                
+                // Attach click listener directly
+                newItem.addEventListener('click', function(e) {{
+                    console.log('Menu item clicked!', e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    const section = this.getAttribute('data-section');
+                    console.log('Section:', section);
+                    
+                    if (section) {{
+                        const baseUrl = window.location.origin + window.location.pathname;
+                        const newUrl = baseUrl + '?section=' + section;
+                        console.log('Navigating to:', newUrl);
+                        window.location.href = newUrl;
+                    }}
+                }}, false);
+                
+                // Also add pointer-events style to ensure clicks work
+                newItem.style.cursor = 'pointer';
+                newItem.style.pointerEvents = 'auto';
+            }});
         }}
         
-        // Attach listener with capture phase to catch events early
-        document.addEventListener('click', handleNavClick, true);
+        // Try multiple times to catch the elements
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', attachListeners);
+        }} else {{
+            attachListeners();
+        }}
         
-        // Also try attaching to body after a delay
-        setTimeout(function() {{
-            if (document.body) {{
-                document.body.addEventListener('click', handleNavClick, true);
-            }}
-        }}, 100);
+        // Retry with delays
+        setTimeout(attachListeners, 100);
+        setTimeout(attachListeners, 500);
+        setTimeout(attachListeners, 1000);
+        setTimeout(attachListeners, 2000);
+        
+        // Use MutationObserver to catch dynamically added elements
+        const observer = new MutationObserver(function(mutations) {{
+            attachListeners();
+        }});
+        
+        if (document.body) {{
+            observer.observe(document.body, {{
+                childList: true,
+                subtree: true
+            }});
+        }}
     }})();
     </script>
     """, unsafe_allow_html=True)
