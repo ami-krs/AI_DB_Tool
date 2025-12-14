@@ -1499,7 +1499,7 @@ def main():
             st.markdown("#### 🤖 AI Database Tool")
     else:
         # Header with title
-        st.title("🤖 AI Database Tool")
+        st.title("#### 🤖 AI Database Tool")
         st.markdown("Intelligent database management with AI-powered SQL generation")
         
         # Navigation dropdown below subtitle on the left
