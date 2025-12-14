@@ -443,6 +443,10 @@ st.markdown("""
     }
 </style>
 <script>
+    // TEST: This should appear in console immediately
+    console.log('=== SIDEBAR TOGGLE SCRIPT STARTING ===');
+    console.error('TEST ERROR MESSAGE - IF YOU SEE THIS, SCRIPT IS RUNNING');
+    
     // Aggressively remove all top spacing
     function removeTopSpacing() {
         // Hide header completely
@@ -515,6 +519,9 @@ st.markdown("""
         childList: true,
         subtree: true
     });
+    
+    // Test if script is running
+    console.log('=== SIDEBAR TOGGLE SCRIPT LOADED ===');
     
     // Ensure sidebar toggle button is always visible
     function ensureSidebarToggleVisible() {
@@ -638,7 +645,7 @@ st.markdown("""
         
         // Always create a custom toggle button that's guaranteed to be visible
         function createCustomSidebarToggle() {
-            console.log('Creating custom sidebar toggle button...');
+            console.log('=== Creating custom sidebar toggle button ===');
             
             // Remove existing custom button if present
             const existing = document.getElementById('custom-sidebar-toggle');
