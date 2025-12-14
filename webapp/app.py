@@ -1126,6 +1126,78 @@ def main():
     </script>
     """, unsafe_allow_html=True)
     
+    # Add navigation dropdown JavaScript
+    st.markdown("""
+    <script>
+    (function() {
+        console.log('Navigation script loading...');
+        
+        function attachNavListeners() {
+            console.log('Attempting to attach navigation listeners...');
+            const menuItems = document.querySelectorAll('.nav-menu-item[data-section]');
+            console.log('Found navigation menu items:', menuItems.length);
+            
+            menuItems.forEach(function(item, index) {
+                // Skip if already has listener attached (check for data attribute)
+                if (item.hasAttribute('data-listener-attached')) {
+                    return;
+                }
+                
+                console.log('Attaching listener to menu item', index, item);
+                item.setAttribute('data-listener-attached', 'true');
+                
+                // Attach click listener directly
+                item.addEventListener('click', function(e) {
+                    console.log('Menu item clicked!', e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    const section = this.getAttribute('data-section');
+                    console.log('Section:', section);
+                    
+                    if (section) {
+                        const baseUrl = window.location.origin + window.location.pathname;
+                        const newUrl = baseUrl + '?section=' + section;
+                        console.log('Navigating to:', newUrl);
+                        window.location.href = newUrl;
+                    }
+                }, false);
+                
+                // Ensure clicks work
+                item.style.cursor = 'pointer';
+                item.style.pointerEvents = 'auto';
+            });
+        }
+        
+        // Try multiple times to catch the elements
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', attachNavListeners);
+        } else {
+            attachNavListeners();
+        }
+        
+        // Retry with delays
+        setTimeout(attachNavListeners, 100);
+        setTimeout(attachNavListeners, 500);
+        setTimeout(attachNavListeners, 1000);
+        setTimeout(attachNavListeners, 2000);
+        
+        // Use MutationObserver to catch dynamically added elements
+        const observer = new MutationObserver(function(mutations) {
+            attachNavListeners();
+        });
+        
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+    
     # Handle navigation via query parameters at the top level (most reliable)
     section_labels = {
         'chatbot': '💬 AI SQL Assistant',
