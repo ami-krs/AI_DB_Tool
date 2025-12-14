@@ -1436,14 +1436,15 @@ def main():
         with col2:
             st.markdown("#### 🤖 AI Database Tool")
     else:
-        # Header with title and navigation dropdown
-        header_col1, header_col2 = st.columns([3, 1])
-        with header_col1:
-            st.title("🤖 AI Database Tool")
-        with header_col2:
-            if st.session_state.connected:
-                render_navigation_bar()
+        # Header with title
+        st.title("🤖 AI Database Tool")
         st.markdown("Intelligent database management with AI-powered SQL generation")
+        
+        # Navigation dropdown below subtitle on the left
+        if st.session_state.connected:
+            nav_col1, nav_col2 = st.columns([1, 3])
+            with nav_col1:
+                render_navigation_bar()
     
     if not st.session_state.connected:
         st.info("👈 Connect to a database using the sidebar to get started")
