@@ -1433,55 +1433,23 @@ def render_navigation_bar():
                 <span style="font-size:0.8rem;">▼</span>
             </span>
             <div class="nav-dropdown-menu">
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" data-section="chatbot">💬 AI SQL Assistant</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" data-section="sql_editor">📝 Smart SQL Editor</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" data-section="data_explorer">🔍 Data Explorer</div>
-                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" data-section="visualizations">📊 Data Visualizations</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'chatbot' else ''}" onclick="navigateTo('chatbot')">💬 AI SQL Assistant</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'sql_editor' else ''}" onclick="navigateTo('sql_editor')">📝 Smart SQL Editor</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'data_explorer' else ''}" onclick="navigateTo('data_explorer')">🔍 Data Explorer</div>
+                <div class="nav-menu-item {'active' if st.session_state.active_section == 'visualizations' else ''}" onclick="navigateTo('visualizations')">📊 Data Visualizations</div>
             </div>
         </div>
     </div>
     <script>
-    (function() {{
-        function initNavigation() {{
-            // Get all menu items
-            const menuItems = document.querySelectorAll('.nav-menu-item[data-section]');
-            
-            menuItems.forEach(function(item) {{
-                // Remove any existing listeners by cloning
-                const newItem = item.cloneNode(true);
-                item.parentNode.replaceChild(newItem, item);
-                
-                // Add click listener to new item
-                newItem.addEventListener('click', function(e) {{
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    
-                    const section = this.getAttribute('data-section');
-                    if (section) {{
-                        // Get current URL without query params
-                        const baseUrl = window.location.origin + window.location.pathname;
-                        const newUrl = baseUrl + '?section=' + section;
-                        
-                        // Navigate in the same window
-                        window.location.assign(newUrl);
-                    }}
-                }}, true); // Use capture phase
-            }});
-        }}
-        
-        // Initialize immediately
-        if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', initNavigation);
-        }} else {{
-            initNavigation();
-        }}
-        
-        // Also retry after delays to catch dynamic content
-        setTimeout(initNavigation, 100);
-        setTimeout(initNavigation, 500);
-        setTimeout(initNavigation, 1000);
-    }})();
+    function navigateTo(section) {{
+        console.log('Navigating to section:', section);
+        // Get current URL without query params
+        const baseUrl = window.location.origin + window.location.pathname;
+        const newUrl = baseUrl + '?section=' + section;
+        console.log('Navigating to URL:', newUrl);
+        // Navigate in the same window
+        window.location.href = newUrl;
+    }}
     </script>
     """, unsafe_allow_html=True)
 
