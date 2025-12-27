@@ -1884,6 +1884,10 @@ def render_settings_dropdown():
     if 'active_setting' not in st.session_state:
         st.session_state.active_setting = None
     
+    # Clear active_setting if it's "connection" (no longer in settings dropdown)
+    if st.session_state.active_setting == 'connection':
+        st.session_state.active_setting = None
+    
     # Determine current index (0 if no active setting)
     try:
         current_setting_label = next(k for k, v in settings_options.items() if v == st.session_state.active_setting)
@@ -2120,7 +2124,6 @@ def render_connection_setting():
                     pass
             
             st.success("Disconnected")
-            st.session_state.active_setting = None
             st.rerun()
 
 
