@@ -7,6 +7,8 @@ import streamlit as st
 import pandas as pd
 from typing import Optional, Dict, Any, List
 import os
+import json
+from pathlib import Path
 from datetime import datetime
 
 # Try to import sqlparse, fallback to simple split if not available
@@ -26,6 +28,61 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai_db_tool.connectors import DatabaseManager, DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
+
+# Configuration file path for persistent storage
+CONFIG_DIR = Path.home() / ".ai_db_tool"
+CONFIG_FILE = CONFIG_DIR / "db_config.json"
+
+def ensure_config_dir():
+    """Ensure config directory exists"""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_db_config(config: DatabaseConfig):
+    """Save database configuration to persistent storage"""
+    try:
+        ensure_config_dir()
+        config_dict = {
+            'db_type': config.db_type,
+            'host': config.host,
+            'port': config.port,
+            'database': config.database,
+            'username': config.username,
+            'password': config.password,  # Note: In production, use encryption
+            'extra_params': config.extra_params or {}
+        }
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config_dict, f, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Failed to save connection config: {e}")
+        return False
+
+def load_db_config() -> Optional[DatabaseConfig]:
+    """Load database configuration from persistent storage"""
+    try:
+        if not CONFIG_FILE.exists():
+            return None
+        
+        with open(CONFIG_FILE, 'r') as f:
+            config_dict = json.load(f)
+        
+        return DatabaseConfig(
+            db_type=config_dict.get('db_type', 'postgresql'),
+            host=config_dict.get('host', ''),
+            port=config_dict.get('port', 5432),
+            database=config_dict.get('database', ''),
+            username=config_dict.get('username', ''),
+            password=config_dict.get('password', ''),
+            extra_params=config_dict.get('extra_params', {})
+        )
+    except Exception as e:
+        st.warning(f"Could not load saved connection: {e}")
+        return None
+
+def get_persistent_sqlite_path() -> str:
+    """Get a persistent path for SQLite database (not in /tmp)"""
+    ensure_config_dir()
+    return str(CONFIG_DIR / "database.sqlite")
 
 # Helper function to get API key from Streamlit secrets or environment variables
 def get_api_key(key_name: str) -> Optional[str]:
@@ -848,6 +905,23 @@ if 'connected' not in st.session_state:
     st.session_state.connected = False
 if 'db_type' not in st.session_state:
     st.session_state.db_type = None
+
+# Auto-load saved database connection on startup
+if not st.session_state.connected:
+    saved_config = load_db_config()
+    if saved_config:
+        try:
+            if st.session_state.db_manager.connect(saved_config):
+                st.session_state.connected = True
+                st.session_state.db_type = saved_config.db_type
+                schema_info = st.session_state.db_manager.get_database_info()
+                schema_info['db_type'] = saved_config.db_type
+                st.session_state.schema_info = schema_info
+                # Show info in sidebar (non-intrusive)
+                st.session_state.auto_connected = True
+        except Exception as e:
+            # Silently fail - user can reconnect manually
+            pass
 if 'query_history' not in st.session_state:
     st.session_state.query_history = []
 if 'chat_history' not in st.session_state:
@@ -1709,6 +1783,11 @@ def main():
     # Inject keyboard shortcuts (must be called early)
     inject_keyboard_shortcuts()
     
+    # Show auto-connection notification if applicable
+    if st.session_state.get('auto_connected', False):
+        st.session_state.auto_connected = False  # Only show once
+        st.toast("✅ Auto-connected to saved database", icon="🔗")
+    
     # Sidebar
     with st.sidebar:
         st.title("🤖 AI Database Tool")
@@ -1983,7 +2062,14 @@ def render_connection_setting():
     
     with st.form("connection_form_popup"):
         if db_type == "sqlite":
-            database = st.text_input("Database File Path", value="/tmp/test_db.sqlite", help="Path to SQLite database file", autocomplete="off", key="db_file_popup")
+            default_path = get_persistent_sqlite_path()
+            database = st.text_input(
+                "Database File Path", 
+                value=default_path, 
+                help="Path to SQLite database file (use a persistent location, not /tmp/)", 
+                autocomplete="off", 
+                key="db_file_popup"
+            )
             host = ""
             port = 0
             username = ""
@@ -2013,6 +2099,14 @@ def render_connection_setting():
             st.session_state.connected = False
             st.session_state.chatbot = None
             st.session_state.query_builder = None
+            
+            # Optionally clear saved config (user can choose to keep it)
+            if CONFIG_FILE.exists():
+                try:
+                    CONFIG_FILE.unlink()
+                except:
+                    pass
+            
             st.success("Disconnected")
             st.session_state.active_setting = None
             st.rerun()
@@ -2020,16 +2114,34 @@ def render_connection_setting():
 
 def handle_connection(db_type, host, port, database, username, password):
     """Handle database connection logic"""
+    # Warn if using /tmp/ for SQLite (will be wiped on restart)
+    if db_type == "sqlite" and "/tmp/" in database:
+        st.warning("⚠️ Using /tmp/ for SQLite database will be wiped on system restart! Use a persistent location like ~/.ai_db_tool/database.sqlite")
+    
     if db_type == "sqlite":
+        # Ensure directory exists for SQLite file
+        db_path = Path(database)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        
         config = DatabaseConfig(
             db_type=db_type,
             host="",
             port=0,
-            database=database,
+            database=str(db_path.absolute()),  # Use absolute path
             username="",
             password="",
         )
     else:
+        # For NeonDB and other cloud databases, add connection parameters for persistence
+        extra_params = {}
+        if db_type == "postgresql" and "neon" in host.lower():
+            # NeonDB-specific parameters for better persistence
+            extra_params = {
+                'sslmode': 'require',
+                'connect_timeout': '10',
+                'application_name': 'ai_db_tool'
+            }
+        
         config = DatabaseConfig(
             db_type=db_type,
             host=host,
@@ -2037,10 +2149,14 @@ def handle_connection(db_type, host, port, database, username, password):
             database=database,
             username=username,
             password=password,
+            extra_params=extra_params if extra_params else None
         )
     
     if st.session_state.db_manager.connect(config):
-        st.success("✅ Connected successfully!")
+        # Save connection config for persistence
+        save_db_config(config)
+        
+        st.success("✅ Connected successfully! Connection saved for next session.")
         st.session_state.connected = True
         st.session_state.db_type = config.db_type
         
