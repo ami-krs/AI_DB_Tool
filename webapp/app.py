@@ -1797,6 +1797,12 @@ def main():
         
         st.markdown("---")
         
+        # Database Connection (standalone)
+        with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
+            render_connection_setting()
+        
+        st.markdown("---")
+        
         # Settings dropdown
         render_settings_dropdown()
     
@@ -1862,14 +1868,13 @@ def render_db_details():
 
 
 def render_settings_dropdown():
-    """Render settings dropdown (Smart Editor, Layout, Database Connection) using Streamlit selectbox"""
+    """Render settings dropdown (Smart Editor, Layout, Theme) using Streamlit selectbox"""
     
     # Use a selectbox styled as a dropdown button for settings
     settings_options = {
         "⚙️ Settings": None,
         "⚡ Smart Editor": "editor",
         "📐 Layout": "layout",
-        "🔌 Database Connection": "connection",
         "🎨 Theme": "theme"
     }
     
@@ -1911,7 +1916,6 @@ def render_settings_dropdown():
         setting_labels = {
             "editor": "⚡ Smart Editor",
             "layout": "📐 Layout",
-            "connection": "🔌 Database Connection",
             "theme": "🎨 Theme"
         }
         setting_label = setting_labels.get(st.session_state.active_setting, "Settings")
@@ -1972,8 +1976,6 @@ def render_setting_content(setting_type):
         render_smart_editor_setting()
     elif setting_type == 'layout':
         render_layout_setting()
-    elif setting_type == 'connection':
-        render_connection_setting()
     elif setting_type == 'theme':
         render_theme_setting()
 
