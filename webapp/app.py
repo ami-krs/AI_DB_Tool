@@ -1797,14 +1797,14 @@ def main():
         
         st.markdown("---")
         
-        # Database Connection (standalone)
-        with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
-            render_connection_setting()
+        # Settings dropdown
+        render_settings_dropdown()
         
         st.markdown("---")
         
-        # Settings dropdown
-        render_settings_dropdown()
+        # Database Connection (standalone)
+        with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
+            render_connection_setting()
     
     # Main content area
     # Header
@@ -2069,6 +2069,19 @@ def render_theme_setting():
 
 def render_connection_setting():
     """Render Database Connection form"""
+    # Add CSS to make Connect/Disconnect buttons more compact
+    st.markdown("""
+    <style>
+    /* Target buttons in connection form columns to make them compact */
+    div[data-testid="stForm"]:has(form) div[data-testid="column"] button {
+        font-size: 0.8rem !important;
+        padding: 0.35rem 0.6rem !important;
+        line-height: 1.2 !important;
+        min-height: 2rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     db_type = st.selectbox(
         "Database Type",
         ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
@@ -2076,7 +2089,7 @@ def render_connection_setting():
         key="db_type_popup"
     )
     
-    with st.form("connection_form_popup"):
+    with st.form("connection_form_popup", clear_on_submit=False):
         if db_type == "sqlite":
             default_path = get_persistent_sqlite_path()
             database = st.text_input(
