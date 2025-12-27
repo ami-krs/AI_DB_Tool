@@ -1799,23 +1799,6 @@ def main():
         
         # Settings dropdown
         render_settings_dropdown()
-        
-        st.markdown("---")
-        
-        # Dark mode toggle
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown("**Theme:**")
-        with col2:
-            dark_mode_toggle = st.toggle(
-                "🌙",
-                value=st.session_state.dark_mode,
-                key="dark_mode_toggle",
-                help="Toggle dark mode"
-            )
-            if dark_mode_toggle != st.session_state.dark_mode:
-                st.session_state.dark_mode = dark_mode_toggle
-                st.rerun()
     
     # Main content area
     # Header
@@ -1886,7 +1869,8 @@ def render_settings_dropdown():
         "⚙️ Settings": None,
         "⚡ Smart Editor": "editor",
         "📐 Layout": "layout",
-        "🔌 Database Connection": "connection"
+        "🔌 Database Connection": "connection",
+        "🎨 Theme": "theme"
     }
     
     option_labels = list(settings_options.keys())
@@ -1927,7 +1911,8 @@ def render_settings_dropdown():
         setting_labels = {
             "editor": "⚡ Smart Editor",
             "layout": "📐 Layout",
-            "connection": "🔌 Database Connection"
+            "connection": "🔌 Database Connection",
+            "theme": "🎨 Theme"
         }
         setting_label = setting_labels.get(st.session_state.active_setting, "Settings")
         with st.expander(setting_label, expanded=True):
@@ -1989,6 +1974,8 @@ def render_setting_content(setting_type):
         render_layout_setting()
     elif setting_type == 'connection':
         render_connection_setting()
+    elif setting_type == 'theme':
+        render_theme_setting()
 
 
 def render_smart_editor_setting():
@@ -2049,6 +2036,29 @@ def render_layout_setting():
         st.session_state.layout_mode = new_layout_mode
         st.session_state.active_setting = None
         st.rerun()
+
+
+def render_theme_setting():
+    """Render Theme settings"""
+    st.markdown("**Appearance Settings**")
+    
+    # Dark mode toggle
+    dark_mode_toggle = st.toggle(
+        "🌙 Dark Mode",
+        value=st.session_state.dark_mode,
+        key="dark_mode_toggle_settings",
+        help="Toggle between light and dark theme"
+    )
+    
+    if dark_mode_toggle != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode_toggle
+        st.rerun()
+    
+    # Theme preview/info
+    if st.session_state.dark_mode:
+        st.info("💡 Dark mode is enabled. The interface uses a dark color scheme for better visibility in low-light environments.")
+    else:
+        st.info("💡 Light mode is enabled. The interface uses a light color scheme for better visibility in bright environments.")
 
 
 def render_connection_setting():
