@@ -2751,11 +2751,11 @@ def chatbot_tab():
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
     
-    # Check if chatbot is available
+    # Check if chatbot is available - don't show warning on load, handle it when user tries to use it
     if not st.session_state.chatbot:
-        st.warning("⚠️ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
-        st.info("💡 You can still use the SQL Editor to write and execute queries manually.")
-        return
+        # Don't return early, just show a subtle message and disable the chat interface
+        st.info("ℹ️ To use AI features, set OPENAI_API_KEY or ANTHROPIC_API_KEY in your environment variables or Streamlit secrets.")
+        # Continue to show the interface but it will be disabled
     
     # Example questions section
     if not st.session_state.chat_history:
@@ -2772,6 +2772,9 @@ def chatbot_tab():
         for idx, question in enumerate(example_questions):
             with cols[idx]:
                 if st.button(f"❓ {question}", key=f"example_{idx}", use_container_width=True):
+                    if not st.session_state.chatbot:
+                        st.warning("⚠️ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI features.")
+                        st.stop()
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
                     with st.spinner("🤔 Thinking..."):
