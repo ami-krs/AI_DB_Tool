@@ -2392,11 +2392,11 @@ def handle_connection(db_type, host, port, database, username, password):
             except Exception as e:
                 st.session_state.chatbot = None
                 st.session_state.query_builder = None
-                    st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
-        
-        st.session_state.active_setting = None
-        st.rerun()
-            else:
+                st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
+            
+            st.session_state.active_setting = None
+            st.rerun()
+        else:
                 st.error("❌ Connection failed!")
                 st.session_state.connected = False
         
