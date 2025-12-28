@@ -3698,15 +3698,15 @@ def execute_query(query: str):
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
-            csv = result['dataframe'].to_csv(index=False)
-            st.download_button(
+                csv = result['dataframe'].to_csv(index=False)
+                st.download_button(
                     "📥",
-                csv,
-                "results.csv",
-                "text/csv",
+                    csv,
+                    "results.csv",
+                    "text/csv",
                     help=f"Download CSV - {len(result['dataframe']):,} rows",
                     use_container_width=True
-            )
+                )
             
             st.session_state.current_page = 1
             display_paginated_dataframe(result['dataframe'])
