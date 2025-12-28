@@ -564,6 +564,33 @@ st.markdown("""
         margin: 0 !important;
         visibility: hidden !important;
     }
+    
+    /* Compact Results header */
+    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📊 Results")) p,
+    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📊 Last Query Results")) p {
+        font-size: 1rem !important;
+        margin-bottom: 0.25rem !important;
+        margin-top: 0.25rem !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Compact download button */
+    button[kind="secondary"]:has-text("📥 Download CSV"),
+    button:has([download]):has-text("Download CSV") {
+        font-size: 0.75rem !important;
+        padding: 0.3rem 0.6rem !important;
+        height: auto !important;
+        min-height: 1.8rem !important;
+    }
+    
+    /* Target download button more specifically */
+    div[data-testid="stDownloadButton"] button {
+        font-size: 0.75rem !important;
+        padding: 0.3rem 0.6rem !important;
+        height: auto !important;
+        min-height: 1.8rem !important;
+        line-height: 1.2 !important;
+    }
 </style>
 <script>
     // TEST: This should appear in console immediately
@@ -2053,48 +2080,48 @@ def render_setting_content(setting_type):
 
 def render_smart_editor_setting():
     """Render Smart Editor selection"""
-    editor_options = [("textarea", "Streamlit Text Area (Default)")]
-    if CODEMIRROR_AVAILABLE:
-        editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
-    if MONACO_EDITOR_AVAILABLE:
-        editor_options.append(("monaco", "Monaco (VS Code Experience)"))
+        editor_options = [("textarea", "Streamlit Text Area (Default)")]
+        if CODEMIRROR_AVAILABLE:
+            editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
+        if MONACO_EDITOR_AVAILABLE:
+            editor_options.append(("monaco", "Monaco (VS Code Experience)"))
 
-    valid_modes = [value for value, _ in editor_options]
-    if st.session_state.editor_mode not in valid_modes:
-        st.session_state.editor_mode = "textarea"
+        valid_modes = [value for value, _ in editor_options]
+        if st.session_state.editor_mode not in valid_modes:
+            st.session_state.editor_mode = "textarea"
 
-    current_index = valid_modes.index(st.session_state.editor_mode)
-    option_labels = [label for _, label in editor_options]
+        current_index = valid_modes.index(st.session_state.editor_mode)
+        option_labels = [label for _, label in editor_options]
 
-    selected_label = st.selectbox(
-        "SQL Editor Mode",
-        option_labels,
-        index=current_index,
+        selected_label = st.selectbox(
+            "SQL Editor Mode",
+            option_labels,
+            index=current_index,
         key="editor_mode_select_popup",
-        help="Choose which SQL editor to use in the workspace."
-    )
-
-    selected_mode = next(value for value, label in editor_options if label == selected_label)
-    if selected_mode != st.session_state.editor_mode:
-        st.session_state.editor_mode = selected_mode
-        st.session_state.use_codemirror_editor = selected_mode != "textarea"
-        st.session_state.active_setting = None
-        st.rerun()
-
-    if st.session_state.editor_mode in ("codemirror", "monaco"):
-        api_url = st.text_input(
-            "API Server URL",
-            value=st.session_state.api_server_url,
-            autocomplete="url",
-            help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
+            help="Choose which SQL editor to use in the workspace."
         )
-        if api_url != st.session_state.api_server_url:
-            st.session_state.api_server_url = api_url
-            st.rerun()
-        st.info("💡 Start the API server: `python webapp/api_server.py`")
-    elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
-        st.info("Install the optional smart editor components to enable AI autocomplete.")
 
+        selected_mode = next(value for value, label in editor_options if label == selected_label)
+        if selected_mode != st.session_state.editor_mode:
+            st.session_state.editor_mode = selected_mode
+            st.session_state.use_codemirror_editor = selected_mode != "textarea"
+        st.session_state.active_setting = None
+            st.rerun()
+
+        if st.session_state.editor_mode in ("codemirror", "monaco"):
+            api_url = st.text_input(
+                "API Server URL",
+                value=st.session_state.api_server_url,
+                autocomplete="url",
+                help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
+            )
+            if api_url != st.session_state.api_server_url:
+                st.session_state.api_server_url = api_url
+                st.rerun()
+            st.info("💡 Start the API server: `python webapp/api_server.py`")
+        elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
+            st.info("Install the optional smart editor components to enable AI autocomplete.")
+        
 
 def render_layout_setting():
     """Render Layout selection"""
@@ -2114,17 +2141,17 @@ def render_layout_setting():
 def render_theme_setting():
     """Render Theme settings"""
     # Dark mode toggle with hover tooltip
-    dark_mode_toggle = st.toggle(
+            dark_mode_toggle = st.toggle(
         "🌙 Dark Mode",
-        value=st.session_state.dark_mode,
+                value=st.session_state.dark_mode,
         key="dark_mode_toggle_settings",
         help="Toggle between light and dark theme. Dark mode uses a dark color scheme for better visibility in low-light environments. Light mode uses a light color scheme for better visibility in bright environments."
-    )
+            )
     
-    if dark_mode_toggle != st.session_state.dark_mode:
-        st.session_state.dark_mode = dark_mode_toggle
-        st.rerun()
-
+            if dark_mode_toggle != st.session_state.dark_mode:
+                st.session_state.dark_mode = dark_mode_toggle
+                st.rerun()
+        
 
 def render_connection_setting():
     """Render Database Connection form"""
@@ -2163,9 +2190,9 @@ def render_connection_setting():
     }
     </style>
     """, unsafe_allow_html=True)
-    
-    db_type = st.selectbox(
-        "Database Type",
+        
+        db_type = st.selectbox(
+            "Database Type",
         ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
         index=4,  # Default to sqlite
         key="db_type_popup"
@@ -2252,57 +2279,57 @@ def handle_connection(db_type, host, port, database, username, password):
                 'application_name': 'ai_db_tool'
             }
         
-        config = DatabaseConfig(
-            db_type=db_type,
-            host=host,
-            port=int(port),
-            database=database,
-            username=username,
-            password=password,
+            config = DatabaseConfig(
+                db_type=db_type,
+                host=host,
+                port=int(port),
+                database=database,
+                username=username,
+                password=password,
             extra_params=extra_params if extra_params else None
-        )
-    
-    if st.session_state.db_manager.connect(config):
+            )
+            
+            if st.session_state.db_manager.connect(config):
         # Save connection config for persistence
         save_db_config(config)
-        
+                
         st.success("✅ Connected successfully! Connection saved for next session.")
         st.session_state.connected = True
-        st.session_state.db_type = config.db_type
-        
-        schema_info = st.session_state.db_manager.get_database_info()
-        schema_info['db_type'] = config.db_type
-        st.session_state.schema_info = schema_info
-        
-        # Initialize AI components
-        try:
-            openai_key = get_api_key("OPENAI_API_KEY")
-            anthropic_key = get_api_key("ANTHROPIC_API_KEY")
-            api_key = openai_key or anthropic_key
-            
-            if not api_key:
-                st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
-                st.session_state.chatbot = None
-                st.session_state.query_builder = None
-            else:
-                provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
-                st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
-                st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                st.session_state.db_type = config.db_type
                 
-                if (st.session_state.chatbot and 
-                    hasattr(st.session_state.chatbot, 'client') and
-                    st.session_state.chatbot.client is not None):
-                    st.session_state.chatbot.set_schema_context(schema_info)
-        except Exception as e:
-            st.session_state.chatbot = None
-            st.session_state.query_builder = None
-            st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
+                schema_info = st.session_state.db_manager.get_database_info()
+                schema_info['db_type'] = config.db_type
+                st.session_state.schema_info = schema_info
+                
+        # Initialize AI components
+                try:
+                    openai_key = get_api_key("OPENAI_API_KEY")
+                    anthropic_key = get_api_key("ANTHROPIC_API_KEY")
+                    api_key = openai_key or anthropic_key
+                    
+                    if not api_key:
+                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
+                        st.session_state.chatbot = None
+                        st.session_state.query_builder = None
+                    else:
+                        provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+                        st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                        st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                        
+                        if (st.session_state.chatbot and 
+                            hasattr(st.session_state.chatbot, 'client') and
+                            st.session_state.chatbot.client is not None):
+                            st.session_state.chatbot.set_schema_context(schema_info)
+                except Exception as e:
+                    st.session_state.chatbot = None
+                    st.session_state.query_builder = None
+                    st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
         
         st.session_state.active_setting = None
         st.rerun()
-    else:
-        st.error("❌ Connection failed!")
-        st.session_state.connected = False
+            else:
+                st.error("❌ Connection failed!")
+                st.session_state.connected = False
         
 
 def render_navigation_bar():
@@ -2501,12 +2528,12 @@ def chatbot_compact():
             else:
                 # Show explanation in collapsed expander by default
                 with st.expander("💡 View Explanation", expanded=False):
-                    st.chat_message("assistant").write(msg['content'])
+                st.chat_message("assistant").write(msg['content'])
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
                     with st.expander("📝 Generated SQL", expanded=True):
-                        st.code(msg['sql_query'], language='sql')
+                    st.code(msg['sql_query'], language='sql')
     else:
         if not st.session_state.chatbot:
             st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
@@ -2894,20 +2921,20 @@ def chatbot_tab():
     
     # Display chat history
     if st.session_state.chat_history:
-        for msg in st.session_state.chat_history:
-            if msg['role'] == 'user':
-                st.chat_message("user").write(msg['content'])
-            else:
+    for msg in st.session_state.chat_history:
+        if msg['role'] == 'user':
+            st.chat_message("user").write(msg['content'])
+        else:
                 # Show explanation in collapsed expander by default
                 with st.expander("💡 View Explanation", expanded=False):
-                    st.chat_message("assistant").write(msg['content'])
+            st.chat_message("assistant").write(msg['content'])
                 
                 # Show SQL query in expanded form by default
-                if 'sql_query' in msg and msg['sql_query']:
+            if 'sql_query' in msg and msg['sql_query']:
                     with st.expander("📝 Generated SQL", expanded=True):
-                        st.code(msg['sql_query'], language='sql')
-                        if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
-                            execute_generated_query(msg['sql_query'])
+                    st.code(msg['sql_query'], language='sql')
+                    if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
+                        execute_generated_query(msg['sql_query'])
     # else:
     #     st.info("💬 Start chatting by typing a message below!")
     
@@ -3373,20 +3400,25 @@ def execute_query(query: str):
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            st.subheader("📊 Results")
+            # Compact Results header with download button in same line
+            result_col1, result_col2 = st.columns([1, 6])
+            with result_col1:
+                st.markdown("**📊 Results**", unsafe_allow_html=True)
+            with result_col2:
+                csv = result['dataframe'].to_csv(index=False)
+                st.download_button(
+                    "📥 Download CSV",
+                    csv,
+                    "results.csv",
+                    "text/csv",
+                    help=f"Download all {len(result['dataframe']):,} rows",
+                    use_container_width=False
+                )
+            
             st.session_state.current_page = 1
             display_paginated_dataframe(result['dataframe'])
             st.session_state.last_result_df = result['dataframe']
             st.session_state.last_result = result['dataframe']
-            
-            csv = result['dataframe'].to_csv(index=False)
-            st.download_button(
-                "📥 Download Full CSV",
-                csv,
-                "results.csv",
-                "text/csv",
-                help=f"Download all {len(result['dataframe']):,} rows"
-            )
             st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
         
         elif result['type'] == 'DDL':
@@ -3467,18 +3499,23 @@ def execute_query(query: str):
     
     if last_select_result is not None:
         st.markdown("---")
-        st.subheader("📊 Last Query Results")
+        # Compact Results header with download button in same line
+        result_col1, result_col2 = st.columns([1, 6])
+        with result_col1:
+            st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
+        with result_col2:
+            csv = last_select_result.to_csv(index=False)
+            st.download_button(
+                "📥 Download CSV",
+                csv,
+                "results.csv",
+                "text/csv",
+                help=f"Download all {len(last_select_result):,} rows",
+                use_container_width=False
+            )
+        
         st.session_state.current_page = 1
         display_paginated_dataframe(last_select_result)
-        
-        csv = last_select_result.to_csv(index=False)
-        st.download_button(
-            "📥 Download Full CSV",
-            csv,
-            "results.csv",
-            "text/csv",
-            help=f"Download all {len(last_select_result):,} rows"
-        )
 
 
 def execute_generated_query(query: str):
