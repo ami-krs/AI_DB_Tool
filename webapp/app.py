@@ -1976,9 +1976,11 @@ def main():
                 with nav_col1:
                     render_navigation_bar()
     
-    # Render active section - Home is always available, others require connection
+    # Render active section - Home and Smart Email Agent are always available, others require connection
     if st.session_state.active_section == 'home':
         home_dashboard()
+    elif st.session_state.active_section == 'smart_email_agent':
+        smart_email_agent()
     elif not st.session_state.connected:
         st.info("👈 Connect to a database using the sidebar to get started")
     else:
@@ -1995,6 +1997,8 @@ def main():
                 data_explorer_tab()
             elif st.session_state.active_section == 'visualizations':
                 visualizations_tab()
+            elif st.session_state.active_section == 'smart_email_agent':
+                smart_email_agent()
 
 
 def render_db_details():
@@ -2404,7 +2408,8 @@ def render_navigation_bar():
         'chatbot': '💬 AI SQL Assistant',
         'sql_editor': '📝 Smart SQL Editor',
         'data_explorer': '🔍 Data Explorer',
-        'visualizations': '📊 Data Visualizations'
+        'visualizations': '📊 Data Visualizations',
+        'smart_email_agent': '📧 Smart Email Agent'
     }
     
     # Get options and current index
@@ -3005,6 +3010,12 @@ def home_dashboard():
             'title': 'AI Database Tool',
             'description': 'Intelligent database management with AI-powered SQL generation',
             'section': 'chatbot'  # Navigate to chatbot section
+        },
+        {
+            'icon': '📧',
+            'title': 'Smart Email Agent',
+            'description': 'AI-powered email management and automation',
+            'section': 'smart_email_agent'  # Navigate to smart email agent section
         },
         # Add more apps here in the future
         # {
