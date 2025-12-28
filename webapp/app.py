@@ -1077,8 +1077,28 @@ if 'show_chatbot' not in st.session_state:
     st.session_state.show_chatbot = True  # Show chatbot by default
 if 'show_connection' not in st.session_state:
     st.session_state.show_connection = True  # Show connection section by default
+# Check query params first to preserve section across refreshes
 if 'active_section' not in st.session_state:
-    st.session_state.active_section = 'home'  # Default to Home Dashboard
+    # Check if there's a section in query params first
+    section_from_query = None
+    try:
+        if hasattr(st, 'query_params') and st.query_params:
+            query_params = st.query_params
+            if 'section' in query_params:
+                section = query_params.get('section')
+                if isinstance(section, list):
+                    section = section[0] if section else None
+                elif isinstance(section, str):
+                    section = section.strip()
+                section_from_query = section
+    except Exception:
+        pass
+    
+    # Use section from query params if available, otherwise default to home
+    if section_from_query and section_from_query in ['home', 'chatbot', 'sql_editor', 'data_explorer', 'visualizations', 'smart_email_agent']:
+        st.session_state.active_section = section_from_query
+    else:
+        st.session_state.active_section = 'home'  # Default to Home Dashboard
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False  # Light mode by default
 if 'current_page' not in st.session_state:
@@ -1905,15 +1925,8 @@ def main():
                     # Update active section if different
                     if st.session_state.active_section != section:
                         st.session_state.active_section = section
-                        # Don't clear query param immediately - let it persist for one render cycle
-                        # This ensures the section update is processed
+                        # Keep query param to persist across refreshes (don't clear it)
                         st.rerun()
-                    else:
-                        # If section is already set, clear the query param to avoid re-triggering
-                        new_params = dict(query_params)
-                        if 'section' in new_params:
-                            del new_params['section']
-                        st.query_params = new_params
     except Exception as e:
         # Continue if query params don't work
         pass
@@ -1957,6 +1970,8 @@ def main():
         with home_col1:
             if st.button("🏠", key="home_nav_button", help="Go to Home Dashboard"):
                 st.session_state.active_section = 'home'
+                # Update query param to persist across refreshes
+                st.query_params['section'] = 'home'
                 st.rerun()
         
         # Style the home button
@@ -2730,7 +2745,11 @@ def chatbot_compact():
     # Chat input
     user_input = st.chat_input("Ask about your database...")
     
-    if user_input and st.session_state.chatbot:
+    if user_input:
+        # Check if chatbot is available when user actually tries to use it
+        if not st.session_state.chatbot:
+            st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
+            return
         # Add user message to history
         st.session_state.chat_history.append({'role': 'user', 'content': user_input})
         
@@ -3018,6 +3037,8 @@ def smart_email_agent():
     with home_col1:
         if st.button("🏠", key="home_nav_button_email", help="Go to Home Dashboard"):
             st.session_state.active_section = 'home'
+            # Update query param to persist across refreshes
+            st.query_params['section'] = 'home'
             st.rerun()
     
     # Style the home button
@@ -3149,6 +3170,8 @@ def home_dashboard():
                     use_container_width=True
                 ):
                     st.session_state.active_section = app['section']
+                    # Set query param to persist section across refreshes
+                    st.query_params['section'] = app['section']
                     st.rerun()
             else:
                 # External link (for future apps)
@@ -3207,11 +3230,7 @@ def chatbot_tab():
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
     
-    # Check if chatbot is available - don't show warning on load, handle it when user tries to use it
-    if not st.session_state.chatbot:
-        # Don't return early, just show a subtle message and disable the chat interface
-        st.info("ℹ️ To use AI features, set OPENAI_API_KEY or ANTHROPIC_API_KEY in your environment variables or Streamlit secrets.")
-        # Continue to show the interface but it will be disabled
+    # Don't show API key message on page load - only show when user tries to use it
     
     # Example questions section - only show if chatbot is available
     if not st.session_state.chat_history and st.session_state.chatbot:
@@ -3347,7 +3366,12 @@ def chatbot_tab():
     # Chat input (outside scrollable container, stays at bottom)
     user_input = st.chat_input("Ask me anything about your database...")
     
-    if user_input and st.session_state.chatbot:
+    if user_input:
+        # Check if chatbot is available when user actually tries to use it
+        if not st.session_state.chatbot:
+            st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
+            return
+        
         # Add user message to history
         st.session_state.chat_history.append({'role': 'user', 'content': user_input})
         
