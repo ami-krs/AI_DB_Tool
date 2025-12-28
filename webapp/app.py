@@ -2420,12 +2420,12 @@ def chatbot_compact():
             else:
                 # Show explanation in collapsed expander by default
                 with st.expander("💡 View Explanation", expanded=False):
-                st.chat_message("assistant").write(msg['content'])
+                    st.chat_message("assistant").write(msg['content'])
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
                     with st.expander("📝 Generated SQL", expanded=True):
-                    st.code(msg['sql_query'], language='sql')
+                        st.code(msg['sql_query'], language='sql')
     else:
         if not st.session_state.chatbot:
             st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
