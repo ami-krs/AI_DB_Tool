@@ -3400,19 +3400,19 @@ def execute_query(query: str):
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with download button in same line
-            result_col1, result_col2 = st.columns([1, 6])
+            # Compact Results header with download icon in same line
+            result_col1, result_col2 = st.columns([10, 1])
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
                 csv = result['dataframe'].to_csv(index=False)
                 st.download_button(
-                    "📥 Download CSV",
+                    "📥",
                     csv,
                     "results.csv",
                     "text/csv",
-                    help=f"Download all {len(result['dataframe']):,} rows",
-                    use_container_width=False
+                    help=f"Download CSV - {len(result['dataframe']):,} rows",
+                    use_container_width=True
                 )
             
             st.session_state.current_page = 1
@@ -3499,19 +3499,19 @@ def execute_query(query: str):
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with download button in same line
-        result_col1, result_col2 = st.columns([1, 6])
+        # Compact Results header with download icon in same line
+        result_col1, result_col2 = st.columns([10, 1])
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
             csv = last_select_result.to_csv(index=False)
             st.download_button(
-                "📥 Download CSV",
+                "📥",
                 csv,
                 "results.csv",
                 "text/csv",
-                help=f"Download all {len(last_select_result):,} rows",
-                use_container_width=False
+                help=f"Download CSV - {len(last_select_result):,} rows",
+                use_container_width=True
             )
         
         st.session_state.current_page = 1
