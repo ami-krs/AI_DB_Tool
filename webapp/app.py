@@ -2852,8 +2852,8 @@ def chatbot_tab():
         st.info("ℹ️ To use AI features, set OPENAI_API_KEY or ANTHROPIC_API_KEY in your environment variables or Streamlit secrets.")
         # Continue to show the interface but it will be disabled
     
-    # Example questions section
-    if not st.session_state.chat_history:
+    # Example questions section - only show if chatbot is available
+    if not st.session_state.chat_history and st.session_state.chatbot:
         #st.markdown("### 💡 Example Questions to Get Started")
         #st.markdown("Click on any question below to get started:")
         
@@ -2867,9 +2867,6 @@ def chatbot_tab():
         for idx, question in enumerate(example_questions):
             with cols[idx]:
                 if st.button(f"❓ {question}", key=f"example_{idx}", use_container_width=True):
-                    if not st.session_state.chatbot:
-                        st.warning("⚠️ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI features.")
-                        st.stop()
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
                     with st.spinner("🤔 Thinking..."):
