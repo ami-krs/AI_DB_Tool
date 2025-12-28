@@ -2518,7 +2518,7 @@ def handle_connection(db_type, host, port, database, username, password):
     if db_type == "sqlite":
         # ALWAYS use persistent path in project directory for SQLite to ensure consistency
         # This prevents connecting to different DB files due to working directory changes
-        persistent_path = get_persistent_sqlite_path()
+        persistent_path = get_persistent_sqlite_path()  # Returns absolute path string
         database = persistent_path  # Force use of persistent path in project directory
         
         # Ensure directory exists for SQLite file
@@ -2529,7 +2529,7 @@ def handle_connection(db_type, host, port, database, username, password):
             db_type=db_type,
             host="",
             port=0,
-            database=str(db_path.absolute()),  # Always use absolute persistent path
+            database=persistent_path,  # Already absolute path from get_persistent_sqlite_path()
             username="",
             password="",
             extra_params=None
