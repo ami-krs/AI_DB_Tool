@@ -2905,6 +2905,29 @@ def home_dashboard():
     """Home/Dashboard page with links to agentic apps"""
     st.markdown("""
     <style>
+    /* Hide sidebar on home page */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+    }
+    
+    /* Hide sidebar toggle button on home page */
+    button[data-testid="baseButton-header"],
+    button[kind="header"][data-testid*="header"],
+    #custom-sidebar-toggle,
+    button[aria-label*="sidebar" i],
+    button[aria-label*="Close" i],
+    button[aria-label*="open" i] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* Adjust main content width when sidebar is hidden */
+    section[data-testid="stMain"] {
+        margin-left: 0 !important;
+    }
+    
     .app-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 12px;
