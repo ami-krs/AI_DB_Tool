@@ -3211,7 +3211,7 @@ def chatbot_tab():
     
     # Display chat history
     if st.session_state.chat_history:
-    for msg in st.session_state.chat_history:
+        for msg in st.session_state.chat_history:
         if msg['role'] == 'user':
             st.chat_message("user").write(msg['content'])
         else:
