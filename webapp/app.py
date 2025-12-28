@@ -79,20 +79,18 @@ def load_db_config() -> Optional[DatabaseConfig]:
         db_type = config_dict.get('db_type', 'postgresql')
         database = config_dict.get('database', '')
         
-        # For SQLite, always use persistent path (migrate old configs if needed)
+        # For SQLite, always use persistent path in project directory
         if db_type == 'sqlite':
             persistent_path = get_persistent_sqlite_path()
-            persistent_path_abs = str(Path(persistent_path).absolute())
-            # If saved config uses a different path (like /tmp/), migrate to persistent path
-            if database != persistent_path and database != persistent_path_abs:
-                database = persistent_path_abs
-                # Update the config file to use persistent path
+            # Always use the project directory path, regardless of what's saved
+            database = persistent_path
+            
+            # If saved path is different, update config file to use project directory path
+            old_db_path = config_dict.get('database', '')
+            if old_db_path and Path(old_db_path).resolve() != Path(persistent_path).resolve():
                 config_dict['database'] = database
-                try:
-                    with open(CONFIG_FILE, 'w') as f:
-                        json.dump(config_dict, f, indent=2)
-                except:
-                    pass  # If we can't update, continue with persistent path
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(config_dict, f, indent=2)
         
         return DatabaseConfig(
             db_type=db_type,
@@ -107,10 +105,6 @@ def load_db_config() -> Optional[DatabaseConfig]:
         st.warning(f"Could not load saved connection: {e}")
         return None
 
-def get_persistent_sqlite_path() -> str:
-    """Get a persistent path for SQLite database (not in /tmp)"""
-    ensure_config_dir()
-    return str(CONFIG_DIR / "database.sqlite")
 
 # Helper function to get API key from Streamlit secrets or environment variables
 def get_api_key(key_name: str) -> Optional[str]:
@@ -2522,10 +2516,10 @@ def handle_connection(db_type, host, port, database, username, password):
         st.warning("⚠️ Using /tmp/ for SQLite database will be wiped on system restart! Use a persistent location like ~/.ai_db_tool/database.sqlite")
     
     if db_type == "sqlite":
-        # ALWAYS use persistent path for SQLite to ensure data persistence
-        # This prevents data loss from using /tmp/ or other temporary locations
+        # ALWAYS use persistent path in project directory for SQLite to ensure consistency
+        # This prevents connecting to different DB files due to working directory changes
         persistent_path = get_persistent_sqlite_path()
-        database = persistent_path  # Force use of persistent path
+        database = persistent_path  # Force use of persistent path in project directory
         
         # Ensure directory exists for SQLite file
         db_path = Path(persistent_path)
