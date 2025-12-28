@@ -2080,13 +2080,13 @@ def render_setting_content(setting_type):
 
 def render_smart_editor_setting():
     """Render Smart Editor selection"""
-        editor_options = [("textarea", "Streamlit Text Area (Default)")]
-        if CODEMIRROR_AVAILABLE:
-            editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
-        if MONACO_EDITOR_AVAILABLE:
-            editor_options.append(("monaco", "Monaco (VS Code Experience)"))
+    editor_options = [("textarea", "Streamlit Text Area (Default)")]
+    if CODEMIRROR_AVAILABLE:
+        editor_options.append(("codemirror", "CodeMirror (AI Autocomplete)"))
+    if MONACO_EDITOR_AVAILABLE:
+        editor_options.append(("monaco", "Monaco (VS Code Experience)"))
 
-        valid_modes = [value for value, _ in editor_options]
+    valid_modes = [value for value, _ in editor_options]
         if st.session_state.editor_mode not in valid_modes:
             st.session_state.editor_mode = "textarea"
 
