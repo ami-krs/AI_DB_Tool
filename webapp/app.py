@@ -2358,6 +2358,7 @@ def render_navigation_bar():
     
     # Get current section label
     section_labels = {
+        'home': '🏠 Home',
         'chatbot': '💬 AI SQL Assistant',
         'sql_editor': '📝 Smart SQL Editor',
         'data_explorer': '🔍 Data Explorer',
