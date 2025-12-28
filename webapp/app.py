@@ -1149,6 +1149,31 @@ if st.session_state.connected and 'schema_info' not in st.session_state:
             'db_type': st.session_state.db_type,
             'total_tables': 0
         }
+
+# Initialize chatbot if connected but chatbot is None and API keys are available
+if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
+    try:
+        openai_key = get_api_key("OPENAI_API_KEY")
+        anthropic_key = get_api_key("ANTHROPIC_API_KEY")
+        api_key = openai_key or anthropic_key
+        
+        if api_key and st.session_state.get('schema_info'):
+            provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+            if st.session_state.chatbot is None:
+                st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+            if st.session_state.query_builder is None:
+                st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+            
+            # Set schema context for chatbot
+            if st.session_state.chatbot and st.session_state.get('schema_info'):
+                try:
+                    st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
+                except:
+                    pass  # Schema context setting failed, but chatbot is still usable
+    except Exception as e:
+        # Silently fail - chatbot will remain None if initialization fails
+        pass
+
 if 'query_history' not in st.session_state:
     st.session_state.query_history = []
 if 'chat_history' not in st.session_state:
