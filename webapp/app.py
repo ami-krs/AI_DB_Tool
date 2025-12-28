@@ -1045,7 +1045,7 @@ if 'connected' not in st.session_state:
 if 'db_type' not in st.session_state:
     st.session_state.db_type = None
 
-# Auto-load saved database connection on startup
+    # Auto-load saved database connection on startup
 if not st.session_state.connected:
     saved_config = load_db_config()
     if saved_config:
@@ -1053,14 +1053,64 @@ if not st.session_state.connected:
             if st.session_state.db_manager.connect(saved_config):
                 st.session_state.connected = True
                 st.session_state.db_type = saved_config.db_type
-                schema_info = st.session_state.db_manager.get_database_info()
-                schema_info['db_type'] = saved_config.db_type
-                st.session_state.schema_info = schema_info
+                # Load schema info to ensure tables are displayed
+                # This is critical - refresh schema info after auto-connect
+                try:
+                    schema_info = st.session_state.db_manager.get_database_info()
+                    if schema_info:
+                        schema_info['db_type'] = saved_config.db_type
+                        st.session_state.schema_info = schema_info
+                    else:
+                        # If get_database_info returns None, create empty schema
+                        st.session_state.schema_info = {
+                            'tables': [],
+                            'db_type': saved_config.db_type
+                        }
+                except Exception as schema_error:
+                    # If schema loading fails, try to create minimal schema info
+                    # But don't fail the connection - user can still use the app
+                    try:
+                        # Try to at least get the table list
+                        tables = st.session_state.db_manager.get_tables()
+                        st.session_state.schema_info = {
+                            'tables': tables or [],
+                            'db_type': saved_config.db_type,
+                            'total_tables': len(tables) if tables else 0
+                        }
+                    except:
+                        # If even that fails, create empty schema info
+                        st.session_state.schema_info = {
+                            'tables': [],
+                            'db_type': saved_config.db_type,
+                            'total_tables': 0
+                        }
                 # Show info in sidebar (non-intrusive)
                 st.session_state.auto_connected = True
         except Exception as e:
             # Silently fail - user can reconnect manually
             pass
+
+# Ensure schema_info exists if connected but schema_info is missing
+if st.session_state.connected and 'schema_info' not in st.session_state:
+    try:
+        schema_info = st.session_state.db_manager.get_database_info()
+        if schema_info:
+            schema_info['db_type'] = st.session_state.db_type
+            st.session_state.schema_info = schema_info
+        else:
+            # Try to get tables directly
+            tables = st.session_state.db_manager.get_tables()
+            st.session_state.schema_info = {
+                'tables': tables or [],
+                'db_type': st.session_state.db_type,
+                'total_tables': len(tables) if tables else 0
+            }
+    except:
+        st.session_state.schema_info = {
+            'tables': [],
+            'db_type': st.session_state.db_type,
+            'total_tables': 0
+        }
 if 'query_history' not in st.session_state:
     st.session_state.query_history = []
 if 'chat_history' not in st.session_state:
