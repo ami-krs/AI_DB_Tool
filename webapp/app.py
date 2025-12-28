@@ -308,10 +308,10 @@ st.markdown("""
         margin-top: 0.1rem !important;
     }
     
-    /* Reduce spacing inside expanders */
+    /* Reduce spacing inside expanders - minimal padding */
     section[data-testid="stSidebar"] .streamlit-expanderContent {
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
     }
     
     /* Reduce spacing for toggle switches in sidebar */
@@ -338,12 +338,6 @@ st.markdown("""
         margin-top: 0.25rem !important;
         margin-bottom: 0.25rem !important;
         padding: 0.5rem !important;
-    }
-    
-    /* Reduce spacing around selectbox in sidebar */
-    section[data-testid="stSidebar"] .stSelectbox {
-        margin-top: 0.25rem !important;
-        margin-bottom: 0.25rem !important;
     }
     
     /* Ensure sidebar collapse/expand button is always visible */
