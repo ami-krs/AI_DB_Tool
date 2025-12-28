@@ -275,6 +275,13 @@ st.markdown("""
         padding-bottom: 0.5rem !important;
     }
     
+    /* Hide sidebar on home page */
+    body:has([data-testid="stAppViewContainer"]:has-text("🏠 Agentic Apps Dashboard")) section[data-testid="stSidebar"],
+    section[data-testid="stSidebar"]:has(+ *:has-text("🏠 Agentic Apps Dashboard")) {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
     /* Make sidebar title more compact */
     section[data-testid="stSidebar"] h1 {
         margin-top: 0 !important;
@@ -1902,24 +1909,25 @@ def main():
         st.session_state.auto_connected = False  # Only show once
         st.toast("✅ Auto-connected to saved database", icon="🔗")
     
-    # Sidebar
-    with st.sidebar:
-        st.title("🤖 AI Database Tool")
-        
-        # Database details display
-        render_db_details()
-        
-        st.markdown("---")
-        
-        # Settings dropdown
-        render_settings_dropdown()
-        
-        # Minimal divider - reduced spacing
-        st.markdown("<hr style='margin: 0.25rem 0; border: none; border-top: 1px solid rgba(250, 250, 250, 0.2);'>", unsafe_allow_html=True)
-        
-        # Database Connection (standalone)
-        with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
-            render_connection_setting()
+    # Sidebar - only show when not on home page
+    if st.session_state.active_section != 'home':
+        with st.sidebar:
+            st.title("🤖 AI Database Tool")
+            
+            # Database details display
+            render_db_details()
+            
+            st.markdown("---")
+            
+            # Settings dropdown
+            render_settings_dropdown()
+            
+            # Minimal divider - reduced spacing
+            st.markdown("<hr style='margin: 0.25rem 0; border: none; border-top: 1px solid rgba(250, 250, 250, 0.2);'>", unsafe_allow_html=True)
+            
+            # Database Connection (standalone)
+            with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
+                render_connection_setting()
     
     # Main content area
     # Header
