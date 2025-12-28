@@ -3385,10 +3385,10 @@ def sql_editor_tab():
         action_col1, action_col2, action_col3 = st.columns([1, 1, 10])
         with action_col1:
             if st.button("▶️", type="primary", use_container_width=True, key="run_btn_tab", help="Execute Query"):
-            execute_query(query)
+                execute_query(query)
         with action_col2:
             if st.button("🤖", use_container_width=True, help="Generate SQL"):
-            generate_sql_query()
+                generate_sql_query()
         
         if st.button("🔧 AI Optimize", use_container_width=True):
             optimize_query(query)
