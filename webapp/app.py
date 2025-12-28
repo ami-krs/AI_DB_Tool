@@ -2219,8 +2219,9 @@ def handle_connection(db_type, host, port, database, username, password):
         
         st.session_state.active_setting = None
         st.rerun()
-                st.error("❌ Connection failed!")
-                st.session_state.connected = False
+    else:
+        st.error("❌ Connection failed!")
+        st.session_state.connected = False
         
 
 def render_navigation_bar():
