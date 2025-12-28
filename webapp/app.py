@@ -2259,9 +2259,9 @@ def render_connection_setting():
     }
     </style>
     """, unsafe_allow_html=True)
-        
-        db_type = st.selectbox(
-            "Database Type",
+    
+    db_type = st.selectbox(
+        "Database Type",
         ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
         index=4,  # Default to sqlite
         key="db_type_popup"
