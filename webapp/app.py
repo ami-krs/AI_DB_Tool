@@ -271,7 +271,53 @@ st.markdown("""
     
     /* Remove spacing from sidebar that might affect layout */
     section[data-testid="stSidebar"] {
-        padding-top: 0 !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    
+    /* Make sidebar title more compact */
+    section[data-testid="stSidebar"] h1 {
+        margin-top: 0 !important;
+        margin-bottom: 0.75rem !important;
+        padding-bottom: 0 !important;
+        font-size: 1.5rem !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Reduce spacing between sidebar elements */
+    section[data-testid="stSidebar"] .element-container {
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+    
+    /* Reduce divider spacing (hr elements created by ---) */
+    section[data-testid="stSidebar"] hr {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+        border: none !important;
+        border-top: 1px solid rgba(250, 250, 250, 0.2) !important;
+    }
+    
+    /* Reduce spacing around sidebar expanders */
+    section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Reduce spacing in sidebar info boxes */
+    section[data-testid="stSidebar"] .stInfo {
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
+        padding: 0.5rem !important;
+    }
+    
+    /* Reduce spacing around selectbox in sidebar */
+    section[data-testid="stSidebar"] .stSelectbox {
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
     }
     
     /* Ensure sidebar collapse/expand button is always visible */
