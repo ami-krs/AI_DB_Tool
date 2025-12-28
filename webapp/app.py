@@ -1150,6 +1150,32 @@ if st.session_state.connected and 'schema_info' not in st.session_state:
             'total_tables': 0
         }
 
+# Force refresh schema_info if connected - ensure tables are always loaded
+if st.session_state.connected and st.session_state.db_manager:
+    try:
+        # Always refresh tables list from database to ensure we have the latest
+        tables = st.session_state.db_manager.get_tables()
+        
+        # Update schema_info with fresh table list
+        if st.session_state.get('schema_info'):
+            st.session_state.schema_info['tables'] = tables or []
+            st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
+        else:
+            # Create schema_info if it doesn't exist
+            st.session_state.schema_info = {
+                'tables': tables or [],
+                'db_type': st.session_state.db_type,
+                'total_tables': len(tables) if tables else 0
+            }
+    except Exception as e:
+        # If refresh fails, try to preserve existing schema_info
+        if not st.session_state.get('schema_info'):
+            st.session_state.schema_info = {
+                'tables': [],
+                'db_type': st.session_state.db_type,
+                'total_tables': 0
+            }
+
 # Initialize chatbot if connected but chatbot is None and API keys are available
 if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
     try:
