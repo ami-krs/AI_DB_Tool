@@ -1937,7 +1937,10 @@ def main():
             with nav_col1:
                 render_navigation_bar()
     
-    if not st.session_state.connected:
+    # Render active section - Home is always available, others require connection
+    if st.session_state.active_section == 'home':
+        home_dashboard()
+    elif not st.session_state.connected:
         st.info("👈 Connect to a database using the sidebar to get started")
     else:
         # Choose layout based on user preference
