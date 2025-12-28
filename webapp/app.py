@@ -302,9 +302,35 @@ st.markdown("""
     
     /* Reduce spacing around sidebar expanders */
     section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+        margin-bottom: 0.1rem !important;
+        margin-top: 0.1rem !important;
+    }
+    
+    /* Reduce spacing inside expanders */
+    section[data-testid="stSidebar"] .streamlit-expanderContent {
         padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
+    }
+    
+    /* Reduce spacing for toggle switches in sidebar */
+    section[data-testid="stSidebar"] .stToggle {
+        margin-top: 0.25rem !important;
         margin-bottom: 0.25rem !important;
+    }
+    
+    /* Reduce spacing for selectbox in sidebar */
+    section[data-testid="stSidebar"] .stSelectbox {
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Remove info box spacing in settings */
+    section[data-testid="stSidebar"] .streamlit-expanderContent .stInfo {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        padding: 0.25rem 0.5rem !important;
     }
     
     /* Reduce spacing in sidebar info boxes */
@@ -2092,25 +2118,17 @@ def render_layout_setting():
 
 def render_theme_setting():
     """Render Theme settings"""
-    st.markdown("**Appearance Settings**")
-    
-    # Dark mode toggle
+    # Dark mode toggle with hover tooltip
     dark_mode_toggle = st.toggle(
         "🌙 Dark Mode",
         value=st.session_state.dark_mode,
         key="dark_mode_toggle_settings",
-        help="Toggle between light and dark theme"
+        help="Toggle between light and dark theme. Dark mode uses a dark color scheme for better visibility in low-light environments. Light mode uses a light color scheme for better visibility in bright environments."
     )
     
     if dark_mode_toggle != st.session_state.dark_mode:
         st.session_state.dark_mode = dark_mode_toggle
         st.rerun()
-    
-    # Theme preview/info
-    if st.session_state.dark_mode:
-        st.info("💡 Dark mode is enabled. The interface uses a dark color scheme for better visibility in low-light environments.")
-    else:
-        st.info("💡 Light mode is enabled. The interface uses a light color scheme for better visibility in bright environments.")
 
 
 def render_connection_setting():
