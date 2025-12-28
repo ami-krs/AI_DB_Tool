@@ -53,19 +53,47 @@ def get_persistent_sqlite_path():
     # Try to get path from Streamlit secrets first
     try:
         if hasattr(st, 'secrets') and st.secrets:
-            # Check for SQLite database path in secrets
-            if 'database' in st.secrets:
-                db_secrets = st.secrets.database
-                if isinstance(db_secrets, dict) and 'sqlite_path' in db_secrets:
-                    secret_path = db_secrets.sqlite_path
-                    if secret_path:
-                        # Ensure it's an absolute path
-                        return str(Path(secret_path).absolute())
-            # Alternative: direct key in secrets
-            if 'SQLITE_DB_PATH' in st.secrets:
-                secret_path = st.secrets.SQLITE_DB_PATH
-                if secret_path:
-                    return str(Path(secret_path).absolute())
+            # Check for SQLite database path in secrets (multiple patterns)
+            # Pattern 1: st.secrets.database.sqlite_path
+            try:
+                if hasattr(st.secrets, 'database'):
+                    db_secrets = st.secrets.database
+                    if hasattr(db_secrets, 'sqlite_path'):
+                        secret_path = db_secrets.sqlite_path
+                        if secret_path and str(secret_path).strip():
+                            # Ensure it's an absolute path
+                            return str(Path(str(secret_path)).absolute())
+            except (AttributeError, KeyError, TypeError):
+                pass
+            
+            # Pattern 2: st.secrets["database"]["sqlite_path"]
+            try:
+                if 'database' in st.secrets:
+                    db_secrets = st.secrets['database']
+                    if isinstance(db_secrets, dict) and 'sqlite_path' in db_secrets:
+                        secret_path = db_secrets['sqlite_path']
+                        if secret_path and str(secret_path).strip():
+                            return str(Path(str(secret_path)).absolute())
+            except (AttributeError, KeyError, TypeError):
+                pass
+            
+            # Pattern 3: Direct key st.secrets.SQLITE_DB_PATH
+            try:
+                if hasattr(st.secrets, 'SQLITE_DB_PATH'):
+                    secret_path = st.secrets.SQLITE_DB_PATH
+                    if secret_path and str(secret_path).strip():
+                        return str(Path(str(secret_path)).absolute())
+            except (AttributeError, KeyError, TypeError):
+                pass
+            
+            # Pattern 4: Direct key st.secrets["SQLITE_DB_PATH"]
+            try:
+                if 'SQLITE_DB_PATH' in st.secrets:
+                    secret_path = st.secrets['SQLITE_DB_PATH']
+                    if secret_path and str(secret_path).strip():
+                        return str(Path(str(secret_path)).absolute())
+            except (AttributeError, KeyError, TypeError):
+                pass
     except Exception:
         # If secrets access fails, fall through to default
         pass
