@@ -44,8 +44,8 @@ def ensure_config_dir():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_persistent_sqlite_path():
-    """Get persistent SQLite database path in project directory"""
-    return DB_DIR / "database.sqlite"
+    """Get persistent SQLite database path in project directory (returns absolute path as string)"""
+    return str((DB_DIR / "database.sqlite").absolute())
 
 def save_db_config(config: DatabaseConfig):
     """Save database configuration to persistent storage"""
