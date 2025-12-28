@@ -2141,16 +2141,16 @@ def render_layout_setting():
 def render_theme_setting():
     """Render Theme settings"""
     # Dark mode toggle with hover tooltip
-            dark_mode_toggle = st.toggle(
+    dark_mode_toggle = st.toggle(
         "🌙 Dark Mode",
-                value=st.session_state.dark_mode,
+        value=st.session_state.dark_mode,
         key="dark_mode_toggle_settings",
         help="Toggle between light and dark theme. Dark mode uses a dark color scheme for better visibility in low-light environments. Light mode uses a light color scheme for better visibility in bright environments."
-            )
+    )
     
-            if dark_mode_toggle != st.session_state.dark_mode:
-                st.session_state.dark_mode = dark_mode_toggle
-                st.rerun()
+    if dark_mode_toggle != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode_toggle
+        st.rerun()
         
 
 def render_connection_setting():
