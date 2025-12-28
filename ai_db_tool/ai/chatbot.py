@@ -223,10 +223,29 @@ class SQLChatbot:
         
         if self.schema_context:
             prompt += "Database Schema:\n"
-            for table in self.schema_context.get('tables', [])[:10]:
-                table_name = table.get('table_name', 'unknown')
-                columns = ', '.join([col['name'] for col in table.get('columns', [])])
-                prompt += f"- {table_name}: {columns}\n"
+            tables = self.schema_context.get('tables', [])[:10]
+            for table in tables:
+                # Handle both cases: table as string (table name) or dict (schema object)
+                if isinstance(table, str):
+                    # If table is just a string (table name), use it directly
+                    table_name = table
+                    prompt += f"- {table_name}\n"
+                elif isinstance(table, dict):
+                    # If table is a dict with schema info, extract table_name and columns
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        # Handle columns as list of dicts or list of strings
+                        if isinstance(columns_list[0], dict):
+                            columns = ', '.join([col.get('name', str(col)) for col in columns_list])
+                        else:
+                            columns = ', '.join([str(col) for col in columns_list])
+                        prompt += f"- {table_name}: {columns}\n"
+                    else:
+                        prompt += f"- {table_name}\n"
+                else:
+                    # Fallback: convert to string
+                    prompt += f"- {str(table)}\n"
             prompt += "\n"
         
         prompt += f"User Question: {user_message}\n"

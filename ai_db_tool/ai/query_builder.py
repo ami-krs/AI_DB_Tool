@@ -117,10 +117,29 @@ class AIQueryBuilder:
         
         if schema_info:
             context += "Available Tables and Columns:\n"
-            for table in schema_info.get('tables', [])[:20]:  # Limit to first 20 tables
-                table_name = table.get('table_name', 'unknown')
-                columns = ', '.join([col['name'] for col in table.get('columns', [])])
-                context += f"- {table_name}: {columns}\n"
+            tables = schema_info.get('tables', [])[:20]  # Limit to first 20 tables
+            for table in tables:
+                # Handle both cases: table as string (table name) or dict (schema object)
+                if isinstance(table, str):
+                    # If table is just a string (table name), use it directly
+                    table_name = table
+                    context += f"- {table_name}\n"
+                elif isinstance(table, dict):
+                    # If table is a dict with schema info, extract table_name and columns
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        # Handle columns as list of dicts or list of strings
+                        if isinstance(columns_list[0], dict):
+                            columns = ', '.join([col.get('name', str(col)) for col in columns_list])
+                        else:
+                            columns = ', '.join([str(col) for col in columns_list])
+                        context += f"- {table_name}: {columns}\n"
+                    else:
+                        context += f"- {table_name}\n"
+                else:
+                    # Fallback: convert to string
+                    context += f"- {str(table)}\n"
         
         user_prompt = f"{context}\n\nQuestion: {question}\n\nGenerate the SQL query:"
         
