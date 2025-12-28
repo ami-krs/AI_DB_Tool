@@ -2302,34 +2302,34 @@ def handle_connection(db_type, host, port, database, username, password):
         st.session_state.schema_info = schema_info
         
         # Initialize AI components
-                try:
-                    openai_key = get_api_key("OPENAI_API_KEY")
-                    anthropic_key = get_api_key("ANTHROPIC_API_KEY")
-                    api_key = openai_key or anthropic_key
-                    
-                    if not api_key:
-                        st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
-                        st.session_state.chatbot = None
-                        st.session_state.query_builder = None
-                    else:
-                        provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
-                        st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
-                        st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
-                        
-                        if (st.session_state.chatbot and 
-                            hasattr(st.session_state.chatbot, 'client') and
-                            st.session_state.chatbot.client is not None):
-                            st.session_state.chatbot.set_schema_context(schema_info)
-                except Exception as e:
-                    st.session_state.chatbot = None
-                    st.session_state.query_builder = None
-                    st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
+        try:
+            openai_key = get_api_key("OPENAI_API_KEY")
+            anthropic_key = get_api_key("ANTHROPIC_API_KEY")
+            api_key = openai_key or anthropic_key
+            
+            if not api_key:
+                st.info("ℹ️ AI features are disabled. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in Streamlit secrets to enable AI chatbot and query generation.")
+                st.session_state.chatbot = None
+                st.session_state.query_builder = None
+            else:
+                provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+                st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                
+                if (st.session_state.chatbot and 
+                    hasattr(st.session_state.chatbot, 'client') and
+                    st.session_state.chatbot.client is not None):
+                    st.session_state.chatbot.set_schema_context(schema_info)
+        except Exception as e:
+            st.session_state.chatbot = None
+            st.session_state.query_builder = None
+            st.warning(f"⚠️ AI features unavailable: {e}. Database operations will still work.")
         
         st.session_state.active_setting = None
         st.rerun()
-            else:
-                st.error("❌ Connection failed!")
-                st.session_state.connected = False
+    else:
+        st.error("❌ Connection failed!")
+        st.session_state.connected = False
         
 
 def render_navigation_bar():
