@@ -83,7 +83,17 @@ class DatabaseManager:
         dialect = self.SUPPORTED_DB_TYPES[db_type]
         
         if db_type == 'sqlite':
-            return f"{dialect}{config.database}"
+            # SQLAlchemy SQLite connection strings:
+            # - sqlite:///relative/path.db (3 slashes for relative paths)
+            # - sqlite:////absolute/path.db (4 slashes for absolute paths)
+            # Since config.database is already an absolute path, ensure we use 4 slashes
+            db_path = str(Path(config.database).absolute()) if not Path(config.database).is_absolute() else config.database
+            # SQLite dialect already has 'sqlite:///' (3 slashes), and absolute paths need 4 total
+            # So if path is absolute, we need one more slash
+            if db_path.startswith('/'):
+                return f"{dialect}/{db_path}"
+            else:
+                return f"{dialect}{db_path}"
         
         # Build URL for other database types
         url = f"{dialect}{config.username}:{config.password}@{config.host}:{config.port}/{config.database}"
