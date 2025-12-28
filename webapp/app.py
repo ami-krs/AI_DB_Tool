@@ -2087,40 +2087,40 @@ def render_smart_editor_setting():
         editor_options.append(("monaco", "Monaco (VS Code Experience)"))
 
     valid_modes = [value for value, _ in editor_options]
-        if st.session_state.editor_mode not in valid_modes:
-            st.session_state.editor_mode = "textarea"
+    if st.session_state.editor_mode not in valid_modes:
+        st.session_state.editor_mode = "textarea"
 
-        current_index = valid_modes.index(st.session_state.editor_mode)
-        option_labels = [label for _, label in editor_options]
+    current_index = valid_modes.index(st.session_state.editor_mode)
+    option_labels = [label for _, label in editor_options]
 
-        selected_label = st.selectbox(
-            "SQL Editor Mode",
-            option_labels,
-            index=current_index,
+    selected_label = st.selectbox(
+        "SQL Editor Mode",
+        option_labels,
+        index=current_index,
         key="editor_mode_select_popup",
-            help="Choose which SQL editor to use in the workspace."
-        )
+        help="Choose which SQL editor to use in the workspace."
+    )
 
-        selected_mode = next(value for value, label in editor_options if label == selected_label)
-        if selected_mode != st.session_state.editor_mode:
-            st.session_state.editor_mode = selected_mode
-            st.session_state.use_codemirror_editor = selected_mode != "textarea"
+    selected_mode = next(value for value, label in editor_options if label == selected_label)
+    if selected_mode != st.session_state.editor_mode:
+        st.session_state.editor_mode = selected_mode
+        st.session_state.use_codemirror_editor = selected_mode != "textarea"
         st.session_state.active_setting = None
-            st.rerun()
+        st.rerun()
 
-        if st.session_state.editor_mode in ("codemirror", "monaco"):
-            api_url = st.text_input(
-                "API Server URL",
-                value=st.session_state.api_server_url,
-                autocomplete="url",
-                help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
-            )
-            if api_url != st.session_state.api_server_url:
-                st.session_state.api_server_url = api_url
-                st.rerun()
-            st.info("💡 Start the API server: `python webapp/api_server.py`")
-        elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
-            st.info("Install the optional smart editor components to enable AI autocomplete.")
+    if st.session_state.editor_mode in ("codemirror", "monaco"):
+        api_url = st.text_input(
+            "API Server URL",
+            value=st.session_state.api_server_url,
+            autocomplete="url",
+            help="Backend API URL for AI autocomplete (default: http://localhost:8000)"
+        )
+        if api_url != st.session_state.api_server_url:
+            st.session_state.api_server_url = api_url
+            st.rerun()
+        st.info("💡 Start the API server: `python webapp/api_server.py`")
+    elif not (CODEMIRROR_AVAILABLE or MONACO_EDITOR_AVAILABLE):
+        st.info("Install the optional smart editor components to enable AI autocomplete.")
         
 
 def render_layout_setting():
