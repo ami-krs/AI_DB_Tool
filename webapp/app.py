@@ -2299,7 +2299,12 @@ def render_connection_setting():
         
         # Handle form submission inside the form context
         if connect_button:
-            handle_connection(db_type, host, port, database, username, password)
+            try:
+                handle_connection(db_type, host, port, database, username, password)
+            except Exception as e:
+                st.error(f"❌ Connection error: {str(e)}")
+                import traceback
+                st.exception(e)
         
         if disconnect_button and st.session_state.connected:
             st.session_state.db_manager.disconnect()
@@ -2336,6 +2341,7 @@ def handle_connection(db_type, host, port, database, username, password):
             database=str(db_path.absolute()),  # Use absolute path
             username="",
             password="",
+            extra_params=None
         )
     else:
         # For NeonDB and other cloud databases, add connection parameters for persistence
@@ -2358,6 +2364,7 @@ def handle_connection(db_type, host, port, database, username, password):
             extra_params=extra_params if extra_params else None
         )
         
+    try:
         if st.session_state.db_manager.connect(config):
             # Save connection config for persistence
             save_db_config(config)
