@@ -1911,8 +1911,8 @@ def main():
         st.session_state.auto_connected = False  # Only show once
         st.toast("✅ Auto-connected to saved database", icon="🔗")
     
-    # Sidebar - only show when not on home page
-    if st.session_state.active_section != 'home':
+    # Sidebar - only show when not on home page or smart email agent page
+    if st.session_state.active_section not in ['home', 'smart_email_agent']:
         with st.sidebar:
             st.title("🤖 AI Database Tool")
             
@@ -1932,8 +1932,8 @@ def main():
                 render_connection_setting()
     
     # Main content area
-    # Header - only show when not on home page
-    if st.session_state.active_section != 'home':
+    # Header - only show when not on home page or smart email agent page
+    if st.session_state.active_section not in ['home', 'smart_email_agent']:
         # Home icon button at top left
         home_col1, home_col2 = st.columns([1, 20])
         with home_col1:
@@ -2941,6 +2941,34 @@ def visualizations_compact():
 
 def smart_email_agent():
     """Smart Email Agent - placeholder page for future implementation"""
+    # Hide sidebar on smart email agent page
+    st.markdown("""
+    <style>
+    /* Hide sidebar on smart email agent page */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+    }
+    
+    /* Hide sidebar toggle button on smart email agent page */
+    button[data-testid="baseButton-header"],
+    button[kind="header"][data-testid*="header"],
+    #custom-sidebar-toggle,
+    button[aria-label*="sidebar" i],
+    button[aria-label*="Close" i],
+    button[aria-label*="open" i] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* Adjust main content width when sidebar is hidden */
+    section[data-testid="stMain"] {
+        margin-left: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.header("📧 Smart Email Agent")
     st.info("Smart Email Agent features will be added here soon.")
 
