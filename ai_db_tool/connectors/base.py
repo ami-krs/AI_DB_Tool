@@ -5,6 +5,7 @@ Supports PostgreSQL, MySQL, SQL Server, Oracle, SQLite, and more
 
 from __future__ import annotations
 import os
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass
