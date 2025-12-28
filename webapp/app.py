@@ -30,12 +30,22 @@ from ai_db_tool.connectors import DatabaseManager, DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 
 # Configuration file path for persistent storage
+# Use project directory for SQLite DB to ensure consistency
+PROJECT_ROOT = Path(__file__).parent.parent
+DB_DIR = PROJECT_ROOT / "data"
+DB_DIR.mkdir(parents=True, exist_ok=True)  # Ensure data directory exists
+
+# Config directory - use home directory for user-specific config
 CONFIG_DIR = Path.home() / ".ai_db_tool"
 CONFIG_FILE = CONFIG_DIR / "db_config.json"
 
 def ensure_config_dir():
     """Ensure config directory exists"""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_persistent_sqlite_path():
+    """Get persistent SQLite database path in project directory"""
+    return DB_DIR / "database.sqlite"
 
 def save_db_config(config: DatabaseConfig):
     """Save database configuration to persistent storage"""
