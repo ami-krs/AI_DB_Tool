@@ -592,13 +592,25 @@ st.markdown("""
         margin: 0 !important;
     }
     
-    /* Compact action buttons - Execute and Generate SQL */
-    div[data-testid="stVerticalBlock"]:has(button:has-text("▶️ Execute")) button,
-    div[data-testid="stVerticalBlock"]:has(button:has-text("🤖 Generate SQL")) button {
-        font-size: 0.85rem !important;
-        padding: 0.4rem 0.8rem !important;
+    /* Compact icon-only action buttons - Execute and Generate SQL */
+    button[data-testid*="run_btn"]:has-text("▶️"),
+    button:has-text("▶️"):not([data-testid*="download"]),
+    button:has-text("🤖"):not([data-testid*="download"]) {
+        font-size: 1.3rem !important;
+        padding: 0.3rem 0.5rem !important;
         height: auto !important;
         min-height: 2rem !important;
+        max-height: 2rem !important;
+        width: auto !important;
+        min-width: 2.5rem !important;
+        line-height: 1 !important;
+    }
+    
+    /* Remove text spacing in icon-only buttons */
+    button:has-text("▶️") > div:not([data-testid*="download"]),
+    button:has-text("🤖") > div:not([data-testid*="download"]) {
+        padding: 0 !important;
+        margin: 0 !important;
     }
 </style>
 <script>
@@ -2813,13 +2825,13 @@ def sql_editor_compact():
         placeholder="SELECT * FROM table_name LIMIT 10;"
     )
     
-    # Action buttons - Execute and Generate SQL on left, others on right
-    action_col1, action_col2, action_col3, action_col4, action_col5 = st.columns([2, 2, 2, 2, 2])
+    # Action buttons - Execute and Generate SQL icon-only on left, others on right
+    action_col1, action_col2, action_col3, action_col4, action_col5 = st.columns([1, 1, 2, 2, 2])
     with action_col1:
-        if st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_compact"):
+        if st.button("▶️", type="primary", use_container_width=True, key="run_btn_compact", help="Execute Query"):
             execute_query(query)
     with action_col2:
-        if st.button("🤖 Generate SQL", use_container_width=True):
+        if st.button("🤖", use_container_width=True, help="Generate SQL"):
             generate_sql_query()
     with action_col3:
         if st.button("🚀 AI Opt", use_container_width=True):
@@ -3100,13 +3112,13 @@ def sql_editor_tab():
     with col2:
         st.markdown("### Actions")
         
-        # Compact buttons: Execute Query and Generate SQL on same line, left-aligned
-        action_col1, action_col2, action_col3 = st.columns([2, 2, 8])
+        # Compact buttons: Execute Query and Generate SQL on same line, icon-only with hover tooltips
+        action_col1, action_col2, action_col3 = st.columns([1, 1, 10])
         with action_col1:
-            if st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab"):
+            if st.button("▶️", type="primary", use_container_width=True, key="run_btn_tab", help="Execute Query"):
                 execute_query(query)
         with action_col2:
-            if st.button("🤖 Generate SQL", use_container_width=True):
+            if st.button("🤖", use_container_width=True, help="Generate SQL"):
                 generate_sql_query()
         
         if st.button("🔧 AI Optimize", use_container_width=True):
