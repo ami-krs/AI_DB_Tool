@@ -1930,20 +1930,51 @@ def main():
                 render_connection_setting()
     
     # Main content area
-    # Header
-    if st.session_state.layout_mode == 'three_column' and st.session_state.connected:
-        # Minimized header for three column layout when connected
-        st.markdown("#### 🤖 AI Database Tool")
-    else:
-        # Header with title
-        st.markdown("#### 🤖 AI Database Tool")
-        st.markdown("Intelligent database management with AI-powered SQL generation")
+    # Header - only show when not on home page
+    if st.session_state.active_section != 'home':
+        # Home icon button at top left
+        home_col1, home_col2 = st.columns([1, 20])
+        with home_col1:
+            if st.button("🏠", key="home_nav_button", help="Go to Home Dashboard"):
+                st.session_state.active_section = 'home'
+                st.rerun()
         
-        # Navigation dropdown below subtitle on the left
-        if st.session_state.connected:
-            nav_col1, nav_col2 = st.columns([1, 3])
-            with nav_col1:
-                render_navigation_bar()
+        # Style the home button
+        st.markdown("""
+        <style>
+        button[data-testid*="home_nav_button"] {
+            background-color: #0d7377 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 45px !important;
+            height: 45px !important;
+            font-size: 1.5rem !important;
+            padding: 0 !important;
+            min-width: 45px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            transition: background-color 0.2s, transform 0.2s !important;
+        }
+        button[data-testid*="home_nav_button"]:hover {
+            background-color: #14a085 !important;
+            transform: scale(1.1) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        if st.session_state.layout_mode == 'three_column' and st.session_state.connected:
+            # Minimized header for three column layout when connected
+            st.markdown("#### 🤖 AI Database Tool")
+        else:
+            # Header with title
+            st.markdown("#### 🤖 AI Database Tool")
+            st.markdown("Intelligent database management with AI-powered SQL generation")
+            
+            # Navigation dropdown below subtitle on the left
+            if st.session_state.connected:
+                nav_col1, nav_col2 = st.columns([1, 3])
+                with nav_col1:
+                    render_navigation_bar()
     
     # Render active section - Home is always available, others require connection
     if st.session_state.active_section == 'home':
