@@ -3031,23 +3031,6 @@ def chatbot_tab():
     </script>
     """, unsafe_allow_html=True)
     
-    # Compact action buttons - Execute Query and Generate SQL on left side, icon-only
-    action_col1, action_col2 = st.columns([1, 1])
-    with action_col1:
-        if st.button("▶️", type="primary", use_container_width=True, key="chat_execute_btn", help="Execute Query"):
-            # Execute the last generated SQL query if available
-            if st.session_state.chat_history:
-                last_sql = None
-                for msg in reversed(st.session_state.chat_history):
-                    if msg['role'] == 'assistant' and 'sql_query' in msg and msg['sql_query']:
-                        last_sql = msg['sql_query']
-                        break
-                if last_sql:
-                    execute_query(last_sql)
-    with action_col2:
-        if st.button("🤖", use_container_width=True, key="chat_generate_btn", help="Generate SQL"):
-            generate_sql_query()
-    
     # Chat input (outside scrollable container, stays at bottom)
     user_input = st.chat_input("Ask me anything about your database...")
     
