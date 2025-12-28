@@ -2269,14 +2269,21 @@ def render_connection_setting():
     
     with st.form("connection_form_popup", clear_on_submit=False):
         if db_type == "sqlite":
-            default_path = get_persistent_sqlite_path()
-            database = st.text_input(
+            # Always use persistent path for SQLite to ensure data persistence
+            persistent_path = get_persistent_sqlite_path()
+            # Always use the persistent path - show it as read-only or inform user
+            st.info(f"💾 SQLite database location: `{persistent_path}` (persistent - data will be preserved)")
+            database = persistent_path  # Always use persistent path
+            # Hidden input to satisfy form requirements
+            st.text_input(
                 "Database File Path", 
-                value=default_path, 
-                help="Path to SQLite database file (use a persistent location, not /tmp/)", 
-                autocomplete="off", 
-                key="db_file_popup"
+                value=persistent_path, 
+                help="SQLite database is always stored in a persistent location to ensure data is preserved across restarts", 
+                disabled=True,  # Make it read-only so user can't change it
+                key="db_file_popup_display"
             )
+            # Store the persistent path
+            st.session_state['db_file_path_sqlite'] = persistent_path
             host = ""
             port = 0
             username = ""
@@ -2300,6 +2307,9 @@ def render_connection_setting():
         # Handle form submission inside the form context
         if connect_button:
             try:
+                # For SQLite, always use persistent path
+                if db_type == "sqlite":
+                    database = get_persistent_sqlite_path()
                 handle_connection(db_type, host, port, database, username, password)
             except Exception as e:
                 st.error(f"❌ Connection error: {str(e)}")
@@ -2330,15 +2340,20 @@ def handle_connection(db_type, host, port, database, username, password):
         st.warning("⚠️ Using /tmp/ for SQLite database will be wiped on system restart! Use a persistent location like ~/.ai_db_tool/database.sqlite")
     
     if db_type == "sqlite":
+        # ALWAYS use persistent path for SQLite to ensure data persistence
+        # This prevents data loss from using /tmp/ or other temporary locations
+        persistent_path = get_persistent_sqlite_path()
+        database = persistent_path  # Force use of persistent path
+        
         # Ensure directory exists for SQLite file
-        db_path = Path(database)
+        db_path = Path(persistent_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         
         config = DatabaseConfig(
             db_type=db_type,
             host="",
             port=0,
-            database=str(db_path.absolute()),  # Use absolute path
+            database=str(db_path.absolute()),  # Always use absolute persistent path
             username="",
             password="",
             extra_params=None
