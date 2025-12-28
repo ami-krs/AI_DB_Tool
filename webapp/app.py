@@ -1053,7 +1053,7 @@ if 'show_chatbot' not in st.session_state:
 if 'show_connection' not in st.session_state:
     st.session_state.show_connection = True  # Show connection section by default
 if 'active_section' not in st.session_state:
-    st.session_state.active_section = 'chatbot'  # Default to AI Chatbot
+    st.session_state.active_section = 'home'  # Default to Home Dashboard
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False  # Light mode by default
 if 'current_page' not in st.session_state:
@@ -2887,6 +2887,124 @@ def visualizations_compact():
                 st.bar_chart(df[selected_col].head(20))
     else:
         st.info("Execute a query to see charts")
+
+
+def home_dashboard():
+    """Home/Dashboard page with links to agentic apps"""
+    st.markdown("""
+    <style>
+    .app-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    .app-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        border-color: #14a085;
+    }
+    .app-card-content {
+        color: white;
+        text-align: center;
+    }
+    .app-icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+    }
+    .app-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    .app-description {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("## 🏠 Agentic Apps Dashboard")
+    st.markdown("Welcome to your AI-powered applications hub. Select an app to get started.")
+    st.markdown("---")
+    
+    # Define agentic apps
+    apps = [
+        {
+            'icon': '🤖',
+            'title': 'AI Database Tool',
+            'description': 'Intelligent database management with AI-powered SQL generation',
+            'section': 'chatbot'  # Navigate to chatbot section
+        },
+        # Add more apps here in the future
+        # {
+        #     'icon': '📊',
+        #     'title': 'Data Analytics App',
+        #     'description': 'Advanced analytics and insights',
+        #     'url': 'https://example.com/analytics'
+        # },
+    ]
+    
+    # Display apps in a grid (2 columns)
+    cols = st.columns(2)
+    for idx, app in enumerate(apps):
+        with cols[idx % 2]:
+            if 'section' in app:
+                # Internal navigation
+                if st.button(
+                    f"""
+                    <div class="app-card-content">
+                        <div class="app-icon">{app['icon']}</div>
+                        <div class="app-title">{app['title']}</div>
+                        <div class="app-description">{app['description']}</div>
+                    </div>
+                    """,
+                    key=f"app_card_{idx}",
+                    use_container_width=True
+                ):
+                    st.session_state.active_section = app['section']
+                    st.rerun()
+            else:
+                # External link (for future apps)
+                st.markdown(f"""
+                <a href="{app.get('url', '#')}" target="_blank" style="text-decoration: none;">
+                    <div class="app-card">
+                        <div class="app-card-content">
+                            <div class="app-icon">{app['icon']}</div>
+                            <div class="app-title">{app['title']}</div>
+                            <div class="app-description">{app['description']}</div>
+                        </div>
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
+    
+    # Add CSS for better card styling
+    st.markdown("""
+    <style>
+    button[data-testid*="app_card"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: 2px solid transparent !important;
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+        color: white !important;
+        font-weight: 600 !important;
+        transition: all 0.2s !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    }
+    button[data-testid*="app_card"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+        border-color: #14a085 !important;
+    }
+    button[data-testid*="app_card"] > div {
+        color: white !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def chatbot_tab():
