@@ -2069,22 +2069,38 @@ def render_theme_setting():
 
 def render_connection_setting():
     """Render Database Connection form"""
-    # Add CSS to make Connect/Disconnect buttons very compact and small
+    # Add CSS to make Connect/Disconnect buttons compact and fit in one line
     st.markdown("""
     <style>
-    /* Target buttons in connection form columns to make them very compact and small */
+    /* Target buttons in connection form columns - wider but shorter height */
     div[data-testid="stForm"]:has(form) div[data-testid="column"] button {
-        font-size: 0.65rem !important;
-        padding: 0.2rem 0.4rem !important;
-        line-height: 1.0 !important;
-        min-height: 1.4rem !important;
+        font-size: 0.7rem !important;
+        padding: 0.15rem 0.8rem !important;
+        line-height: 1.2 !important;
+        height: 1.8rem !important;
+        min-height: 1.8rem !important;
+        max-height: 1.8rem !important;
         margin: 0 !important;
-        height: auto !important;
+    }
+    /* Reduce padding around form fields */
+    div[data-testid="stForm"]:has(form) {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    /* Reduce spacing between form elements */
+    div[data-testid="stForm"]:has(form) > div {
+        gap: 0.5rem !important;
+    }
+    div[data-testid="stForm"]:has(form) .stTextInput,
+    div[data-testid="stForm"]:has(form) .stSelectbox,
+    div[data-testid="stForm"]:has(form) .stNumberInput {
+        margin-bottom: 0.5rem !important;
     }
     /* Make button text more compact */
     div[data-testid="stForm"]:has(form) div[data-testid="column"] button > div {
         padding: 0 !important;
         margin: 0 !important;
+        line-height: 1.2 !important;
     }
     </style>
     """, unsafe_allow_html=True)
