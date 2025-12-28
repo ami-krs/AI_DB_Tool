@@ -1913,13 +1913,13 @@ def main():
     
     # Sidebar - only show when not on home page or smart email agent page
     if st.session_state.active_section not in ['home', 'smart_email_agent']:
-    with st.sidebar:
-        st.title("🤖 AI Database Tool")
-        
+        with st.sidebar:
+            st.title("🤖 AI Database Tool")
+            
             # Database details display
             render_db_details()
             
-        st.markdown("---")
+            st.markdown("---")
             
             # Settings dropdown
             render_settings_dropdown()
