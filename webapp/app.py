@@ -66,11 +66,29 @@ def load_db_config() -> Optional[DatabaseConfig]:
         with open(CONFIG_FILE, 'r') as f:
             config_dict = json.load(f)
         
+        db_type = config_dict.get('db_type', 'postgresql')
+        database = config_dict.get('database', '')
+        
+        # For SQLite, always use persistent path (migrate old configs if needed)
+        if db_type == 'sqlite':
+            persistent_path = get_persistent_sqlite_path()
+            persistent_path_abs = str(Path(persistent_path).absolute())
+            # If saved config uses a different path (like /tmp/), migrate to persistent path
+            if database != persistent_path and database != persistent_path_abs:
+                database = persistent_path_abs
+                # Update the config file to use persistent path
+                config_dict['database'] = database
+                try:
+                    with open(CONFIG_FILE, 'w') as f:
+                        json.dump(config_dict, f, indent=2)
+                except:
+                    pass  # If we can't update, continue with persistent path
+        
         return DatabaseConfig(
-            db_type=config_dict.get('db_type', 'postgresql'),
+            db_type=db_type,
             host=config_dict.get('host', ''),
             port=config_dict.get('port', 5432),
-            database=config_dict.get('database', ''),
+            database=database,
             username=config_dict.get('username', ''),
             password=config_dict.get('password', ''),
             extra_params=config_dict.get('extra_params', {})
