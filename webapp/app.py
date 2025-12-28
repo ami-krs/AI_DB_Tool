@@ -2404,9 +2404,13 @@ def handle_connection(db_type, host, port, database, username, password):
             st.session_state.active_setting = None
             st.rerun()
         else:
-                st.error("❌ Connection failed!")
-                st.session_state.connected = False
-        
+            st.error("❌ Connection failed!")
+            st.session_state.connected = False
+    except Exception as e:
+        st.error(f"❌ Connection error: {str(e)}")
+        import traceback
+        st.exception(e)
+        st.session_state.connected = False
 
 def render_navigation_bar():
     """Render dropdown navigation bar using Streamlit selectbox styled as dropdown"""
