@@ -2955,15 +2955,10 @@ def home_dashboard():
     for idx, app in enumerate(apps):
         with cols[idx % 2]:
             if 'section' in app:
-                # Internal navigation
+                # Internal navigation - use button with styled content
+                button_text = f"{app['icon']}\n\n**{app['title']}**\n\n{app['description']}"
                 if st.button(
-                    f"""
-                    <div class="app-card-content">
-                        <div class="app-icon">{app['icon']}</div>
-                        <div class="app-title">{app['title']}</div>
-                        <div class="app-description">{app['description']}</div>
-                    </div>
-                    """,
+                    button_text,
                     key=f"app_card_{idx}",
                     use_container_width=True
                 ):
@@ -2990,11 +2985,17 @@ def home_dashboard():
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         border: 2px solid transparent !important;
         border-radius: 12px !important;
-        padding: 1.5rem !important;
+        padding: 2rem 1rem !important;
         color: white !important;
         font-weight: 600 !important;
         transition: all 0.2s !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+        min-height: 180px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        line-height: 1.6 !important;
     }
     button[data-testid*="app_card"]:hover {
         transform: translateY(-2px) !important;
@@ -3003,6 +3004,13 @@ def home_dashboard():
     }
     button[data-testid*="app_card"] > div {
         color: white !important;
+        font-size: 1rem !important;
+    }
+    button[data-testid*="app_card"] strong {
+        color: white !important;
+        font-size: 1.2rem !important;
+        display: block !important;
+        margin: 0.5rem 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
