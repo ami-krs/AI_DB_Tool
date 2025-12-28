@@ -44,8 +44,35 @@ def ensure_config_dir():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_persistent_sqlite_path():
-    """Get persistent SQLite database path in project directory (returns absolute path as string)"""
-    return str((DB_DIR / "database.sqlite").absolute())
+    """
+    Get persistent SQLite database path (returns absolute path as string)
+    Priority:
+    1. Streamlit secrets (if available)
+    2. Project directory: {project_root}/data/database.sqlite
+    """
+    # Try to get path from Streamlit secrets first
+    try:
+        if hasattr(st, 'secrets') and st.secrets:
+            # Check for SQLite database path in secrets
+            if 'database' in st.secrets:
+                db_secrets = st.secrets.database
+                if isinstance(db_secrets, dict) and 'sqlite_path' in db_secrets:
+                    secret_path = db_secrets.sqlite_path
+                    if secret_path:
+                        # Ensure it's an absolute path
+                        return str(Path(secret_path).absolute())
+            # Alternative: direct key in secrets
+            if 'SQLITE_DB_PATH' in st.secrets:
+                secret_path = st.secrets.SQLITE_DB_PATH
+                if secret_path:
+                    return str(Path(secret_path).absolute())
+    except Exception:
+        # If secrets access fails, fall through to default
+        pass
+    
+    # Default: Use project directory
+    default_path = DB_DIR / "database.sqlite"
+    return str(default_path.absolute())
 
 def save_db_config(config: DatabaseConfig):
     """Save database configuration to persistent storage"""
@@ -1155,30 +1182,39 @@ if st.session_state.connected and 'schema_info' not in st.session_state:
         }
 
 # Force refresh schema_info if connected - ensure tables are always loaded
+# This MUST run on every app run to ensure tables are displayed
 if st.session_state.connected and st.session_state.db_manager:
     try:
         # Always refresh tables list from database to ensure we have the latest
+        # This is critical - refresh on every run, not just on connect
         tables = st.session_state.db_manager.get_tables()
         
-        # Update schema_info with fresh table list
-        if st.session_state.get('schema_info'):
-            st.session_state.schema_info['tables'] = tables or []
-            st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
-        else:
+        # Always update schema_info with fresh table list
+        if not st.session_state.get('schema_info'):
             # Create schema_info if it doesn't exist
             st.session_state.schema_info = {
                 'tables': tables or [],
                 'db_type': st.session_state.db_type,
                 'total_tables': len(tables) if tables else 0
             }
+        else:
+            # Update existing schema_info with fresh data
+            st.session_state.schema_info['tables'] = tables or []
+            st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
+            st.session_state.schema_info['db_type'] = st.session_state.db_type
+        
+        # Debug: Log table count (can be removed later)
+        # print(f"DEBUG: Refreshed schema_info with {len(tables) if tables else 0} tables")
     except Exception as e:
-        # If refresh fails, try to preserve existing schema_info
+        # If refresh fails, try to preserve existing schema_info or create empty one
         if not st.session_state.get('schema_info'):
             st.session_state.schema_info = {
                 'tables': [],
                 'db_type': st.session_state.db_type,
                 'total_tables': 0
             }
+        # Log error for debugging (silent failure for user)
+        # print(f"DEBUG: Error refreshing schema_info: {e}")
 
 # Initialize chatbot if connected but chatbot is None and API keys are available
 if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
