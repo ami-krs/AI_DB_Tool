@@ -2921,18 +2921,18 @@ def chatbot_tab():
     
     # Display chat history
     if st.session_state.chat_history:
-    for msg in st.session_state.chat_history:
-        if msg['role'] == 'user':
-            st.chat_message("user").write(msg['content'])
-        else:
+        for msg in st.session_state.chat_history:
+            if msg['role'] == 'user':
+                st.chat_message("user").write(msg['content'])
+            else:
                 # Show explanation in collapsed expander by default
                 with st.expander("💡 View Explanation", expanded=False):
-            st.chat_message("assistant").write(msg['content'])
+                    st.chat_message("assistant").write(msg['content'])
                 
                 # Show SQL query in expanded form by default
-            if 'sql_query' in msg and msg['sql_query']:
+                if 'sql_query' in msg and msg['sql_query']:
                     with st.expander("📝 Generated SQL", expanded=True):
-                    st.code(msg['sql_query'], language='sql')
+                        st.code(msg['sql_query'], language='sql')
                     if st.button(f"Execute Query", key=f"exec_{msg['timestamp']}"):
                         execute_generated_query(msg['sql_query'])
     # else:
