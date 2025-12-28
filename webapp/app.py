@@ -1056,34 +1056,51 @@ if not st.session_state.connected:
                 # Load schema info to ensure tables are displayed
                 # This is critical - refresh schema info after auto-connect
                 try:
-                    schema_info = st.session_state.db_manager.get_database_info()
-                    if schema_info:
-                        schema_info['db_type'] = saved_config.db_type
-                        st.session_state.schema_info = schema_info
-                    else:
-                        # If get_database_info returns None, create empty schema
-                        st.session_state.schema_info = {
-                            'tables': [],
-                            'db_type': saved_config.db_type
-                        }
-                except Exception as schema_error:
-                    # If schema loading fails, try to create minimal schema info
-                    # But don't fail the connection - user can still use the app
+                    # Get table names directly first (this is more reliable)
+                    tables = st.session_state.db_manager.get_tables()
+                    
+                    # Then get full database info if available
                     try:
-                        # Try to at least get the table list
-                        tables = st.session_state.db_manager.get_tables()
+                        schema_info = st.session_state.db_manager.get_database_info()
+                        if schema_info:
+                            # Ensure 'tables' contains table names (strings), not schema objects
+                            # get_database_info() returns schema objects, but we need names
+                            if tables and isinstance(tables[0] if tables else None, str):
+                                # If we have table names, use them directly
+                                schema_info['tables'] = tables
+                            elif schema_info.get('tables') and isinstance(schema_info['tables'][0] if schema_info['tables'] else None, dict):
+                                # If it's schema objects, extract table names
+                                schema_info['tables'] = [t['table_name'] if isinstance(t, dict) and 'table_name' in t else str(t) for t in schema_info['tables']]
+                            else:
+                                schema_info['tables'] = tables or []
+                            
+                            schema_info['db_type'] = saved_config.db_type
+                            schema_info['total_tables'] = len(tables) if tables else 0
+                            st.session_state.schema_info = schema_info
+                        else:
+                            # If get_database_info returns None, use table names directly
+                            st.session_state.schema_info = {
+                                'tables': tables or [],
+                                'db_type': saved_config.db_type,
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': saved_config.database
+                            }
+                    except:
+                        # If get_database_info fails, use table names directly
                         st.session_state.schema_info = {
                             'tables': tables or [],
                             'db_type': saved_config.db_type,
-                            'total_tables': len(tables) if tables else 0
+                            'total_tables': len(tables) if tables else 0,
+                            'database_name': saved_config.database
                         }
-                    except:
-                        # If even that fails, create empty schema info
-                        st.session_state.schema_info = {
-                            'tables': [],
-                            'db_type': saved_config.db_type,
-                            'total_tables': 0
-                        }
+                except Exception as schema_error:
+                    # If even get_tables fails, create empty schema info
+                    st.session_state.schema_info = {
+                        'tables': [],
+                        'db_type': saved_config.db_type,
+                        'total_tables': 0,
+                        'database_name': saved_config.database
+                    }
                 # Show info in sidebar (non-intrusive)
                 st.session_state.auto_connected = True
         except Exception as e:
@@ -1093,13 +1110,34 @@ if not st.session_state.connected:
 # Ensure schema_info exists if connected but schema_info is missing
 if st.session_state.connected and 'schema_info' not in st.session_state:
     try:
-        schema_info = st.session_state.db_manager.get_database_info()
-        if schema_info:
-            schema_info['db_type'] = st.session_state.db_type
-            st.session_state.schema_info = schema_info
-        else:
-            # Try to get tables directly
-            tables = st.session_state.db_manager.get_tables()
+        # Get table names directly (more reliable)
+        tables = st.session_state.db_manager.get_tables()
+        
+        # Try to get full database info
+        try:
+            schema_info = st.session_state.db_manager.get_database_info()
+            if schema_info:
+                # Ensure 'tables' contains table names (strings), not schema objects
+                if tables and isinstance(tables[0] if tables else None, str):
+                    schema_info['tables'] = tables
+                elif schema_info.get('tables') and isinstance(schema_info['tables'][0] if schema_info['tables'] else None, dict):
+                    # Extract table names from schema objects
+                    schema_info['tables'] = [t['table_name'] if isinstance(t, dict) and 'table_name' in t else str(t) for t in schema_info['tables']]
+                else:
+                    schema_info['tables'] = tables or []
+                
+                schema_info['db_type'] = st.session_state.db_type
+                schema_info['total_tables'] = len(tables) if tables else 0
+                st.session_state.schema_info = schema_info
+            else:
+                # Use table names directly
+                st.session_state.schema_info = {
+                    'tables': tables or [],
+                    'db_type': st.session_state.db_type,
+                    'total_tables': len(tables) if tables else 0
+                }
+        except:
+            # If get_database_info fails, use table names directly
             st.session_state.schema_info = {
                 'tables': tables or [],
                 'db_type': st.session_state.db_type,
