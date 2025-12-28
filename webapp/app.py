@@ -574,22 +574,22 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
-    /* Compact download button */
-    button[kind="secondary"]:has-text("📥 Download CSV"),
-    button:has([download]):has-text("Download CSV") {
-        font-size: 0.75rem !important;
-        padding: 0.3rem 0.6rem !important;
+    /* Compact download button - icon only */
+    div[data-testid="stDownloadButton"] button {
+        font-size: 1.2rem !important;
+        padding: 0.2rem 0.4rem !important;
         height: auto !important;
-        min-height: 1.8rem !important;
+        min-height: 1.5rem !important;
+        max-height: 1.5rem !important;
+        line-height: 1 !important;
+        width: auto !important;
+        min-width: 2rem !important;
     }
     
-    /* Target download button more specifically */
-    div[data-testid="stDownloadButton"] button {
-        font-size: 0.75rem !important;
-        padding: 0.3rem 0.6rem !important;
-        height: auto !important;
-        min-height: 1.8rem !important;
-        line-height: 1.2 !important;
+    /* Remove text spacing in icon-only button */
+    div[data-testid="stDownloadButton"] button > div {
+        padding: 0 !important;
+        margin: 0 !important;
     }
 </style>
 <script>
