@@ -2279,28 +2279,28 @@ def handle_connection(db_type, host, port, database, username, password):
                 'application_name': 'ai_db_tool'
             }
         
-            config = DatabaseConfig(
-                db_type=db_type,
-                host=host,
-                port=int(port),
-                database=database,
-                username=username,
-                password=password,
+        config = DatabaseConfig(
+            db_type=db_type,
+            host=host,
+            port=int(port),
+            database=database,
+            username=username,
+            password=password,
             extra_params=extra_params if extra_params else None
-            )
-            
-            if st.session_state.db_manager.connect(config):
+        )
+    
+    if st.session_state.db_manager.connect(config):
         # Save connection config for persistence
         save_db_config(config)
-                
+        
         st.success("✅ Connected successfully! Connection saved for next session.")
         st.session_state.connected = True
-                st.session_state.db_type = config.db_type
-                
-                schema_info = st.session_state.db_manager.get_database_info()
-                schema_info['db_type'] = config.db_type
-                st.session_state.schema_info = schema_info
-                
+        st.session_state.db_type = config.db_type
+        
+        schema_info = st.session_state.db_manager.get_database_info()
+        schema_info['db_type'] = config.db_type
+        st.session_state.schema_info = schema_info
+        
         # Initialize AI components
                 try:
                     openai_key = get_api_key("OPENAI_API_KEY")
