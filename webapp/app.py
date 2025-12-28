@@ -591,6 +591,15 @@ st.markdown("""
         padding: 0 !important;
         margin: 0 !important;
     }
+    
+    /* Compact action buttons - Execute and Generate SQL */
+    div[data-testid="stVerticalBlock"]:has(button:has-text("▶️ Execute")) button,
+    div[data-testid="stVerticalBlock"]:has(button:has-text("🤖 Generate SQL")) button {
+        font-size: 0.85rem !important;
+        padding: 0.4rem 0.8rem !important;
+        height: auto !important;
+        min-height: 2rem !important;
+    }
 </style>
 <script>
     // TEST: This should appear in console immediately
@@ -2804,21 +2813,21 @@ def sql_editor_compact():
         placeholder="SELECT * FROM table_name LIMIT 10;"
     )
     
-    # Action buttons in row
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        if st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_compact"):
+    # Action buttons - Execute and Generate SQL on left, others on right
+    action_col1, action_col2, action_col3, action_col4, action_col5 = st.columns([2, 2, 2, 2, 2])
+    with action_col1:
+        if st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_compact"):
             execute_query(query)
-    with col2:
-        if st.button("🤖 AI Gen", use_container_width=True):
+    with action_col2:
+        if st.button("🤖 Generate SQL", use_container_width=True):
             generate_sql_query()
-    with col3:
+    with action_col3:
         if st.button("🚀 AI Opt", use_container_width=True):
             optimize_query(query)
-    with col4:
+    with action_col4:
         if st.button("🔧 Fix", use_container_width=True):
             debug_query(query)
-    with col5:
+    with action_col5:
         if st.button("💾 Save", use_container_width=True):
             save_query_to_history(query)
     
@@ -3091,11 +3100,14 @@ def sql_editor_tab():
     with col2:
         st.markdown("### Actions")
         
-        if st.button("▶️ Run", type="primary", use_container_width=True, key="run_btn_tab"):
-            execute_query(query)
-        
-        if st.button("🤖 AI Generate", use_container_width=True):
-            generate_sql_query()
+        # Compact buttons: Execute Query and Generate SQL on same line, left-aligned
+        action_col1, action_col2, action_col3 = st.columns([2, 2, 8])
+        with action_col1:
+            if st.button("▶️ Execute", type="primary", use_container_width=True, key="run_btn_tab"):
+                execute_query(query)
+        with action_col2:
+            if st.button("🤖 Generate SQL", use_container_width=True):
+                generate_sql_query()
         
         if st.button("🔧 AI Optimize", use_container_width=True):
             optimize_query(query)
