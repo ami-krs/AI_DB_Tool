@@ -1872,7 +1872,8 @@ def main():
         # Settings dropdown
         render_settings_dropdown()
         
-        st.markdown("---")
+        # Minimal divider - reduced spacing
+        st.markdown("<hr style='margin: 0.25rem 0; border: none; border-top: 1px solid rgba(250, 250, 250, 0.2);'>", unsafe_allow_html=True)
         
         # Database Connection (standalone)
         with st.expander("🔌 Database Connection", expanded=not st.session_state.connected):
