@@ -1863,10 +1863,12 @@ def main():
     
     # Handle navigation via query parameters at the top level (most reliable)
     section_labels = {
+        'home': '🏠 Home',
         'chatbot': '💬 AI SQL Assistant',
         'sql_editor': '📝 Smart SQL Editor',
         'data_explorer': '🔍 Data Explorer',
-        'visualizations': '📊 Data Visualizations'
+        'visualizations': '📊 Data Visualizations',
+        'smart_email_agent': '📧 Smart Email Agent'
     }
     
     # Check query parameters first, before anything else
@@ -2935,6 +2937,12 @@ def visualizations_compact():
                 st.bar_chart(df[selected_col].head(20))
     else:
         st.info("Execute a query to see charts")
+
+
+def smart_email_agent():
+    """Smart Email Agent - placeholder page for future implementation"""
+    st.header("📧 Smart Email Agent")
+    st.info("Smart Email Agent features will be added here soon.")
 
 
 def home_dashboard():
