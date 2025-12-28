@@ -2509,9 +2509,43 @@ def handle_connection(db_type, host, port, database, username, password):
             st.session_state.connected = True
             st.session_state.db_type = config.db_type
             
-            schema_info = st.session_state.db_manager.get_database_info()
-            schema_info['db_type'] = config.db_type
-            st.session_state.schema_info = schema_info
+            # Get table names directly first (more reliable)
+            tables = st.session_state.db_manager.get_tables()
+            
+            # Get full database info
+            try:
+                schema_info = st.session_state.db_manager.get_database_info()
+                if schema_info:
+                    # Ensure 'tables' contains table names (strings), not schema objects
+                    # get_database_info() returns schema objects, but we need names
+                    if tables and isinstance(tables[0] if tables else None, str):
+                        # Use table names directly if available
+                        schema_info['tables'] = tables
+                    elif schema_info.get('tables') and isinstance(schema_info['tables'][0] if schema_info['tables'] else None, dict):
+                        # Extract table names from schema objects
+                        schema_info['tables'] = [t.get('table_name', str(t)) if isinstance(t, dict) else str(t) for t in schema_info['tables']]
+                    else:
+                        schema_info['tables'] = tables or []
+                    
+                    schema_info['db_type'] = config.db_type
+                    schema_info['total_tables'] = len(tables) if tables else 0
+                    st.session_state.schema_info = schema_info
+                else:
+                    # If get_database_info returns None, use table names directly
+                    st.session_state.schema_info = {
+                        'tables': tables or [],
+                        'db_type': config.db_type,
+                        'total_tables': len(tables) if tables else 0,
+                        'database_name': config.database
+                    }
+            except:
+                # If get_database_info fails, use table names directly
+                st.session_state.schema_info = {
+                    'tables': tables or [],
+                    'db_type': config.db_type,
+                    'total_tables': len(tables) if tables else 0,
+                    'database_name': config.database
+                }
             
             # Initialize AI components
             try:
