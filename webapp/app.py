@@ -11,9 +11,6 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-import os
-st.write("DB path:", os.path.abspath("mydb.sqlite"))
-
 # Try to import sqlparse, fallback to simple split if not available
 try:
     import sqlparse
@@ -2222,23 +2219,38 @@ def render_db_details():
         try:
             schema_info = st.session_state.get('schema_info', {})
             db_type = st.session_state.db_type or 'unknown'
-            db_name = schema_info.get('database_name', 'unknown')
             
-            # Format database name for display
-            if db_type == 'sqlite':
-                # Show just the filename for SQLite
-                if '/' in db_name:
-                    db_name = db_name.split('/')[-1]
-                display_name = db_name
+            # Get actual database path from config
+            db_path = None
+            if st.session_state.db_manager.config:
+                db_path = st.session_state.db_manager.config.database
+            
+            # For SQLite, show the full path for debugging
+            if db_type == 'sqlite' and db_path:
+                # Get expected path from secrets/default
+                expected_path = get_persistent_sqlite_path()
+                db_name = db_path.split('/')[-1] if '/' in db_path else db_path
+                
+                total_tables = schema_info.get('total_tables', 0)
+                
+                # Display path info
+                st.info(f"🔌 **{db_type.upper()}** | {db_name} | {total_tables} tables")
+                # Show full path in expandable section for debugging
+                with st.expander("📁 Database Path Info", expanded=False):
+                    st.code(f"Current path: {db_path}")
+                    st.code(f"Expected path: {expected_path}")
+                    if db_path != expected_path:
+                        st.warning(f"⚠️ Path mismatch! Current: `{db_path}` vs Expected: `{expected_path}`")
+                    else:
+                        st.success("✅ Path matches expected location")
             else:
-                display_name = db_name
-            
-            total_tables = schema_info.get('total_tables', 0)
-            
-            # Display in a compact info box
-            st.info(f"🔌 **{db_type.upper()}** | {display_name} | {total_tables} tables")
-        except Exception:
-            st.info("🔌 **Connected**")
+                db_name = schema_info.get('database_name', 'unknown')
+                if db_type == 'sqlite' and '/' in str(db_name):
+                    db_name = str(db_name).split('/')[-1]
+                total_tables = schema_info.get('total_tables', 0)
+                st.info(f"🔌 **{db_type.upper()}** | {db_name} | {total_tables} tables")
+        except Exception as e:
+            st.info(f"🔌 **Connected** (Error: {e})")
     else:
         st.info("🔌 **Not Connected**")
 
