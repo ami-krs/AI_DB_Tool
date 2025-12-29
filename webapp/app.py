@@ -11,6 +11,9 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+import os
+st.write("DB path:", os.path.abspath("mydb.sqlite"))
+
 # Try to import sqlparse, fallback to simple split if not available
 try:
     import sqlparse
@@ -51,56 +54,35 @@ def get_persistent_sqlite_path():
     2. Project directory: {project_root}/data/database.sqlite
     """
     # Try to get path from Streamlit secrets first
+    secret_path_used = None
     try:
         if hasattr(st, 'secrets') and st.secrets:
-            # Check for SQLite database path in secrets (multiple patterns)
-            # Pattern 1: st.secrets.database.sqlite_path
-            try:
-                if hasattr(st.secrets, 'database'):
-                    db_secrets = st.secrets.database
-                    if hasattr(db_secrets, 'sqlite_path'):
-                        secret_path = db_secrets.sqlite_path
-                        if secret_path and str(secret_path).strip():
-                            # Ensure it's an absolute path
-                            return str(Path(str(secret_path)).absolute())
-            except (AttributeError, KeyError, TypeError):
-                pass
-            
-            # Pattern 2: st.secrets["database"]["sqlite_path"]
-            try:
-                if 'database' in st.secrets:
-                    db_secrets = st.secrets['database']
-                    if isinstance(db_secrets, dict) and 'sqlite_path' in db_secrets:
-                        secret_path = db_secrets['sqlite_path']
-                        if secret_path and str(secret_path).strip():
-                            return str(Path(str(secret_path)).absolute())
-            except (AttributeError, KeyError, TypeError):
-                pass
-            
-            # Pattern 3: Direct key st.secrets.SQLITE_DB_PATH
-            try:
-                if hasattr(st.secrets, 'SQLITE_DB_PATH'):
-                    secret_path = st.secrets.SQLITE_DB_PATH
-                    if secret_path and str(secret_path).strip():
-                        return str(Path(str(secret_path)).absolute())
-            except (AttributeError, KeyError, TypeError):
-                pass
-            
-            # Pattern 4: Direct key st.secrets["SQLITE_DB_PATH"]
-            try:
-                if 'SQLITE_DB_PATH' in st.secrets:
-                    secret_path = st.secrets['SQLITE_DB_PATH']
-                    if secret_path and str(secret_path).strip():
-                        return str(Path(str(secret_path)).absolute())
-            except (AttributeError, KeyError, TypeError):
-                pass
-    except Exception:
+            # Check for SQLite database path in secrets
+            if 'database' in st.secrets:
+                db_secrets = st.secrets.database
+                if isinstance(db_secrets, dict) and 'sqlite_path' in db_secrets:
+                    secret_path = db_secrets.sqlite_path
+                    if secret_path:
+                        # Ensure it's an absolute path
+                        secret_path_used = str(Path(secret_path).absolute())
+                        print(f"DEBUG: Using database path from secrets [database.sqlite_path]: {secret_path_used}")
+                        return secret_path_used
+            # Alternative: direct key in secrets
+            if 'SQLITE_DB_PATH' in st.secrets:
+                secret_path = st.secrets.SQLITE_DB_PATH
+                if secret_path:
+                    secret_path_used = str(Path(secret_path).absolute())
+                    print(f"DEBUG: Using database path from secrets [SQLITE_DB_PATH]: {secret_path_used}")
+                    return secret_path_used
+    except Exception as e:
         # If secrets access fails, fall through to default
-        pass
+        print(f"DEBUG: Error reading secrets: {e}")
     
     # Default: Use project directory
     default_path = DB_DIR / "database.sqlite"
-    return str(default_path.absolute())
+    default_path_str = str(default_path.absolute())
+    print(f"DEBUG: Using default database path (project directory): {default_path_str}")
+    return default_path_str
 
 def save_db_config(config: DatabaseConfig):
     """Save database configuration to persistent storage"""
@@ -1210,39 +1192,30 @@ if st.session_state.connected and 'schema_info' not in st.session_state:
         }
 
 # Force refresh schema_info if connected - ensure tables are always loaded
-# This MUST run on every app run to ensure tables are displayed
 if st.session_state.connected and st.session_state.db_manager:
     try:
         # Always refresh tables list from database to ensure we have the latest
-        # This is critical - refresh on every run, not just on connect
         tables = st.session_state.db_manager.get_tables()
         
-        # Always update schema_info with fresh table list
-        if not st.session_state.get('schema_info'):
+        # Update schema_info with fresh table list
+        if st.session_state.get('schema_info'):
+            st.session_state.schema_info['tables'] = tables or []
+            st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
+        else:
             # Create schema_info if it doesn't exist
             st.session_state.schema_info = {
                 'tables': tables or [],
                 'db_type': st.session_state.db_type,
                 'total_tables': len(tables) if tables else 0
             }
-        else:
-            # Update existing schema_info with fresh data
-            st.session_state.schema_info['tables'] = tables or []
-            st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
-            st.session_state.schema_info['db_type'] = st.session_state.db_type
-        
-        # Debug: Log table count (can be removed later)
-        # print(f"DEBUG: Refreshed schema_info with {len(tables) if tables else 0} tables")
     except Exception as e:
-        # If refresh fails, try to preserve existing schema_info or create empty one
+        # If refresh fails, try to preserve existing schema_info
         if not st.session_state.get('schema_info'):
             st.session_state.schema_info = {
                 'tables': [],
                 'db_type': st.session_state.db_type,
                 'total_tables': 0
             }
-        # Log error for debugging (silent failure for user)
-        # print(f"DEBUG: Error refreshing schema_info: {e}")
 
 # Initialize chatbot if connected but chatbot is None and API keys are available
 if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
