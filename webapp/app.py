@@ -2591,20 +2591,11 @@ def handle_connection(db_type, host, port, database, username, password):
         print(f"DEBUG: handle_connection - Using database path: {persistent_path}")
         print(f"DEBUG: handle_connection - Path exists: {db_path.exists()}")
         if db_path.exists():
-            file_size = db_path.stat().st_size
-            print(f"DEBUG: handle_connection - File size: {file_size} bytes")
-            # Try to check if file has tables (quick check)
             try:
-                import sqlite3
-                conn = sqlite3.connect(str(db_path))
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                existing_tables = cursor.fetchall()
-                table_names = [t[0] for t in existing_tables]
-                conn.close()
-                print(f"DEBUG: handle_connection - Existing tables in file: {len(table_names)} - {', '.join(table_names[:10])}")
+                file_size = db_path.stat().st_size
+                print(f"DEBUG: handle_connection - File size: {file_size} bytes")
             except Exception as e:
-                print(f"DEBUG: handle_connection - Could not check existing tables: {e}")
+                print(f"DEBUG: handle_connection - Could not get file size: {e}")
         
         config = DatabaseConfig(
             db_type=db_type,
