@@ -3010,7 +3010,10 @@ def chatbot_compact():
     
     if user_input:
         # Check if chatbot is available when user actually tries to use it
+        print(f"DEBUG: User input received (chatbot_compact): {user_input}")
+        print(f"DEBUG: Chatbot available (chatbot_compact): {st.session_state.chatbot is not None}")
         if not st.session_state.chatbot:
+            print(f"DEBUG: Chatbot is None (chatbot_compact), showing error message")
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         else:
             # Add user message to history
@@ -3018,8 +3021,10 @@ def chatbot_compact():
             
             # Get AI response
             try:
+                print(f"DEBUG: Calling chatbot.chat() (chatbot_compact) with query: {user_input}")
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                print(f"DEBUG: Chatbot response received (chatbot_compact): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
                 
                 if 'error' not in response:
                     # Add assistant response to history
@@ -3660,7 +3665,10 @@ def chatbot_tab():
     
     if user_input:
         # Check if chatbot is available when user actually tries to use it
+        print(f"DEBUG: User input received (chatbot_tab): {user_input}")
+        print(f"DEBUG: Chatbot available (chatbot_tab): {st.session_state.chatbot is not None}")
         if not st.session_state.chatbot:
+            print(f"DEBUG: Chatbot is None (chatbot_tab), showing error message")
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         else:
             # Add user message to history
@@ -3668,8 +3676,10 @@ def chatbot_tab():
             
             # Get AI response
             try:
+                print(f"DEBUG: Calling chatbot.chat() (chatbot_tab) with query: {user_input}")
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                print(f"DEBUG: Chatbot response received (chatbot_tab): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
                 
                 if 'error' not in response:
                     # Add assistant response to history
