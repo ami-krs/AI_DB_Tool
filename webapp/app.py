@@ -3025,21 +3025,39 @@ def chatbot_compact():
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
                 print(f"DEBUG: Chatbot response received (chatbot_compact): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
-                
+                print(f"DEBUG: Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
                 if 'error' not in response:
                     # Add assistant response to history
-                    st.session_state.chat_history.append({
-                        'role': 'assistant',
-                        'content': response['response'],
-                        'sql_query': response.get('sql_query'),
-                        'timestamp': response['timestamp']
-                    })
-                    st.rerun()
+                    try:
+                        response_content = response.get('response', response.get('content', str(response)))
+                        sql_query = response.get('sql_query', response.get('sql', None))
+                        timestamp = response.get('timestamp', datetime.now().isoformat())
+                        print(f"DEBUG: Adding response to chat history - content length: {len(response_content) if response_content else 0}, has sql: {bool(sql_query)}")
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response_content,
+                            'sql_query': sql_query,
+                            'timestamp': timestamp
+                        })
+                        st.rerun()
+                    except Exception as process_error:
+                        print(f"DEBUG: Error processing response: {process_error}")
+                        import traceback
+                        traceback.print_exc()
+                        st.error(f"❌ Error processing chatbot response: {str(process_error)}")
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': f"Error processing response: {str(process_error)}",
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        st.rerun()
                 else:
-                    st.error(f"Error: {response.get('error', 'Unknown error occurred')}")
+                    error_msg = response.get('error', 'Unknown error occurred')
+                    print(f"DEBUG: Response contains error: {error_msg}")
+                    st.error(f"Error: {error_msg}")
                     st.session_state.chat_history.append({
                         'role': 'assistant',
-                        'content': f"Error: {response.get('error', 'Unknown error occurred')}",
+                        'content': f"Error: {error_msg}",
                         'timestamp': datetime.now().isoformat()
                     })
             except Exception as e:
@@ -3680,21 +3698,39 @@ def chatbot_tab():
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
                 print(f"DEBUG: Chatbot response received (chatbot_tab): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
-                
+                print(f"DEBUG: Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
                 if 'error' not in response:
                     # Add assistant response to history
-                    st.session_state.chat_history.append({
-                        'role': 'assistant',
-                        'content': response['response'],
-                        'sql_query': response.get('sql_query'),
-                        'timestamp': response['timestamp']
-                    })
-                    st.rerun()
+                    try:
+                        response_content = response.get('response', response.get('content', str(response)))
+                        sql_query = response.get('sql_query', response.get('sql', None))
+                        timestamp = response.get('timestamp', datetime.now().isoformat())
+                        print(f"DEBUG: Adding response to chat history - content length: {len(response_content) if response_content else 0}, has sql: {bool(sql_query)}")
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': response_content,
+                            'sql_query': sql_query,
+                            'timestamp': timestamp
+                        })
+                        st.rerun()
+                    except Exception as process_error:
+                        print(f"DEBUG: Error processing response: {process_error}")
+                        import traceback
+                        traceback.print_exc()
+                        st.error(f"❌ Error processing chatbot response: {str(process_error)}")
+                        st.session_state.chat_history.append({
+                            'role': 'assistant',
+                            'content': f"Error processing response: {str(process_error)}",
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        st.rerun()
                 else:
-                    st.error(f"Error: {response.get('error', 'Unknown error occurred')}")
+                    error_msg = response.get('error', 'Unknown error occurred')
+                    print(f"DEBUG: Response contains error: {error_msg}")
+                    st.error(f"Error: {error_msg}")
                     st.session_state.chat_history.append({
                         'role': 'assistant',
-                        'content': f"Error: {response.get('error', 'Unknown error occurred')}",
+                        'content': f"Error: {error_msg}",
                         'timestamp': datetime.now().isoformat()
                     })
             except Exception as e:
