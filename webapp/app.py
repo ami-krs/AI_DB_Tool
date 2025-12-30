@@ -3531,6 +3531,7 @@ def home_dashboard():
 
 def chatbot_tab():
     """AI Chatbot interface"""
+    print(f"DEBUG: chatbot_tab() called - chat_history length: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
     
