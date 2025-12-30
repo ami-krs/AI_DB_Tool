@@ -1234,21 +1234,35 @@ if st.session_state.connected and (st.session_state.chatbot is None or st.sessio
         anthropic_key = get_api_key("ANTHROPIC_API_KEY")
         api_key = openai_key or anthropic_key
         
+        print(f"DEBUG: Chatbot initialization - OpenAI key present: {bool(openai_key)}, Anthropic key present: {bool(anthropic_key)}")
+        print(f"DEBUG: Chatbot initialization - API key available: {bool(api_key)}")
+        print(f"DEBUG: Chatbot initialization - Schema info available: {bool(st.session_state.get('schema_info'))}")
+        
         if api_key and st.session_state.get('schema_info'):
             provider = "openai" if openai_key else "anthropic" if anthropic_key else "openai"
+            print(f"DEBUG: Chatbot initialization - Using provider: {provider}")
             if st.session_state.chatbot is None:
                 st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
+                print(f"DEBUG: Chatbot initialized successfully")
             if st.session_state.query_builder is None:
                 st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
+                print(f"DEBUG: Query builder initialized successfully")
             
             # Set schema context for chatbot
             if st.session_state.chatbot and st.session_state.get('schema_info'):
                 try:
                     st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
-                except:
+                    print(f"DEBUG: Schema context set successfully")
+                except Exception as schema_error:
+                    print(f"DEBUG: Schema context setting failed: {schema_error}")
                     pass  # Schema context setting failed, but chatbot is still usable
+        else:
+            print(f"DEBUG: Chatbot initialization skipped - api_key: {bool(api_key)}, schema_info: {bool(st.session_state.get('schema_info'))}")
     except Exception as e:
-        # Silently fail - chatbot will remain None if initialization fails
+        # Log error but don't fail completely
+        print(f"DEBUG: Chatbot initialization error: {e}")
+        import traceback
+        traceback.print_exc()
         pass
 
 if 'query_history' not in st.session_state:
