@@ -3588,8 +3588,10 @@ def chatbot_tab():
     st.markdown('<div id="chat-container-start"></div>', unsafe_allow_html=True)
     
     # Display chat history
+    print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     if st.session_state.chat_history:
-        for msg in st.session_state.chat_history:
+        for idx, msg in enumerate(st.session_state.chat_history):
+            print(f"DEBUG: Displaying message {idx}: role={msg.get('role')}, has_content={bool(msg.get('content'))}, has_sql={bool(msg.get('sql_query'))}")
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
