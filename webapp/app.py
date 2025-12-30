@@ -1194,10 +1194,19 @@ if st.session_state.connected and st.session_state.db_manager:
         # Always refresh tables list from database to ensure we have the latest
         tables = st.session_state.db_manager.get_tables()
         
+        # Debug: Log table count
+        print(f"DEBUG: Refreshing schema_info - Found {len(tables) if tables else 0} tables in database")
+        if tables:
+            print(f"DEBUG: Table names: {', '.join(tables[:10])}")  # Show first 10 table names
+        
         # Update schema_info with fresh table list
         if st.session_state.get('schema_info'):
+            old_count = st.session_state.schema_info.get('total_tables', 0)
             st.session_state.schema_info['tables'] = tables or []
             st.session_state.schema_info['total_tables'] = len(tables) if tables else 0
+            new_count = st.session_state.schema_info['total_tables']
+            if old_count != new_count:
+                print(f"DEBUG: Table count changed from {old_count} to {new_count}")
         else:
             # Create schema_info if it doesn't exist
             st.session_state.schema_info = {
@@ -1205,7 +1214,11 @@ if st.session_state.connected and st.session_state.db_manager:
                 'db_type': st.session_state.db_type,
                 'total_tables': len(tables) if tables else 0
             }
+            print(f"DEBUG: Created new schema_info with {len(tables) if tables else 0} tables")
     except Exception as e:
+        print(f"DEBUG: Error refreshing schema_info: {e}")
+        import traceback
+        traceback.print_exc()
         # If refresh fails, try to preserve existing schema_info
         if not st.session_state.get('schema_info'):
             st.session_state.schema_info = {
@@ -2573,6 +2586,25 @@ def handle_connection(db_type, host, port, database, username, password):
         # Ensure directory exists for SQLite file
         db_path = Path(persistent_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Debug: Log the path and file status
+        print(f"DEBUG: handle_connection - Using database path: {persistent_path}")
+        print(f"DEBUG: handle_connection - Path exists: {db_path.exists()}")
+        if db_path.exists():
+            file_size = db_path.stat().st_size
+            print(f"DEBUG: handle_connection - File size: {file_size} bytes")
+            # Try to check if file has tables (quick check)
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                existing_tables = cursor.fetchall()
+                table_names = [t[0] for t in existing_tables]
+                conn.close()
+                print(f"DEBUG: handle_connection - Existing tables in file: {len(table_names)} - {', '.join(table_names[:10])}")
+            except Exception as e:
+                print(f"DEBUG: handle_connection - Could not check existing tables: {e}")
         
         config = DatabaseConfig(
             db_type=db_type,
