@@ -3516,21 +3516,32 @@ def chatbot_tab():
                 if st.button(f"❓ {question}", key=f"example_{idx}", use_container_width=True):
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
-                    with st.spinner("🤔 Thinking..."):
-                        response = st.session_state.chatbot.chat(question, include_sql=True)
-                    
-                    if 'error' not in response:
+                    try:
+                        with st.spinner("🤔 Thinking..."):
+                            response = st.session_state.chatbot.chat(question, include_sql=True)
+                        
+                        if 'error' not in response:
+                            st.session_state.chat_history.append({
+                                'role': 'assistant',
+                                'content': response['response'],
+                                'sql_query': response.get('sql_query'),
+                                'timestamp': response['timestamp']
+                            })
+                        else:
+                            st.session_state.chat_history.append({
+                                'role': 'assistant',
+                                'content': response.get('response', response.get('error', 'Error occurred')),
+                                'timestamp': response.get('timestamp', datetime.now().isoformat())
+                            })
+                    except Exception as e:
+                        error_msg = f"❌ Error processing query: {str(e)}"
+                        print(f"DEBUG: Chatbot error on example question: {e}")
+                        import traceback
+                        traceback.print_exc()
                         st.session_state.chat_history.append({
                             'role': 'assistant',
-                            'content': response['response'],
-                            'sql_query': response.get('sql_query'),
-                            'timestamp': response['timestamp']
-                        })
-                    else:
-                        st.session_state.chat_history.append({
-                            'role': 'assistant',
-                            'content': response.get('response', response.get('error', 'Error occurred')),
-                            'timestamp': response.get('timestamp', datetime.now().isoformat())
+                            'content': error_msg,
+                            'timestamp': datetime.now().isoformat()
                         })
                     st.rerun()
         
@@ -3637,26 +3648,43 @@ def chatbot_tab():
         # Check if chatbot is available when user actually tries to use it
         if not st.session_state.chatbot:
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
-            return
-        
-        # Add user message to history
-        st.session_state.chat_history.append({'role': 'user', 'content': user_input})
-        
-        # Get AI response
-        with st.spinner("🤔 Thinking..."):
-            response = st.session_state.chatbot.chat(user_input, include_sql=True)
-        
-        if 'error' not in response:
-            # Add assistant response to history
-            st.session_state.chat_history.append({
-                'role': 'assistant',
-                'content': response['response'],
-                'sql_query': response.get('sql_query'),
-                'timestamp': response['timestamp']
-            })
-            st.rerun()
         else:
-            st.error(response['error'])
+            # Add user message to history
+            st.session_state.chat_history.append({'role': 'user', 'content': user_input})
+            
+            # Get AI response
+            try:
+                with st.spinner("🤔 Thinking..."):
+                    response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                
+                if 'error' not in response:
+                    # Add assistant response to history
+                    st.session_state.chat_history.append({
+                        'role': 'assistant',
+                        'content': response['response'],
+                        'sql_query': response.get('sql_query'),
+                        'timestamp': response['timestamp']
+                    })
+                    st.rerun()
+                else:
+                    st.error(f"Error: {response.get('error', 'Unknown error occurred')}")
+                    st.session_state.chat_history.append({
+                        'role': 'assistant',
+                        'content': f"Error: {response.get('error', 'Unknown error occurred')}",
+                        'timestamp': datetime.now().isoformat()
+                    })
+            except Exception as e:
+                error_msg = f"❌ Error processing query: {str(e)}"
+                st.error(error_msg)
+                print(f"DEBUG: Chatbot error: {e}")
+                import traceback
+                traceback.print_exc()
+                st.session_state.chat_history.append({
+                    'role': 'assistant',
+                    'content': error_msg,
+                    'timestamp': datetime.now().isoformat()
+                })
+                st.rerun()
 
 
 def sql_editor_tab():
