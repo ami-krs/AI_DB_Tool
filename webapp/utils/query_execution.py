@@ -1,8 +1,9 @@
 """Query execution and SQL-related utility functions"""
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
+import time
 
 # Try to import sqlparse, fallback to simple split if not available
 try:
@@ -12,6 +13,14 @@ except ImportError:
     SQLPARSE_AVAILABLE = False
 
 from .helpers import display_paginated_dataframe
+
+# Import agents (with fallback if not available)
+try:
+    from ai_db_tool.ai.agents import AgentOrchestrator
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+    AgentOrchestrator = None
 
 def split_sql_statements(query: str) -> List[str]:
     """Split SQL query into individual statements, handling semicolons in strings/comments"""
@@ -181,11 +190,33 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
         result['error'] = str(e)
         return result
 
-def execute_query(query: str):
-    """Execute SQL query and display results (supports multiple statements, SELECT, INSERT, UPDATE, DELETE, DDL)"""
+def execute_query(query: str, enable_agents: Optional[bool] = None):
+    """Execute SQL query and display results (supports multiple statements, SELECT, INSERT, UPDATE, DELETE, DDL)
+    
+    Args:
+        query: SQL query to execute
+        enable_agents: Whether to use AI agents for analysis (default: from session state)
+    """
     if not query.strip():
         st.warning("Please enter a query")
         return
+    
+    # Use session state setting if enable_agents not explicitly provided
+    if enable_agents is None:
+        enable_agents = st.session_state.get('enable_ai_agents', True)
+    
+    # Initialize agent orchestrator if available and enabled
+    orchestrator = None
+    if enable_agents and AGENTS_AVAILABLE:
+        try:
+            from utils.helpers import get_api_key
+            api_key = get_api_key("OPENAI_API_KEY") or get_api_key("ANTHROPIC_API_KEY")
+            provider = "openai" if get_api_key("OPENAI_API_KEY") else "anthropic"
+            if api_key:
+                orchestrator = AgentOrchestrator(api_key=api_key, provider=provider)
+        except Exception as e:
+            st.warning(f"⚠️ Could not initialize AI agents: {e}")
+            orchestrator = None
     
     # Split into multiple statements
     try:
@@ -207,11 +238,48 @@ def execute_query(query: str):
     # If single statement, use original behavior for backward compatibility
     if len(statements) == 1:
         single_statement = statements[0]
+        
+            # Pre-execution: Query Analyzer Agent
+        if orchestrator:
+            try:
+                from ui.agent_display import display_agent_response
+                schema_info = st.session_state.get('schema_info', {})
+                db_type = st.session_state.get('db_type', 'unknown')
+                with st.spinner("🔍 Analyzing query with AI..."):
+                    query_analysis = orchestrator.analyze_query(single_statement, schema_info, db_type)
+                    if query_analysis and query_analysis.confidence > 0.5:
+                        display_agent_response(query_analysis, expanded=False)
+            except Exception as e:
+                st.debug(f"Query analysis failed: {e}")
+        
+        # Execute query
+        start_time = time.time()
         result = execute_single_statement(single_statement)
+        execution_time = time.time() - start_time
         
         if not result['success']:
             st.error(f"❌ Query execution failed: {result['error']}")
             st.code(single_statement, language='sql')
+            
+            # Debug Agent: Analyze the error
+            if orchestrator:
+                try:
+                    from ui.agent_display import display_agent_response
+                    schema_info = st.session_state.get('schema_info', {})
+                    db_type = st.session_state.get('db_type', 'unknown')
+                    with st.spinner("🐛 Debugging error with AI..."):
+                        debug_response = orchestrator.debug_error(
+                            single_statement, 
+                            result.get('error', 'Unknown error'),
+                            str(result.get('error', '')),
+                            schema_info,
+                            db_type
+                        )
+                        if debug_response:
+                            display_agent_response(debug_response, expanded=True)
+                except Exception as e:
+                    st.debug(f"Debug analysis failed: {e}")
+            
             st.info("💡 Tip: Check your SQL syntax, table/column names, and ensure you're connected to the database.")
             return
         
@@ -237,6 +305,38 @@ def execute_query(query: str):
             st.session_state.last_result_df = result['dataframe']
             st.session_state.last_result = result['dataframe']
             st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
+            
+            # Post-execution: Results Analyzer and Review Agent
+            if orchestrator:
+                try:
+                    from ui.agent_display import display_agent_response
+                    with st.spinner("📊 Analyzing results with AI..."):
+                        # Results Analyzer
+                        results_analysis = orchestrator.analyze_results(
+                            single_statement,
+                            result,
+                            error=None,
+                            rows_retrieved=result['rows_retrieved'],
+                            execution_time=execution_time,
+                            dataframe=result['dataframe']
+                        )
+                        
+                        # Review Agent
+                        review_response = orchestrator.review_results(
+                            single_statement,
+                            result,
+                            rows_retrieved=result['rows_retrieved'],
+                            execution_time=execution_time,
+                            dataframe=result['dataframe']
+                        )
+                        
+                        # Display agent responses
+                        if results_analysis:
+                            display_agent_response(results_analysis, expanded=False)
+                        if review_response:
+                            display_agent_response(review_response, expanded=False)
+                except Exception as e:
+                    st.debug(f"Results analysis failed: {e}")
         
         elif result['type'] == 'DDL':
             st.success(f"✅ Database object operation completed successfully!")

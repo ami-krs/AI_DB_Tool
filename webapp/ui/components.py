@@ -64,7 +64,8 @@ def render_settings_dropdown():
         "⚙️ Settings": None,
         "⚡ Smart Editor": "editor",
         "📐 Layout": "layout",
-        "🎨 Theme": "theme"
+        "🎨 Theme": "theme",
+        "🤖 AI Agents": "agents"
     }
     
     option_labels = list(settings_options.keys())
@@ -109,7 +110,8 @@ def render_settings_dropdown():
         setting_labels = {
             "editor": "⚡ Smart Editor",
             "layout": "📐 Layout",
-            "theme": "🎨 Theme"
+            "theme": "🎨 Theme",
+            "agents": "🤖 AI Agents"
         }
         setting_label = setting_labels.get(st.session_state.active_setting, "Settings")
         with st.expander(setting_label, expanded=True):
@@ -173,6 +175,8 @@ def render_setting_content(setting_type):
         render_layout_setting()
     elif setting_type == 'theme':
         render_theme_setting()
+    elif setting_type == 'agents':
+        render_agents_setting()
 
 
 
@@ -254,6 +258,34 @@ def render_theme_setting():
     if dark_mode_toggle != st.session_state.dark_mode:
         st.session_state.dark_mode = dark_mode_toggle
         st.rerun()
+
+def render_agents_setting():
+    """Render AI Agents settings"""
+    st.info("🤖 Multi-Agent AI System")
+    st.markdown("""
+    Enable specialized AI agents to analyze queries, review results, debug errors, and suggest improvements.
+    
+    **Available Agents:**
+    - 🔍 **Query Analyzer**: Analyzes queries before execution
+    - 📊 **Results Analyzer**: Reviews results and suggests solutions
+    - 🐛 **Debug Agent**: Debugs errors and issues
+    - ✨ **Review Agent**: Reviews results and suggests optimizations
+    """)
+    
+    enable_agents = st.toggle(
+        "Enable AI Agents", 
+        value=st.session_state.get('enable_ai_agents', True),
+        key="enable_ai_agents_toggle",
+        help="Enable multi-agent AI analysis for queries and results"
+    )
+    if enable_agents != st.session_state.get('enable_ai_agents', True):
+        st.session_state.enable_ai_agents = enable_agents
+        st.rerun()
+    
+    if enable_agents:
+        st.success("✅ AI Agents are enabled. They will analyze your queries and results automatically.")
+    else:
+        st.info("ℹ️ AI Agents are disabled. Enable them to get AI-powered analysis and suggestions.")
         
 
 
