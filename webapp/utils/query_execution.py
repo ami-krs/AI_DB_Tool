@@ -354,6 +354,20 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
     # Multiple statements - execute each and show summary
     st.subheader(f"📋 Executing {len(statements)} Statement(s)")
     
+    # Pre-execution: Query Analyzer Agent for first statement (or all if enabled)
+    if orchestrator and len(statements) > 0:
+        try:
+            from ui.agent_display import display_agent_response
+            schema_info = st.session_state.get('schema_info', {})
+            db_type = st.session_state.get('db_type', 'unknown')
+            # Analyze the first statement as a preview
+            with st.spinner("🔍 Analyzing queries with AI..."):
+                query_analysis = orchestrator.analyze_query(statements[0], schema_info, db_type)
+                if query_analysis and query_analysis.confidence > 0.5:
+                    display_agent_response(query_analysis, expanded=False)
+        except Exception as e:
+            st.debug(f"Query analysis failed: {e}")
+    
     results = []
     success_count = 0
     error_count = 0
@@ -386,6 +400,26 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
             else:
                 error_count += 1
                 st.error(f"❌ Statement {idx} failed: {result['error']}")
+                
+                # Debug Agent: Analyze the error for multi-statement queries
+                if orchestrator:
+                    try:
+                        from ui.agent_display import display_agent_response
+                        schema_info = st.session_state.get('schema_info', {})
+                        db_type = st.session_state.get('db_type', 'unknown')
+                        with st.spinner("🐛 Debugging error with AI..."):
+                            debug_response = orchestrator.debug_error(
+                                statement,
+                                result.get('error', 'Unknown error'),
+                                str(result.get('error', '')),
+                                schema_info,
+                                db_type
+                            )
+                            if debug_response:
+                                display_agent_response(debug_response, expanded=True)
+                    except Exception as e:
+                        st.debug(f"Debug analysis failed: {e}")
+                
                 st.info("💡 This statement failed, but other statements will continue executing.")
     
     # Summary
