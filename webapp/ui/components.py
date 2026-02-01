@@ -6,6 +6,7 @@ from pathlib import Path
 from config.database_config import get_persistent_sqlite_path, CONFIG_FILE, save_db_config
 from utils.helpers import get_api_key
 from shared import CODEMIRROR_AVAILABLE, MONACO_EDITOR_AVAILABLE, codemirror_editor, monaco_editor
+from ui.navigation import handle_connection
 
 from ai_db_tool.connectors import DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
