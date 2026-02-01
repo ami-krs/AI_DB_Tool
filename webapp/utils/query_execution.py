@@ -190,6 +190,24 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
         result['error'] = str(e)
         return result
 
+def _is_simple_query(query: str) -> bool:
+    """Check if query is simple enough to skip agent analysis"""
+    query_upper = query.strip().upper()
+    query_len = len(query.strip())
+    
+    # Skip agents for very short queries (< 50 chars)
+    if query_len < 50:
+        return True
+    
+    # Skip for simple SELECT queries without complex operations
+    if query_upper.startswith('SELECT') and query_len < 200:
+        # Check for complex operations that might need analysis
+        complex_ops = ['JOIN', 'UNION', 'GROUP BY', 'HAVING', 'SUBQUERY', 'WITH', 'CTE', 'WINDOW', 'OVER']
+        if not any(op in query_upper for op in complex_ops):
+            return True
+    
+    return False
+
 def execute_query(query: str, enable_agents: Optional[bool] = None):
     """Execute SQL query and display results (supports multiple statements, SELECT, INSERT, UPDATE, DELETE, DDL)
     
@@ -250,15 +268,15 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
     if len(statements) == 1:
         single_statement = statements[0]
         
-            # Pre-execution: Query Analyzer Agent
-        if orchestrator:
+        # Pre-execution: Query Analyzer Agent (skip for simple queries)
+        if orchestrator and not _is_simple_query(single_statement):
             try:
                 from ui.agent_display import display_agent_response
                 schema_info = st.session_state.get('schema_info', {})
                 db_type = st.session_state.get('db_type', 'unknown')
                 with st.spinner("🔍 Analyzing query with AI..."):
                     query_analysis = orchestrator.analyze_query(single_statement, schema_info, db_type)
-                    if query_analysis and query_analysis.confidence > 0.5:
+                    if query_analysis and query_analysis.confidence > 0.7:  # Higher threshold for brief mode
                         display_agent_response(query_analysis, expanded=False)
             except Exception as e:
                 st.debug(f"Query analysis failed: {e}")
@@ -317,35 +335,43 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
             st.session_state.last_result = result['dataframe']
             st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
             
-            # Post-execution: Results Analyzer and Review Agent
-            if orchestrator:
+            # Post-execution: Results Analyzer and Review Agent (skip for simple queries)
+            if orchestrator and not _is_simple_query(single_statement):
                 try:
                     from ui.agent_display import display_agent_response
-                    with st.spinner("📊 Analyzing results with AI..."):
-                        # Results Analyzer
-                        results_analysis = orchestrator.analyze_results(
-                            single_statement,
-                            result,
-                            error=None,
-                            rows_retrieved=result['rows_retrieved'],
-                            execution_time=execution_time,
-                            dataframe=result['dataframe']
-                        )
-                        
-                        # Review Agent
-                        review_response = orchestrator.review_results(
-                            single_statement,
-                            result,
-                            rows_retrieved=result['rows_retrieved'],
-                            execution_time=execution_time,
-                            dataframe=result['dataframe']
-                        )
-                        
-                        # Display agent responses
-                        if results_analysis:
-                            display_agent_response(results_analysis, expanded=False)
-                        if review_response:
-                            display_agent_response(review_response, expanded=False)
+                    # Only analyze if there are issues or interesting patterns (skip for normal results)
+                    should_analyze = (
+                        result['rows_retrieved'] == 0 or  # Empty results
+                        execution_time > 1.0 or  # Slow query
+                        result.get('rows_retrieved', 0) > 10000  # Large result set
+                    )
+                    if should_analyze:
+                        with st.spinner("📊 Analyzing results..."):
+                            # Results Analyzer (brief mode)
+                            results_analysis = orchestrator.analyze_results(
+                                single_statement,
+                                result,
+                                error=None,
+                                rows_retrieved=result['rows_retrieved'],
+                                execution_time=execution_time,
+                                dataframe=result['dataframe']
+                            )
+                            
+                            # Review Agent (only for slow or large queries)
+                            if execution_time > 1.0 or result.get('rows_retrieved', 0) > 10000:
+                                review_response = orchestrator.review_results(
+                                    single_statement,
+                                    result,
+                                    rows_retrieved=result['rows_retrieved'],
+                                    execution_time=execution_time,
+                                    dataframe=result['dataframe']
+                                )
+                                if review_response and review_response.confidence > 0.7:
+                                    display_agent_response(review_response, expanded=False)
+                            
+                            # Display agent responses (brief mode - only show if confidence is high)
+                            if results_analysis and results_analysis.confidence > 0.7:
+                                display_agent_response(results_analysis, expanded=False)
                 except Exception as e:
                     st.debug(f"Results analysis failed: {e}")
         

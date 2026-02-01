@@ -89,13 +89,14 @@ class BaseAgent(ABC):
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=0.3
+                    temperature=0.3,
+                    max_tokens=150
                 )
                 return response.choices[0].message.content
             elif self.provider == "anthropic":
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=2000,
+                    max_tokens=150,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )
@@ -107,20 +108,14 @@ class BaseAgent(ABC):
 class QueryAnalyzerAgent(BaseAgent):
     """Agent that analyzes SQL queries before execution"""
     
-    SYSTEM_PROMPT = """You are an expert SQL query analyzer. Your role is to:
-1. Analyze SQL queries for potential issues BEFORE execution
-2. Identify syntax errors, logical errors, and performance issues
-3. Check for security concerns (SQL injection risks, dangerous operations)
-4. Suggest optimizations and improvements
-5. Warn about potentially destructive operations (DROP, DELETE without WHERE, etc.)
+    SYSTEM_PROMPT = """You are an expert SQL query analyzer. Provide BRIEF analysis (2-3 sentences max).
 
-Provide your analysis in a clear, structured format with:
-- Overall assessment
-- Specific issues found (if any)
-- Suggestions for improvement
-- Confidence level (0.0 to 1.0) in your analysis
+Analyze queries for:
+- Critical errors or security issues
+- Destructive operations (DROP, DELETE without WHERE)
+- Major performance problems
 
-Be thorough but concise. Focus on actionable insights."""
+Format: One sentence assessment, then 1-2 key suggestions if needed. Be concise."""
     
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
         super().__init__("Query Analyzer", api_key, provider, model)
@@ -131,25 +126,14 @@ Be thorough but concise. Focus on actionable insights."""
         schema_info = context.get('schema_info', {})
         db_type = context.get('db_type', 'unknown')
         
-        user_prompt = f"""Analyze this SQL query:
+        user_prompt = f"""Briefly analyze this SQL query (2-3 sentences max):
 
-Database Type: {db_type}
-Schema Information: {schema_info.get('total_tables', 0)} tables available
-
-Query to analyze:
-```sql
+Database: {db_type} ({schema_info.get('total_tables', 0)} tables)
+Query: ```sql
 {query}
 ```
 
-Please provide:
-1. Overall assessment (is this query safe and well-formed?)
-2. Any syntax or logical errors you can spot
-3. Performance concerns
-4. Security concerns
-5. Suggestions for improvement
-6. Confidence level (0.0-1.0) in your analysis
-
-Format your response clearly with sections."""
+Provide: 1) Quick assessment, 2) Critical issues only (if any), 3) One key suggestion if needed. Be very brief."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
@@ -196,21 +180,14 @@ Format your response clearly with sections."""
 class ResultsAnalyzerAgent(BaseAgent):
     """Agent that analyzes query results and suggests solutions for errors/issues"""
     
-    SYSTEM_PROMPT = """You are an expert database results analyzer. Your role is to:
-1. Analyze query execution results
-2. Identify errors, anomalies, or unexpected results
-3. Suggest solutions when issues are detected
-4. Provide insights about data quality and patterns
-5. Recommend follow-up queries or actions
+    SYSTEM_PROMPT = """You are an expert database results analyzer. Provide BRIEF analysis (2-3 sentences max).
 
-When analyzing results, consider:
-- Error messages and their meanings
-- Empty result sets (might indicate query issues)
-- Unexpected data patterns
-- Performance implications
+Focus on:
+- Critical errors or anomalies
 - Data quality issues
+- One key follow-up action if needed
 
-Provide clear, actionable suggestions."""
+Be very concise. Only mention important issues."""
     
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
         super().__init__("Results Analyzer", api_key, provider, model)
@@ -223,28 +200,15 @@ Provide clear, actionable suggestions."""
         rows_retrieved = context.get('rows_retrieved', 0)
         execution_time = context.get('execution_time', 0)
         
-        user_prompt = f"""Analyze this query execution result:
+        user_prompt = f"""Briefly analyze this query result (2-3 sentences max):
 
-Query executed:
-```sql
+Query: ```sql
 {query}
 ```
+Result: Success={result.get('success', False)}, Rows={rows_retrieved}, Time={execution_time:.3f}s
+Error: {error if error else 'None'}
 
-Execution Result:
-- Success: {result.get('success', False)}
-- Rows retrieved: {rows_retrieved}
-- Execution time: {execution_time:.3f}s
-- Error: {error if error else 'None'}
-
-Result details:
-{result.get('message', 'No additional details')}
-
-Please analyze:
-1. Is the result expected?
-2. Are there any issues or anomalies?
-3. What suggestions do you have?
-4. Should the user take any follow-up actions?
-5. Confidence level (0.0-1.0) in your analysis"""
+Provide: 1) Quick assessment, 2) Critical issues only, 3) One suggestion if needed. Be very brief."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
@@ -285,22 +249,14 @@ Please analyze:
 class DebugAgent(BaseAgent):
     """Agent specialized in debugging SQL queries and database issues"""
     
-    SYSTEM_PROMPT = """You are an expert SQL debugger. Your role is to:
-1. Debug SQL query errors and issues
-2. Identify root causes of problems
-3. Provide step-by-step debugging guidance
-4. Suggest fixes and workarounds
-5. Explain error messages in user-friendly terms
+    SYSTEM_PROMPT = """You are an expert SQL debugger. Provide BRIEF debugging (2-3 sentences max).
 
-When debugging, consider:
-- Syntax errors
-- Type mismatches
-- Missing tables/columns
-- Permission issues
-- Logic errors
-- Database-specific quirks
+Focus on:
+- Root cause (one sentence)
+- One specific fix suggestion
+- One alternative if needed
 
-Provide clear, actionable debugging steps."""
+Be very concise. Only mention critical debugging steps."""
     
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
         super().__init__("Debug Agent", api_key, provider, model)
@@ -313,26 +269,15 @@ Provide clear, actionable debugging steps."""
         schema_info = context.get('schema_info', {})
         db_type = context.get('db_type', 'unknown')
         
-        user_prompt = f"""Debug this SQL query error:
+        user_prompt = f"""Briefly debug this SQL error (2-3 sentences max):
 
-Database Type: {db_type}
-Schema: {schema_info.get('total_tables', 0)} tables available
-
-Query that failed:
-```sql
+Database: {db_type} ({schema_info.get('total_tables', 0)} tables)
+Query: ```sql
 {query}
 ```
+Error: {error} - {error_message}
 
-Error information:
-- Error type: {error}
-- Error message: {error_message}
-
-Please provide:
-1. Root cause analysis
-2. Step-by-step debugging approach
-3. Specific fix suggestions
-4. Alternative approaches if the fix doesn't work
-5. Confidence level (0.0-1.0) in your diagnosis"""
+Provide: 1) Root cause, 2) One fix, 3) One alternative if needed. Be very brief."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
@@ -373,21 +318,14 @@ Please provide:
 class ReviewAgent(BaseAgent):
     """Agent that reviews results and suggests optimizations and improvements"""
     
-    SYSTEM_PROMPT = """You are an expert database query reviewer. Your role is to:
-1. Review query results for quality and completeness
-2. Suggest optimizations and improvements
-3. Identify data quality issues
-4. Recommend best practices
-5. Suggest follow-up queries or analyses
+    SYSTEM_PROMPT = """You are an expert database query reviewer. Provide BRIEF review (2-3 sentences max).
 
-When reviewing, consider:
-- Query efficiency and performance
-- Result completeness
-- Data patterns and insights
-- Opportunities for optimization
-- Best practices adherence
+Focus on:
+- One key optimization if significant
+- One data quality insight if notable
+- One follow-up query suggestion if valuable
 
-Provide constructive, actionable feedback."""
+Be very concise. Only mention important improvements."""
     
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
         super().__init__("Review Agent", api_key, provider, model)
@@ -409,28 +347,15 @@ Provide constructive, actionable feedback."""
 - Sample data types: {dict(dataframe.dtypes.head(5))}
 """
         
-        user_prompt = f"""Review this query and its results:
+        user_prompt = f"""Briefly review this query (2-3 sentences max):
 
-Query:
-```sql
+Query: ```sql
 {query}
 ```
+Rows: {rows_retrieved}, Time: {execution_time:.3f}s
+Data: {data_summary[:200] if len(data_summary) > 200 else data_summary}
 
-Execution Summary:
-- Rows retrieved: {rows_retrieved}
-- Execution time: {execution_time:.3f}s
-- Success: {result.get('success', False)}
-
-Data Summary:
-{data_summary}
-
-Please provide:
-1. Overall review of query quality
-2. Optimization suggestions
-3. Data quality observations
-4. Best practice recommendations
-5. Suggested follow-up queries or analyses
-6. Confidence level (0.0-1.0) in your review"""
+Provide: 1) One key optimization if significant, 2) One insight if notable. Be very brief."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
