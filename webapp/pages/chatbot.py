@@ -287,18 +287,32 @@ def chatbot_tab():
     if st.session_state.chat_history:
         for idx, msg in enumerate(st.session_state.chat_history):
             print(f"DEBUG: Displaying message {idx}: role={msg.get('role')}, has_content={bool(msg.get('content'))}, has_sql={bool(msg.get('sql_query'))}")
+            # Generate unique key using index and timestamp if available
+            msg_timestamp = msg.get('timestamp', str(idx))
+            unique_key_base = f"chatbot_tab_{idx}_{hash(str(msg_timestamp)) % 10000}"
+            
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
                 # Show explanation in collapsed expander by default
-                with st.expander("💡 View Explanation", expanded=False, key=f"explanation_{idx}"):
+                try:
+                    with st.expander("💡 View Explanation", expanded=False, key=f"explanation_{unique_key_base}"):
+                        st.chat_message("assistant").write(msg['content'])
+                except Exception as e:
+                    # Fallback if expander fails
                     st.chat_message("assistant").write(msg['content'])
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
-                    with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{idx}"):
+                    try:
+                        with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{unique_key_base}"):
+                            st.code(msg['sql_query'], language='sql')
+                            if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
+                                execute_generated_query(msg['sql_query'])
+                    except Exception as e:
+                        # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
-                        if st.button(f"Execute Query", key=f"exec_{idx}"):
+                        if st.button(f"Execute Query", key=f"exec_fallback_{unique_key_base}"):
                             execute_generated_query(msg['sql_query'])
     # else:
     #     st.info("💬 Start chatting by typing a message below!")
