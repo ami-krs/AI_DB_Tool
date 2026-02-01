@@ -413,17 +413,29 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                         from ui.agent_display import display_agent_response
                         schema_info = st.session_state.get('schema_info', {})
                         db_type = st.session_state.get('db_type', 'unknown')
+                        
+                        # Extract error information
+                        error_obj = result.get('error', 'Unknown error')
+                        error_message = str(error_obj) if error_obj else 'Unknown error'
+                        
+                        # Extract error type
+                        error_type = type(error_obj).__name__ if error_obj and hasattr(error_obj, '__class__') else 'Error'
+                        
                         with st.spinner("🐛 Debugging error with AI..."):
                             debug_response = orchestrator.debug_error(
                                 statement,
-                                result.get('error', 'Unknown error'),
-                                str(result.get('error', '')),
+                                error_type,
+                                error_message,
                                 schema_info,
                                 db_type
                             )
                             if debug_response:
                                 display_agent_response(debug_response, expanded=True)
                     except Exception as e:
+                        # Show error in debug mode, but don't break the UI
+                        import traceback
+                        print(f"DEBUG: Debug Agent failed: {e}")
+                        print(traceback.format_exc())
                         st.debug(f"Debug analysis failed: {e}")
                 
                 st.info("💡 This statement failed, but other statements will continue executing.")
