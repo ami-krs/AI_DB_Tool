@@ -214,8 +214,14 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
             provider = "openai" if get_api_key("OPENAI_API_KEY") else "anthropic"
             if api_key:
                 orchestrator = AgentOrchestrator(api_key=api_key, provider=provider)
+            else:
+                # Silently skip if no API key - agents are optional
+                pass
         except Exception as e:
-            st.warning(f"⚠️ Could not initialize AI agents: {e}")
+            # Log error but don't show warning to user (agents are optional)
+            import traceback
+            print(f"DEBUG: Could not initialize AI agents: {e}")
+            print(traceback.format_exc())
             orchestrator = None
     
     # Split into multiple statements
