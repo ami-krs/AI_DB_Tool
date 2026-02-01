@@ -8,10 +8,9 @@ from .components import (
     render_layout_setting,
     render_theme_setting,
     render_connection_setting,
-    render_sql_editor,
-    handle_connection
+    render_sql_editor
 )
-from .navigation import render_navigation_bar
+from .navigation import render_navigation_bar, handle_connection
 
 __all__ = [
     'inject_dark_mode_css',
