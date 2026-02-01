@@ -205,6 +205,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
     if enable_agents is None:
         enable_agents = st.session_state.get('enable_ai_agents', True)
     
+    # Debug: Log agent status
+    print(f"DEBUG: enable_agents={enable_agents}, AGENTS_AVAILABLE={AGENTS_AVAILABLE}, session_state.enable_ai_agents={st.session_state.get('enable_ai_agents', 'NOT SET')}")
+    
     # Initialize agent orchestrator if available and enabled
     orchestrator = None
     if enable_agents and AGENTS_AVAILABLE:
@@ -214,8 +217,10 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
             provider = "openai" if get_api_key("OPENAI_API_KEY") else "anthropic"
             if api_key:
                 orchestrator = AgentOrchestrator(api_key=api_key, provider=provider)
+                print(f"DEBUG: AgentOrchestrator initialized successfully with provider={provider}")
             else:
                 # Silently skip if no API key - agents are optional
+                print("DEBUG: No API key available, agents will not be used")
                 pass
         except Exception as e:
             # Log error but don't show warning to user (agents are optional)
@@ -408,6 +413,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                 st.error(f"❌ Statement {idx} failed: {result['error']}")
                 
                 # Debug Agent: Analyze the error for multi-statement queries
+                print(f"DEBUG: Error occurred in statement {idx}, orchestrator={orchestrator is not None}")
                 if orchestrator:
                     try:
                         from ui.agent_display import display_agent_response
@@ -421,6 +427,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                         # Extract error type
                         error_type = type(error_obj).__name__ if error_obj and hasattr(error_obj, '__class__') else 'Error'
                         
+                        print(f"DEBUG: Calling Debug Agent - error_type={error_type}, error_message length={len(error_message)}")
                         with st.spinner("🐛 Debugging error with AI..."):
                             debug_response = orchestrator.debug_error(
                                 statement,
@@ -429,14 +436,20 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                                 schema_info,
                                 db_type
                             )
+                            print(f"DEBUG: Debug Agent response received: {debug_response is not None}")
                             if debug_response:
                                 display_agent_response(debug_response, expanded=True)
+                                print(f"DEBUG: Debug Agent response displayed")
+                            else:
+                                print("DEBUG: Debug Agent returned None response")
                     except Exception as e:
                         # Show error in debug mode, but don't break the UI
                         import traceback
                         print(f"DEBUG: Debug Agent failed: {e}")
                         print(traceback.format_exc())
                         st.debug(f"Debug analysis failed: {e}")
+                else:
+                    print(f"DEBUG: Orchestrator is None - enable_agents={enable_agents}, AGENTS_AVAILABLE={AGENTS_AVAILABLE}")
                 
                 st.info("💡 This statement failed, but other statements will continue executing.")
     
