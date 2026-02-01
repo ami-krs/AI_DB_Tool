@@ -35,11 +35,21 @@ def get_api_key(key_name: str) -> Optional[str]:
     
     return None
 
-def display_paginated_dataframe(df):
-    """Display dataframe with pagination controls"""
+def display_paginated_dataframe(df, unique_suffix=None):
+    """Display dataframe with pagination controls
+    
+    Args:
+        df: DataFrame to display
+        unique_suffix: Optional unique suffix for keys to avoid conflicts when called multiple times
+    """
     if df is None or len(df) == 0:
         st.info("No data to display")
         return
+    
+    # Generate unique key suffix to avoid conflicts
+    if unique_suffix is None:
+        import time
+        unique_suffix = f"{id(df)}_{int(time.time() * 1000000) % 1000000}"
     
     total_rows = len(df)
     total_pages = (total_rows - 1) // st.session_state.rows_per_page + 1
@@ -57,8 +67,8 @@ def display_paginated_dataframe(df):
     # Display pagination info (using markdown to avoid column nesting issues)
     st.markdown(f"**Total Rows:** {total_rows:,} | **Page:** {st.session_state.current_page} of {total_pages} | **Showing:** {start_idx + 1:,} - {end_idx:,}")
     
-    # Rows per page selector - use unique key based on dataframe ID
-    rows_per_page_key = f"rows_per_page_select_{id(df)}"
+    # Rows per page selector - use unique key based on dataframe ID and unique suffix
+    rows_per_page_key = f"rows_per_page_select_{unique_suffix}"
     rows_per_page_options = [50, 100, 250, 500, 1000]
     new_rows_per_page = st.selectbox(
         "Rows per page:",
@@ -74,7 +84,7 @@ def display_paginated_dataframe(df):
     # Pagination controls (NO COLUMNS to prevent nesting issues when called from within columns)
     if total_pages > 1:
         # Create unique keys for each button to avoid conflicts
-        button_key_prefix = f"pagination_{id(df)}"
+        button_key_prefix = f"pagination_{unique_suffix}"
         
         st.markdown("**Navigation:**")
         

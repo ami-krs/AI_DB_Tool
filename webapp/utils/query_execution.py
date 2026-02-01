@@ -233,7 +233,7 @@ def execute_query(query: str):
                 )
             
             st.session_state.current_page = 1
-            display_paginated_dataframe(result['dataframe'])
+            display_paginated_dataframe(result['dataframe'], unique_suffix=f"query_result_{len(st.session_state.query_history)}")
             st.session_state.last_result_df = result['dataframe']
             st.session_state.last_result = result['dataframe']
             st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
@@ -272,7 +272,7 @@ def execute_query(query: str):
                     st.success(f"✅ Statement {idx} executed: Retrieved {result['rows_retrieved']:,} rows")
                     if result['dataframe'] is not None and len(result['dataframe']) > 0:
                         st.session_state.current_page = 1
-                        display_paginated_dataframe(result['dataframe'])
+                        display_paginated_dataframe(result['dataframe'], unique_suffix=f"multi_stmt_{idx}_{len(statements)}")
                         
                         # Store last result for visualization
                         st.session_state.last_result_df = result['dataframe']
@@ -332,7 +332,7 @@ def execute_query(query: str):
             )
         
         st.session_state.current_page = 1
-        display_paginated_dataframe(last_select_result)
+        display_paginated_dataframe(last_select_result, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
 
 def execute_generated_query(query: str):
     """Execute AI-generated query"""
