@@ -50,7 +50,18 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
     ):
         # Display analysis
         st.markdown("#### 📝 Analysis")
-        st.markdown(response.analysis)
+        analysis_text = response.analysis or ""
+
+        # For Results Analyzer, force very brief display (first 2 sentences or ~250 chars)
+        if response.agent_name == "Results Analyzer":
+            # Split on sentence boundaries (very simple heuristic)
+            parts = re.split(r'(?<=[.!?])\s+', analysis_text.strip())
+            brief = " ".join(parts[:2]).strip()
+            if len(brief) > 250:
+                brief = brief[:247].rstrip() + "..."
+            st.markdown(brief)
+        else:
+            st.markdown(analysis_text)
         
         # Display suggestions if available
         if response.suggestions:
