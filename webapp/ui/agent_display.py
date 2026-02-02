@@ -73,7 +73,7 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
         suggested_sql = _extract_first_sql_block(response.analysis or "")
         if suggested_sql:
             st.markdown("#### ▶ Run suggested SQL")
-            st.caption("Edit and run the suggested SQL. This runs **without** invoking agents (faster, avoids loops).")
+            st.caption("Edit and run the suggested SQL. This runs **once** in the main results area (agents disabled).")
 
             key_base = f"agent_sql_{response.agent_name}_{int(response.timestamp.timestamp())}"
             sql_to_run = st.text_area(
@@ -85,12 +85,13 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             run_cols = st.columns([1, 4])
             with run_cols[0]:
                 if st.button("Run", key=f"{key_base}_run"):
-                    try:
-                        # Local import to avoid import cycles
-                        from utils.query_execution import execute_query
-                        execute_query(sql_to_run, enable_agents=False)
-                    except Exception as e:
-                        st.error(f"Failed to run suggested SQL: {e}")
+                    # Store SQL in session state and trigger a rerun.
+                    # The active page (e.g., chatbot) will pick this up and execute it
+                    # so that results are shown in the normal results area.
+                    st.session_state["agent_sql_to_run"] = sql_to_run
+                    st.session_state["agent_sql_source"] = response.agent_name
+                    st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
+                    st.experimental_rerun()
         
         # Display metadata
         if response.metadata:

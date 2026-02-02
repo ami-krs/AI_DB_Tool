@@ -228,6 +228,19 @@ def chatbot_tab():
     print(f"DEBUG: chatbot_tab() called - chat_history length: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
+
+    # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
+    agent_sql = st.session_state.get("agent_sql_to_run")
+    if agent_sql:
+        st.info("▶ Running SQL suggested by AI agent")
+        try:
+            # Run without agents to avoid recursive analysis
+            execute_query(agent_sql, enable_agents=False)
+        finally:
+            # Clear the flag so it only runs once
+            st.session_state.pop("agent_sql_to_run", None)
+            st.session_state.pop("agent_sql_source", None)
+            st.session_state.pop("agent_sql_timestamp", None)
     
     # Don't show API key message on page load - only show when user tries to use it
     
