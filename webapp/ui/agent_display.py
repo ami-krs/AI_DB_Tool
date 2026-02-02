@@ -2,8 +2,20 @@
 import streamlit as st
 from typing import List, Dict, Any
 from datetime import datetime
+import re
 
 from ai_db_tool.ai.agents import AgentResponse
+
+
+def _extract_first_sql_block(text: str) -> str | None:
+    """Extract first ```sql ...``` fenced block from text, if present."""
+    if not text:
+        return None
+    match = re.search(r"```sql\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    sql = match.group(1).strip()
+    return sql or None
 
 
 def display_agent_response(response: AgentResponse, expanded: bool = False):
@@ -45,6 +57,29 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             st.markdown("#### 💡 Suggestions")
             for idx, suggestion in enumerate(response.suggestions, 1):
                 st.markdown(f"{idx}. {suggestion}")
+
+        # Optional: runnable SQL snippet (when agent suggests SQL)
+        suggested_sql = _extract_first_sql_block(response.analysis or "")
+        if suggested_sql:
+            st.markdown("#### ▶ Run suggested SQL")
+            st.caption("Edit and run the suggested SQL. This runs **without** invoking agents (faster, avoids loops).")
+
+            key_base = f"agent_sql_{response.agent_name}_{int(response.timestamp.timestamp())}"
+            sql_to_run = st.text_area(
+                "Suggested SQL",
+                value=suggested_sql,
+                height=120,
+                key=f"{key_base}_editor",
+            )
+            run_cols = st.columns([1, 4])
+            with run_cols[0]:
+                if st.button("Run", key=f"{key_base}_run"):
+                    try:
+                        # Local import to avoid import cycles
+                        from utils.query_execution import execute_query
+                        execute_query(sql_to_run, enable_agents=False)
+                    except Exception as e:
+                        st.error(f"Failed to run suggested SQL: {e}")
         
         # Display metadata
         if response.metadata:
