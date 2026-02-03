@@ -414,6 +414,25 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                                 'total_tables': len(tables) if tables else 0,
                                 'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
                             }
+                        
+                        # Refresh chatbot schema context with full column details
+                        if st.session_state.chatbot:
+                            try:
+                                # Fetch full schemas for all tables (with columns)
+                                full_table_schemas = []
+                                for table_name in (tables or []):
+                                    try:
+                                        table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                        if table_schema:
+                                            full_table_schemas.append(table_schema)
+                                    except:
+                                        full_table_schemas.append({'table_name': table_name, 'columns': []})
+                                
+                                updated_schema_info = st.session_state.schema_info.copy()
+                                updated_schema_info['tables'] = full_table_schemas
+                                st.session_state.chatbot.set_schema_context(updated_schema_info)
+                            except Exception as e:
+                                st.debug(f"Could not update chatbot schema context: {e}")
                 except Exception as e:
                     st.debug(f"Could not refresh schema info: {e}")
         

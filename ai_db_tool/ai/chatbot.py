@@ -238,31 +238,49 @@ class SQLChatbot:
             prompt += f"Database Type: {db_type}\n\n"
         
         if self.schema_context:
-            prompt += "Database Schema:\n"
-            tables = self.schema_context.get('tables', [])[:10]
-            for table in tables:
-                # Handle both cases: table as string (table name) or dict (schema object)
-                if isinstance(table, str):
-                    # If table is just a string (table name), use it directly
-                    table_name = table
+            prompt += "Database Schema (IMPORTANT: Use EXACT column names from schema below):\n"
+            tables = self.schema_context.get('tables', [])
+            
+            # If tables are just strings, try to get full schema from db_manager
+            if tables and isinstance(tables[0], str):
+                # Tables are just names - we need to fetch full schema
+                prompt += "Available Tables (fetching column details...):\n"
+                # Note: We'll include what we have, but ideally schema should have full details
+                for table_name in tables[:20]:  # Show up to 20 tables
                     prompt += f"- {table_name}\n"
-                elif isinstance(table, dict):
-                    # If table is a dict with schema info, extract table_name and columns
-                    table_name = table.get('table_name', 'unknown')
-                    columns_list = table.get('columns', [])
-                    if columns_list:
-                        # Handle columns as list of dicts or list of strings
-                        if isinstance(columns_list[0], dict):
-                            columns = ', '.join([col.get('name', str(col)) for col in columns_list])
+                prompt += "\n⚠️ WARNING: Column details not available. Please ensure schema context includes column information.\n\n"
+            else:
+                # Tables have full schema info
+                for table in tables[:20]:  # Show up to 20 tables
+                    if isinstance(table, dict):
+                        # If table is a dict with schema info, extract table_name and columns
+                        table_name = table.get('table_name', 'unknown')
+                        columns_list = table.get('columns', [])
+                        if columns_list:
+                            # Handle columns as list of dicts or list of strings
+                            if isinstance(columns_list[0], dict):
+                                # Format: column_name (type) [nullable/not null] [primary key]
+                                col_details = []
+                                for col in columns_list:
+                                    col_name = col.get('name', str(col))
+                                    col_type = col.get('type', '')
+                                    nullable = 'NULL' if col.get('nullable', True) else 'NOT NULL'
+                                    pk = 'PRIMARY KEY' if col.get('primary_key', False) else ''
+                                    col_str = f"{col_name} ({col_type}) {nullable}"
+                                    if pk:
+                                        col_str += f" {pk}"
+                                    col_details.append(col_str)
+                                columns = ', '.join(col_details)
+                            else:
+                                columns = ', '.join([str(col) for col in columns_list])
+                            prompt += f"- {table_name}:\n  Columns: {columns}\n"
                         else:
-                            columns = ', '.join([str(col) for col in columns_list])
-                        prompt += f"- {table_name}: {columns}\n"
+                            prompt += f"- {table_name} (no column info available)\n"
+                    elif isinstance(table, str):
+                        prompt += f"- {table} (no column info available)\n"
                     else:
-                        prompt += f"- {table_name}\n"
-                else:
-                    # Fallback: convert to string
-                    prompt += f"- {str(table)}\n"
-            prompt += "\n"
+                        prompt += f"- {str(table)}\n"
+            prompt += "\nCRITICAL: When generating INSERT/UPDATE/DELETE statements, you MUST use the EXACT column names and types shown above. Do NOT guess or invent column names.\n\n"
         
         prompt += f"User Question: {user_message}\n"
         

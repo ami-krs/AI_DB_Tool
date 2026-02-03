@@ -264,6 +264,13 @@ def chatbot_tab():
                                 'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
                             }
                         st.success("🔄 Schema information refreshed!")
+                        
+                        # Also refresh chatbot schema context if available
+                        if st.session_state.chatbot:
+                            try:
+                                st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
+                            except Exception as e:
+                                st.debug(f"Could not update chatbot schema context: {e}")
                 except Exception as e:
                     st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
         except Exception as e:

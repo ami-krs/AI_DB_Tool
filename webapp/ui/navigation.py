@@ -77,36 +77,62 @@ def handle_connection(db_type, host, port, database, username, password):
             # Get table names directly first (more reliable)
             tables = st.session_state.db_manager.get_tables()
             
-            # Get full database info
+            # Get full database info WITH column details
             try:
                 schema_info = st.session_state.db_manager.get_database_info()
                 if schema_info:
-                    # Ensure 'tables' contains table names (strings), not schema objects
-                    # get_database_info() returns schema objects, but we need names
-                    if tables and isinstance(tables[0] if tables else None, str):
-                        # Use table names directly if available
-                        schema_info['tables'] = tables
-                    elif schema_info.get('tables') and isinstance(schema_info['tables'][0] if schema_info['tables'] else None, dict):
-                        # Extract table names from schema objects
-                        schema_info['tables'] = [t.get('table_name', str(t)) if isinstance(t, dict) else str(t) for t in schema_info['tables']]
+                    # Ensure 'tables' contains FULL schema objects with columns, not just names
+                    # This is critical for the chatbot to generate correct INSERT statements
+                    if schema_info.get('tables') and isinstance(schema_info['tables'][0] if schema_info['tables'] else None, dict):
+                        # Already has full schema objects - keep them
+                        schema_info['tables'] = schema_info['tables']
                     else:
-                        schema_info['tables'] = tables or []
+                        # Need to fetch full schema for each table
+                        full_table_schemas = []
+                        for table_name in (tables or []):
+                            try:
+                                table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                if table_schema:
+                                    full_table_schemas.append(table_schema)
+                            except Exception as e:
+                                # If we can't get schema, at least include the table name
+                                full_table_schemas.append({'table_name': table_name, 'columns': []})
+                        schema_info['tables'] = full_table_schemas
                     
                     schema_info['db_type'] = config.db_type
                     schema_info['total_tables'] = len(tables) if tables else 0
                     st.session_state.schema_info = schema_info
                 else:
-                    # If get_database_info returns None, use table names directly
+                    # If get_database_info returns None, fetch full schemas manually
+                    full_table_schemas = []
+                    for table_name in (tables or []):
+                        try:
+                            table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                            if table_schema:
+                                full_table_schemas.append(table_schema)
+                        except Exception as e:
+                            # If we can't get schema, at least include the table name
+                            full_table_schemas.append({'table_name': table_name, 'columns': []})
+                    
                     st.session_state.schema_info = {
-                        'tables': tables or [],
+                        'tables': full_table_schemas,
                         'db_type': config.db_type,
                         'total_tables': len(tables) if tables else 0,
                         'database_name': config.database
                     }
-            except:
-                # If get_database_info fails, use table names directly
+            except Exception as e:
+                # If get_database_info fails, try to fetch schemas manually
+                full_table_schemas = []
+                for table_name in (tables or []):
+                    try:
+                        table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                        if table_schema:
+                            full_table_schemas.append(table_schema)
+                    except:
+                        full_table_schemas.append({'table_name': table_name, 'columns': []})
+                
                 st.session_state.schema_info = {
-                    'tables': tables or [],
+                    'tables': full_table_schemas,
                     'db_type': config.db_type,
                     'total_tables': len(tables) if tables else 0,
                     'database_name': config.database
