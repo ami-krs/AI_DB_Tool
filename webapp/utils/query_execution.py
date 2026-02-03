@@ -4,6 +4,7 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import time
+import re
 
 # Try to import sqlparse, fallback to simple split if not available
 try:
@@ -376,9 +377,45 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                     st.debug(f"Results analysis failed: {e}")
         
         elif result['type'] == 'DDL':
-            st.success(f"✅ Database object operation completed successfully!")
-            if any(single_statement.strip().upper().startswith(cmd) for cmd in ['CREATE', 'DROP', 'ALTER']):
-                st.info("💡 Refresh the page to see updated schema")
+            # Show detailed success message based on DDL type
+            stmt_upper = single_statement.strip().upper()
+            if stmt_upper.startswith('CREATE SCHEMA'):
+                # Extract schema name
+                schema_match = re.search(r'CREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)', stmt_upper, re.IGNORECASE)
+                schema_name = schema_match.group(1) if schema_match else 'schema'
+                st.success(f"✅ Schema '{schema_name}' created successfully!")
+                st.info("💡 Schema is now available. You can create tables in it using: CREATE TABLE schema_name.table_name (...)")
+            elif stmt_upper.startswith('CREATE TABLE'):
+                table_match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:(\w+)\.)?(\w+)', stmt_upper, re.IGNORECASE)
+                if table_match:
+                    schema_part = table_match.group(1)
+                    table_name = table_match.group(2)
+                    if schema_part:
+                        st.success(f"✅ Table '{schema_part}.{table_name}' created successfully!")
+                    else:
+                        st.success(f"✅ Table '{table_name}' created successfully!")
+            else:
+                st.success(f"✅ Database object operation completed successfully!")
+            
+            # Refresh schema info after DDL operations
+            if any(stmt_upper.startswith(cmd) for cmd in ['CREATE SCHEMA', 'CREATE TABLE', 'DROP SCHEMA', 'DROP TABLE', 'ALTER']):
+                try:
+                    if st.session_state.connected and st.session_state.db_manager:
+                        tables = st.session_state.db_manager.get_tables()
+                        schema_info = st.session_state.db_manager.get_database_info()
+                        if schema_info:
+                            schema_info['tables'] = tables or []
+                            schema_info['total_tables'] = len(tables) if tables else 0
+                            st.session_state.schema_info = schema_info
+                        else:
+                            st.session_state.schema_info = {
+                                'tables': tables or [],
+                                'db_type': st.session_state.get('db_type', 'unknown'),
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                            }
+                except Exception as e:
+                    st.debug(f"Could not refresh schema info: {e}")
         
         else:  # DML
             if result['rows_affected'] >= 0:

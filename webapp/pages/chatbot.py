@@ -236,6 +236,29 @@ def chatbot_tab():
         try:
             # Run without agents to avoid recursive analysis
             execute_query(agent_sql, enable_agents=False)
+            
+            # After DDL operations (especially CREATE SCHEMA), refresh schema info
+            sql_upper = agent_sql.strip().upper()
+            if any(sql_upper.startswith(cmd) for cmd in ['CREATE SCHEMA', 'CREATE TABLE', 'DROP SCHEMA', 'DROP TABLE', 'ALTER']):
+                try:
+                    # Refresh schema info to reflect new schema/table
+                    if st.session_state.connected and st.session_state.db_manager:
+                        tables = st.session_state.db_manager.get_tables()
+                        schema_info = st.session_state.db_manager.get_database_info()
+                        if schema_info:
+                            schema_info['tables'] = tables or []
+                            schema_info['total_tables'] = len(tables) if tables else 0
+                            st.session_state.schema_info = schema_info
+                        else:
+                            st.session_state.schema_info = {
+                                'tables': tables or [],
+                                'db_type': st.session_state.get('db_type', 'unknown'),
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                            }
+                        st.success("🔄 Schema information refreshed!")
+                except Exception as e:
+                    st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
         finally:
             # Clear the flag so it only runs once
             st.session_state.pop("agent_sql_to_run", None)
