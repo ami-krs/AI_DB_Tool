@@ -84,14 +84,16 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             )
             run_cols = st.columns([1, 4])
             with run_cols[0]:
-                if st.button("Run", key=f"{key_base}_run"):
+                if st.button("Run", key=f"{key_base}_run", type="primary"):
                     # Store SQL in session state and trigger a rerun.
                     # The active page (e.g., chatbot) will pick this up and execute it
                     # so that results are shown in the normal results area.
-                    st.session_state["agent_sql_to_run"] = sql_to_run
+                    # Use the current value from text_area to get the edited SQL
+                    current_sql = st.session_state.get(f"{key_base}_editor", sql_to_run)
+                    st.session_state["agent_sql_to_run"] = current_sql
                     st.session_state["agent_sql_source"] = response.agent_name
                     st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
-                    st.experimental_rerun()
+                    st.rerun()
         
         # Display metadata
         if response.metadata:

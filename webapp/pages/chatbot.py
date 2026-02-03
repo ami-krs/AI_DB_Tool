@@ -230,9 +230,16 @@ def chatbot_tab():
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
+    # Check this FIRST before rendering anything else, so results appear at the top
     agent_sql = st.session_state.get("agent_sql_to_run")
     if agent_sql:
-        st.info("▶ Running SQL suggested by AI agent")
+        # Clear the flag immediately to prevent re-execution
+        st.session_state.pop("agent_sql_to_run", None)
+        agent_source = st.session_state.pop("agent_sql_source", "AI Agent")
+        agent_timestamp = st.session_state.pop("agent_sql_timestamp", None)
+        
+        st.info(f"▶ Running SQL suggested by {agent_source}")
+        st.code(agent_sql, language='sql')
         try:
             # Run without agents to avoid recursive analysis
             execute_query(agent_sql, enable_agents=False)
@@ -259,11 +266,10 @@ def chatbot_tab():
                         st.success("🔄 Schema information refreshed!")
                 except Exception as e:
                     st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
-        finally:
-            # Clear the flag so it only runs once
-            st.session_state.pop("agent_sql_to_run", None)
-            st.session_state.pop("agent_sql_source", None)
-            st.session_state.pop("agent_sql_timestamp", None)
+        except Exception as e:
+            st.error(f"❌ Failed to execute suggested SQL: {e}")
+            import traceback
+            st.exception(e)
     
     # Don't show API key message on page load - only show when user tries to use it
     
