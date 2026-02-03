@@ -583,6 +583,47 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
 
 def execute_generated_query(query: str):
     """Execute AI-generated query"""
+    # Guardrail: prevent executing AI SQL that references tables that don't exist.
+    # This is especially common when the model falls back to placeholders like "example_table".
+    try:
+        if st.session_state.get("connected") and st.session_state.get("db_manager"):
+            db_type = (st.session_state.get("db_type") or "").lower()
+
+            def _find_insert_targets(sql: str) -> List[str]:
+                targets: List[str] = []
+                for m in re.finditer(r"INSERT\s+INTO\s+([A-Za-z_][\w]*)(?:\s*\.\s*([A-Za-z_][\w]*))?", sql, flags=re.IGNORECASE):
+                    a = m.group(1)
+                    b = m.group(2)
+                    targets.append(f"{a}.{b}" if b else a)
+                return targets
+
+            targets = _find_insert_targets(query)
+            if targets and db_type == "postgresql":
+                # Validate each target using information_schema to handle non-public schemas (e.g., dfu)
+                for t in targets:
+                    if "." in t:
+                        schema_name, table_name = t.split(".", 1)
+                    else:
+                        schema_name, table_name = None, t
+
+                    if schema_name:
+                        exists_df = st.session_state.db_manager.execute_query(
+                            f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '{schema_name}' AND table_name = '{table_name}') AS exists"
+                        )
+                    else:
+                        exists_df = st.session_state.db_manager.execute_query(
+                            f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_name = '{table_name}') AS exists"
+                        )
+                    exists_val = bool(exists_df.iloc[0, 0]) if exists_df is not None and len(exists_df) else False
+                    if not exists_val:
+                        st.error(f"❌ AI-generated SQL references a table that doesn't exist: `{t}`")
+                        st.info("💡 Tip: Ask the chatbot to use the exact table/column names from your DB schema, or refresh/reconnect so it can see the latest schema.")
+                        st.code(query, language="sql")
+                        return
+    except Exception:
+        # If validation fails for any reason, don't block execution
+        pass
+
     execute_query(query)
 
 def show_table_details():
