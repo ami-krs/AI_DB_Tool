@@ -291,7 +291,9 @@ class SQLChatbot:
                         prompt += f"- {table} (no column info available)\n"
                     else:
                         prompt += f"- {str(table)}\n"
-            prompt += "\nCRITICAL: When generating INSERT/UPDATE/DELETE statements, you MUST use the EXACT column names and types shown above. Do NOT guess or invent column names.\n\n"
+            prompt += "\nCRITICAL: When generating INSERT/UPDATE/DELETE statements, you MUST use the EXACT column names and types shown above. Do NOT guess or invent column names.\n"
+            prompt += "CRITICAL: When user asks to insert records in 'all tables', generate INSERT statements for EACH table listed above. Use the actual table names from the schema, not placeholders.\n"
+            prompt += "CRITICAL: NEVER use 'table_name' as a literal string in SQL queries (e.g., 'FROM dfu.table_name'). You MUST replace 'table_name' with actual table names from the schema above. If you need to query multiple tables, generate separate statements for each table.\n\n"
         
         prompt += f"User Question: {user_message}\n"
         
