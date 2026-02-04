@@ -52,6 +52,13 @@ You are an intelligent SQL assistant chatbot. You help users:
 6. Create, modify, and manage database objects (tables, indexes, views)
 7. Insert, update, and delete data
 
+CRITICAL - RESPONSE FORMAT:
+- When user asks for SQL (INSERT, SELECT, UPDATE, DELETE, etc.), you MUST respond with ONLY the SQL code in a ```sql code block
+- DO NOT provide explanations, instructions, or "here's how you can" text BEFORE the SQL
+- DO NOT say "you'll need to" or "first ensure you have" - just generate the SQL directly
+- Start your response with the SQL code block immediately
+- Brief explanations can come AFTER the SQL code block, but the SQL must come first
+
 IMPORTANT RULES:
 - ONLY generate SQL queries (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, etc.) - NEVER shell commands or CLI syntax
 - Generate ONLY the SQL statement(s), nothing else
@@ -315,8 +322,18 @@ class SQLChatbot:
         if include_sql:
             # For INSERT/UPDATE/DELETE operations, emphasize generating actual SQL, not explanations
             user_upper = user_message.upper()
-            if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA']):
-                prompt += "\nCRITICAL: The user wants actual SQL INSERT statements, NOT explanations or examples. Generate the INSERT statements directly for the tables in the schema above. Use the exact table names and column names from the schema. Do NOT provide generic examples or explanations."
+            if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
+                prompt += "\n\n=== CRITICAL INSTRUCTIONS ===\n"
+                prompt += "The user wants ACTUAL SQL INSERT statements for their specific database tables.\n"
+                prompt += "1. Start your response IMMEDIATELY with ```sql\n"
+                prompt += "2. Generate INSERT statements for EACH table listed in the schema above\n"
+                prompt += "3. Use the EXACT table names and column names from the schema\n"
+                prompt += "4. Generate 5 INSERT statements per table (as requested)\n"
+                prompt += "5. DO NOT write explanations before the SQL - the SQL code block must be the FIRST thing in your response\n"
+                prompt += "6. DO NOT use placeholder names like 'table_name', 'example_table', 'column1', 'column2'\n"
+                prompt += "7. DO NOT say 'you'll need to' or 'first ensure' - just generate the SQL\n"
+                prompt += "8. If you cannot generate SQL, return an error message explaining why\n"
+                prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
             else:
                 prompt += "\nIf the question requires SQL, provide the SQL query in a code block. Keep explanations brief and focus on the actual SQL."
         
