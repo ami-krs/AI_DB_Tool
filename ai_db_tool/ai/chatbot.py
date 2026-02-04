@@ -197,6 +197,23 @@ class SQLChatbot:
                 'timestamp': datetime.now().isoformat()
             }
         
+        # Validate that we have actual table names (not empty)
+        tables = self.schema_context.get('tables', [])
+        if not tables or len(tables) == 0:
+            return {
+                'error': 'No tables found in schema',
+                'response': '❌ No tables found in your database schema. Please ensure your database has tables and reconnect.',
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        # Log schema info for debugging
+        print(f"DEBUG: Chatbot schema context - {len(tables)} tables available")
+        if tables and isinstance(tables[0], dict):
+            table_names = [t.get('table_name', 'unknown') for t in tables[:5]]
+            print(f"DEBUG: First 5 tables: {table_names}")
+        elif tables:
+            print(f"DEBUG: First 5 table names: {tables[:5]}")
+        
         # Add user message to history
         self.conversation_history.append(
             ChatMessage("user", user_message, datetime.now())
@@ -283,12 +300,21 @@ class SQLChatbot:
             prompt += f"Database Type: {db_type}\n\n"
         
         if self.schema_context:
-            prompt += "=== DATABASE SCHEMA (YOU MUST USE ONLY THESE TABLES AND COLUMNS) ===\n"
+            prompt += "=== DATABASE SCHEMA (YOU MUST USE ONLY THESE TABLES AND COLUMNS - NO PLACEHOLDERS) ===\n"
             tables = self.schema_context.get('tables', [])
             
             if not tables:
                 prompt += "⚠️ ERROR: No tables found in schema. Cannot generate SQL without table information.\n\n"
             else:
+                # List all table names at the top for visibility
+                if isinstance(tables[0], dict):
+                    all_table_names = [t.get('table_name', 'unknown') for t in tables]
+                else:
+                    all_table_names = [str(t) for t in tables]
+                prompt += f"AVAILABLE TABLES ({len(all_table_names)} total): {', '.join(all_table_names[:20])}\n"
+                if len(all_table_names) > 20:
+                    prompt += f"(... and {len(all_table_names) - 20} more tables)\n"
+                prompt += "\n"
                 # If tables are just strings, try to get full schema from db_manager
                 if isinstance(tables[0], str):
                     # Tables are just names - we need to fetch full schema
@@ -329,12 +355,14 @@ class SQLChatbot:
                         else:
                             prompt += f"\nTable: {str(table)}\n"
                 prompt += "\n=== END OF SCHEMA ===\n\n"
-                prompt += "CRITICAL RULES FOR SQL GENERATION:\n"
-                prompt += "1. You MUST ONLY use table names and column names listed above. DO NOT invent or guess table/column names.\n"
-                prompt += "2. When user asks to insert records in 'all tables', generate INSERT statements for EACH table listed above.\n"
-                prompt += "3. NEVER use placeholder names like 'example_table', 'test_table', 'table_name', 'column1', 'column2' - these DO NOT EXIST.\n"
-                prompt += "4. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names.\n"
-                prompt += "5. Generate actual SQL statements directly - do NOT provide explanations or examples.\n\n"
+                prompt += "🚨 CRITICAL RULES FOR SQL GENERATION (VIOLATION WILL CAUSE ERRORS):\n"
+                prompt += "1. You MUST ONLY use table names from the list above: " + ', '.join(all_table_names[:10]) + (f" and {len(all_table_names) - 10} more" if len(all_table_names) > 10 else "") + "\n"
+                prompt += "2. You MUST ONLY use column names that appear in the column lists above for each table.\n"
+                prompt += "3. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
+                prompt += "4. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
+                prompt += "5. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
+                prompt += "6. Generate actual SQL statements directly - do NOT provide explanations, examples, or 'here's how you can' text.\n"
+                prompt += "7. If you cannot see the table names above, DO NOT generate SQL - return an error instead.\n\n"
         
         prompt += f"User Question: {user_message}\n"
         
