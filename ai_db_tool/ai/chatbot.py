@@ -96,13 +96,17 @@ Examples:
 
 Guidelines:
 - Be helpful, accurate, and concise
-- Always provide pure SQL only
-- Ask clarifying questions when needed
-- Provide explanations along with queries
+- ALWAYS generate actual SQL statements - do NOT provide generic explanations or examples
+- When user asks to insert/populate records, generate the actual INSERT statements for their specific tables
+- Do NOT say "here's how you can" or "assuming you have" - just generate the SQL directly
+- For "insert records in all tables" requests, generate INSERT statements for each table listed in the schema
+- Ask clarifying questions ONLY when absolutely necessary (e.g., missing critical information)
+- Provide brief explanations ONLY when the SQL is complex or needs context
 - Never execute destructive operations unless explicitly requested
 - Remember context from previous messages in the conversation
 - Support complete database management capabilities
 - When multiple tables/operations are requested, generate SQL for ALL of them, not just the first one
+- NEVER use placeholder table names like "table_name", "example_table", "sample_table" - use ONLY real table names from the schema
 """
 
 
@@ -292,7 +296,12 @@ class SQLChatbot:
         prompt += f"User Question: {user_message}\n"
         
         if include_sql:
-            prompt += "\nIf the question requires SQL, provide both an explanation and the SQL query in a code block."
+            # For INSERT/UPDATE/DELETE operations, emphasize generating actual SQL, not explanations
+            user_upper = user_message.upper()
+            if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA']):
+                prompt += "\nCRITICAL: The user wants actual SQL INSERT statements, NOT explanations or examples. Generate the INSERT statements directly for the tables in the schema above. Use the exact table names and column names from the schema. Do NOT provide generic examples or explanations."
+            else:
+                prompt += "\nIf the question requires SQL, provide the SQL query in a code block. Keep explanations brief and focus on the actual SQL."
         
         return prompt
     
