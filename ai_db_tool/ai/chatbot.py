@@ -74,8 +74,9 @@ IMPORTANT RULES:
 - For MySQL: Use information_schema
 
 CRITICAL - USE REAL SCHEMA ONLY (NO PLACEHOLDERS):
-- You MUST ONLY use table names and column names that appear in the provided "Database Schema".
-- NEVER invent table names like example_table/sample_table/test_table or columns like column1/column2 unless those exact names exist in the schema.
+- For SELECT/INSERT/UPDATE/DELETE operations: You MUST ONLY use table names and column names that appear in the provided "Database Schema".
+- For CREATE TABLE operations: You can create NEW tables based on the user's description. Use appropriate column names, data types, and relationships as described by the user.
+- NEVER invent table names like example_table/sample_table/test_table or columns like column1/column2 for SELECT/INSERT/UPDATE/DELETE operations (unless those exact names exist in the schema).
 - If the user requests inserts "in all tables" and there are many tables, LIMIT to the first 10 tables and note in SQL comments which tables were included.
 - For each table, generate INSERT statements that match the real columns. Prefer inserting into a minimal set of non-null, non-generated columns.
 
@@ -189,22 +190,33 @@ class SQLChatbot:
                 'timestamp': datetime.now().isoformat()
             }
         
-        # Check if schema context is available - critical for generating accurate SQL
-        if not self.schema_context or not self.schema_context.get('tables'):
-            return {
-                'error': 'Database schema not available',
-                'response': '❌ Database schema information is not available. Please reconnect to your database to refresh the schema context.',
-                'timestamp': datetime.now().isoformat()
-            }
+        # Check user request type - CREATE TABLE requests don't need existing schema
+        user_upper = user_message.upper()
+        is_create_request = any(keyword in user_upper for keyword in [
+            'CREATE TABLE', 'CREATE TABLES', 'CREATE SCHEMA', 'CREATE DATABASE',
+            'DESIGN TABLE', 'DESIGN TABLES', 'BUILD TABLE', 'BUILD TABLES',
+            'MAKE TABLE', 'MAKE TABLES', 'NEW TABLE', 'NEW TABLES'
+        ])
         
-        # Validate that we have actual table names (not empty)
-        tables = self.schema_context.get('tables', [])
-        if not tables or len(tables) == 0:
-            return {
-                'error': 'No tables found in schema',
-                'response': '❌ No tables found in your database schema. Please ensure your database has tables and reconnect.',
-                'timestamp': datetime.now().isoformat()
-            }
+        # For CREATE TABLE requests, schema context is optional (we're creating new tables)
+        # For other requests (INSERT, SELECT, etc.), schema context is required
+        if not is_create_request:
+            # Check if schema context is available - critical for generating accurate SQL
+            if not self.schema_context or not self.schema_context.get('tables'):
+                return {
+                    'error': 'Database schema not available',
+                    'response': '❌ Database schema information is not available. Please reconnect to your database to refresh the schema context.',
+                    'timestamp': datetime.now().isoformat()
+                }
+            
+            # Validate that we have actual table names (not empty)
+            tables = self.schema_context.get('tables', [])
+            if not tables or len(tables) == 0:
+                return {
+                    'error': 'No tables found in schema',
+                    'response': '❌ No tables found in your database schema. Please ensure your database has tables and reconnect.',
+                    'timestamp': datetime.now().isoformat()
+                }
         
         # Log schema info for debugging
         print(f"DEBUG: Chatbot schema context - {len(tables)} tables available")
@@ -380,6 +392,18 @@ class SQLChatbot:
                 prompt += "6. DO NOT use placeholder names like 'table_name', 'example_table', 'column1', 'column2'\n"
                 prompt += "7. DO NOT say 'you'll need to' or 'first ensure' - just generate the SQL\n"
                 prompt += "8. If you cannot generate SQL, return an error message explaining why\n"
+                prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
+            elif any(keyword in user_upper for keyword in ['CREATE TABLE', 'CREATE TABLES', 'DESIGN TABLE', 'BUILD TABLE', 'MAKE TABLE', 'NEW TABLE']):
+                prompt += "\n\n=== CRITICAL INSTRUCTIONS FOR CREATE TABLE ===\n"
+                prompt += "The user wants you to CREATE NEW tables based on their description.\n"
+                prompt += "1. Start your response IMMEDIATELY with ```sql\n"
+                prompt += "2. Generate CREATE TABLE statements based on the user's description\n"
+                prompt += "3. Use appropriate column names, data types, and constraints\n"
+                prompt += "4. Include PRIMARY KEYs, FOREIGN KEYs, and relationships as described\n"
+                prompt += "5. Use PostgreSQL syntax (since database type is PostgreSQL)\n"
+                prompt += "6. DO NOT say 'I cannot' or 'details not provided' - generate the SQL based on best practices for the described tables\n"
+                prompt += "7. For purchase order tables, typical tables include: purchase_orders, purchase_order_items, suppliers, products, etc.\n"
+                prompt += "8. Include relationships (FOREIGN KEYs) between related tables\n"
                 prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
             else:
                 prompt += "\nIf the question requires SQL, provide the SQL query in a code block. Keep explanations brief and focus on the actual SQL."
