@@ -217,14 +217,17 @@ class SQLChatbot:
                     'response': '❌ No tables found in your database schema. Please ensure your database has tables and reconnect.',
                     'timestamp': datetime.now().isoformat()
                 }
-        
-        # Log schema info for debugging
-        print(f"DEBUG: Chatbot schema context - {len(tables)} tables available")
-        if tables and isinstance(tables[0], dict):
-            table_names = [t.get('table_name', 'unknown') for t in tables[:5]]
-            print(f"DEBUG: First 5 tables: {table_names}")
-        elif tables:
-            print(f"DEBUG: First 5 table names: {tables[:5]}")
+            
+            # Log schema info for debugging
+            print(f"DEBUG: Chatbot schema context - {len(tables)} tables available")
+            if tables and isinstance(tables[0], dict):
+                table_names = [t.get('table_name', 'unknown') for t in tables[:5]]
+                print(f"DEBUG: First 5 tables: {table_names}")
+            elif tables:
+                print(f"DEBUG: First 5 table names: {tables[:5]}")
+        else:
+            # For CREATE TABLE requests, log that we're creating new tables
+            print(f"DEBUG: CREATE TABLE request detected - schema context not required")
         
         # Add user message to history
         self.conversation_history.append(
