@@ -449,12 +449,21 @@ def chatbot_tab():
             print(f"DEBUG: Chatbot is None (chatbot_tab), showing error message")
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         else:
+            # Ensure chatbot has latest schema context before generating SQL
+            if st.session_state.chatbot and st.session_state.get('schema_info'):
+                try:
+                    st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
+                except Exception as e:
+                    st.debug(f"Could not refresh chatbot schema: {e}")
+            
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
             
             # Get AI response
             try:
                 print(f"DEBUG: Calling chatbot.chat() (chatbot_tab) with query: {user_input}")
+                print(f"DEBUG: Schema context available: {st.session_state.chatbot.schema_context is not None if st.session_state.chatbot else False}")
+                print(f"DEBUG: Schema tables count: {len(st.session_state.get('schema_info', {}).get('tables', [])) if st.session_state.get('schema_info') else 0}")
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
                 print(f"DEBUG: Chatbot response received (chatbot_tab): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
