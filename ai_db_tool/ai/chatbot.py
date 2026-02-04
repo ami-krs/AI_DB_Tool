@@ -230,12 +230,31 @@ class SQLChatbot:
             
             # Extract SQL from response if present
             sql_query = None
-            if include_sql and "```sql" in response_text:
-                sql_start = response_text.find("```sql")
-                sql_end = response_text.find("```", sql_start + 6)
-                if sql_end != -1:
-                    sql_query = response_text[sql_start + 6:sql_end].strip()
-                    response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+            if include_sql:
+                # Look for SQL code block
+                if "```sql" in response_text:
+                    sql_start = response_text.find("```sql")
+                    sql_end = response_text.find("```", sql_start + 6)
+                    if sql_end != -1:
+                        sql_query = response_text[sql_start + 6:sql_end].strip()
+                        # For INSERT requests, prioritize SQL - remove explanations before SQL
+                        user_upper = user_message.upper()
+                        if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
+                            # Keep only SQL and anything after it, remove text before SQL
+                            response_text = response_text[sql_start:]  # Keep SQL code block and anything after
+                        else:
+                            response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+                # If no SQL block found but response contains SQL-like text, try to extract it
+                elif any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
+                    # Try to find SQL statements even without code blocks
+                    import re
+                    sql_pattern = r'(INSERT\s+INTO[^;]+(?:;[^;]+)*)'
+                    matches = re.findall(sql_pattern, response_text, re.IGNORECASE | re.DOTALL)
+                    if matches:
+                        sql_query = '; '.join(matches)
+                        # Remove the SQL from response text
+                        for match in matches:
+                            response_text = response_text.replace(match, '').strip()
             
             # Add assistant response to history
             self.conversation_history.append(
