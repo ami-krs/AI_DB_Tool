@@ -624,7 +624,7 @@ def chatbot_tab():
                                     st.session_state['chatbot_auto_executed_timestamp'] = timestamp
                                     st.session_state['chatbot_auto_execution_error'] = None  # Clear any previous error
                                     print(f"DEBUG: Flag set before execute_query")
-                                    execute_query(sql_query, enable_agents=False)
+                                    execute_query(sql_query, enable_agents=False, unique_suffix="chatbot_auto")
                                     # Verify results were stored
                                     has_results = st.session_state.get('last_result_df') is not None
                                     print(f"DEBUG: After execute_query - has_results={has_results}, last_result_df type: {type(st.session_state.get('last_result_df'))}")

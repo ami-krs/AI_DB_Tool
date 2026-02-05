@@ -209,12 +209,13 @@ def _is_simple_query(query: str) -> bool:
     
     return False
 
-def execute_query(query: str, enable_agents: Optional[bool] = None):
+def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffix: Optional[str] = None):
     """Execute SQL query and display results (supports multiple statements, SELECT, INSERT, UPDATE, DELETE, DDL)
     
     Args:
         query: SQL query to execute
         enable_agents: Whether to use AI agents for analysis (default: from session state)
+        unique_suffix: Optional unique suffix for widget keys to prevent duplicates
     """
     if not query.strip():
         st.warning("Please enter a query")
@@ -321,13 +322,17 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
                 csv = result['dataframe'].to_csv(index=False)
+                download_key = f"download_csv_{len(st.session_state.query_history)}"
+                if unique_suffix:
+                    download_key = f"download_csv_{unique_suffix}_{len(st.session_state.query_history)}"
                 st.download_button(
                     "📥",
                     csv,
                     "results.csv",
                     "text/csv",
                     help=f"Download CSV - {len(result['dataframe']):,} rows",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=download_key
                 )
             
             st.session_state.current_page = 1
@@ -569,13 +574,17 @@ def execute_query(query: str, enable_agents: Optional[bool] = None):
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
             csv = last_select_result.to_csv(index=False)
+            download_key = f"download_csv_last_{len(st.session_state.query_history)}"
+            if unique_suffix:
+                download_key = f"download_csv_last_{unique_suffix}_{len(st.session_state.query_history)}"
             st.download_button(
                 "📥",
                 csv,
                 "results.csv",
                 "text/csv",
                 help=f"Download CSV - {len(last_select_result):,} rows",
-                use_container_width=True
+                use_container_width=True,
+                key=download_key
             )
         
         st.session_state.current_page = 1
