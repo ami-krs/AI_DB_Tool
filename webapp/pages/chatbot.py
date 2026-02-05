@@ -260,17 +260,29 @@ def chatbot_tab():
         
         st.info(f"▶ Running SQL suggested by {agent_source}")
         st.code(agent_sql, language='sql')
-        try:
-            # Run without agents to avoid recursive analysis
-            # execute_query will display results/success messages automatically
-            execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
-            
-            # For UPDATE/DELETE/INSERT, add extra confirmation message
-            sql_upper = agent_sql.strip().upper()
-            if any(sql_upper.startswith(cmd) for cmd in ['UPDATE', 'DELETE', 'INSERT']):
-                # The execute_query function already shows success message with rows affected
-                # But we add a helpful tip to verify changes
-                st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
+        
+        # Add a container to ensure messages persist
+        with st.container():
+            try:
+                print(f"DEBUG: Executing agent SQL: {agent_sql[:100]}...")
+                # Run without agents to avoid recursive analysis
+                # execute_query will display results/success messages automatically
+                execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
+                print(f"DEBUG: Agent SQL execution completed")
+                
+                # For UPDATE/DELETE/INSERT, add extra confirmation message
+                sql_upper = agent_sql.strip().upper()
+                if any(sql_upper.startswith(cmd) for cmd in ['UPDATE', 'DELETE', 'INSERT']):
+                    # The execute_query function already shows success message with rows affected
+                    # But we add a helpful tip to verify changes
+                    st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
+            except Exception as e:
+                error_msg = f"❌ Failed to execute suggested SQL: {str(e)}"
+                st.error(error_msg)
+                print(f"DEBUG: Agent SQL execution error: {e}")
+                import traceback
+                traceback.print_exc()
+                st.exception(e)
             
             # After DDL operations (especially CREATE SCHEMA), refresh schema info
             sql_upper = agent_sql.strip().upper()

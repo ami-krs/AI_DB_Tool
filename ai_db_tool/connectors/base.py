@@ -223,11 +223,19 @@ class DatabaseManager:
             raise ValueError("No active connection")
         
         try:
+            # Use engine.begin() which automatically commits on success and rolls back on exception
             with engine.begin() as conn:
                 result = conn.execute(text(query))
-                return result.rowcount
+                rowcount = result.rowcount
+                # Explicitly commit (though begin() context manager does this automatically)
+                # This ensures the transaction is committed before returning
+                conn.commit()
+                print(f"DEBUG: execute_non_query - {rowcount} rows affected, transaction committed")
+                return rowcount
         except SQLAlchemyError as e:
-            raise ValueError(f"Query execution failed: {e}")
+            error_msg = f"Query execution failed: {e}"
+            print(f"DEBUG: execute_non_query error: {error_msg}")
+            raise ValueError(error_msg)
     
     def get_tables(self, connection_id: str = "default") -> List[str]:
         """Get list of all tables in the database"""
