@@ -251,9 +251,14 @@ def chatbot_tab():
     
     # Re-display results from auto-executed query if they exist in session state
     # execute_query stores results in st.session_state.last_result_df
-    if st.session_state.get('last_result_df') is not None and st.session_state.get('chatbot_last_auto_executed_query'):
+    has_last_result = st.session_state.get('last_result_df') is not None
+    has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
+    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}")
+    
+    if has_last_result and has_auto_query:
         # Results exist from auto-execution, re-display them
         from utils.helpers import display_paginated_dataframe
+        print(f"DEBUG: Re-displaying results - rows: {len(st.session_state.last_result_df)}")
         st.markdown("---")
         result_col1, result_col2 = st.columns([10, 1])
         with result_col1:
@@ -273,6 +278,10 @@ def chatbot_tab():
             st.session_state.last_result_df, 
             unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
         )
+    elif has_last_result:
+        print(f"DEBUG: last_result_df exists but no chatbot_last_auto_executed_query flag")
+    elif has_auto_query:
+        print(f"DEBUG: chatbot_last_auto_executed_query flag exists but no last_result_df")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
@@ -584,10 +593,14 @@ def chatbot_tab():
                                 # Auto-execute SELECT queries
                                 try:
                                     print(f"DEBUG: Auto-executing SELECT query: {sql_query[:100]}...")
-                                    # Store the query so we can re-display results after rerun
+                                    # Store the query BEFORE execution so it's available after rerun
                                     st.session_state['chatbot_last_auto_executed_query'] = sql_query
                                     st.session_state['chatbot_auto_executed_timestamp'] = timestamp
+                                    print(f"DEBUG: Flag set before execute_query")
                                     execute_query(sql_query, enable_agents=False)
+                                    # Verify results were stored
+                                    has_results = st.session_state.get('last_result_df') is not None
+                                    print(f"DEBUG: After execute_query - has_results={has_results}, last_result_df type: {type(st.session_state.get('last_result_df'))}")
                                     auto_executed = True
                                     print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}")
                                 except Exception as exec_error:
@@ -596,6 +609,7 @@ def chatbot_tab():
                                     traceback.print_exc()
                                     # Clear the flag on error
                                     st.session_state.pop('chatbot_last_auto_executed_query', None)
+                                    st.session_state.pop('chatbot_auto_executed_timestamp', None)
                                     # Continue to show SQL even if execution fails
                         else:
                             print(f"DEBUG: No SQL query extracted from response")
