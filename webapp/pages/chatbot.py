@@ -643,11 +643,53 @@ def chatbot_tab():
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         else:
             # Ensure chatbot has latest schema context before generating SQL
-            if st.session_state.chatbot and st.session_state.get('schema_info'):
-                try:
-                    st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
-                except Exception as e:
-                    st.debug(f"Could not refresh chatbot schema: {e}")
+            schema_info = st.session_state.get('schema_info')
+            if st.session_state.chatbot:
+                if schema_info:
+                    try:
+                        st.session_state.chatbot.set_schema_context(schema_info)
+                        print(f"DEBUG: Schema context set - tables: {len(schema_info.get('tables', []))}")
+                        # Debug: Check if tables have column details
+                        tables = schema_info.get('tables', [])
+                        if tables:
+                            first_table = tables[0]
+                            if isinstance(first_table, dict):
+                                cols = first_table.get('columns', [])
+                                print(f"DEBUG: First table '{first_table.get('table_name', 'unknown')}' has {len(cols)} columns")
+                            else:
+                                print(f"DEBUG: WARNING - First table is not a dict, it's: {type(first_table)}")
+                    except Exception as e:
+                        print(f"DEBUG: Could not refresh chatbot schema: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"DEBUG: WARNING - schema_info is None or not set in session state")
+                    # Try to rebuild schema_info if connected
+                    if st.session_state.connected and st.session_state.db_manager:
+                        try:
+                            tables = st.session_state.db_manager.get_tables()
+                            full_table_schemas = []
+                            for table_name in (tables or []):
+                                try:
+                                    table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                    if table_schema:
+                                        full_table_schemas.append(table_schema)
+                                except Exception as e:
+                                    full_table_schemas.append({'table_name': table_name, 'columns': []})
+                            
+                            schema_info = {
+                                'tables': full_table_schemas,
+                                'db_type': st.session_state.get('db_type', 'unknown'),
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                            }
+                            st.session_state.schema_info = schema_info
+                            st.session_state.chatbot.set_schema_context(schema_info)
+                            print(f"DEBUG: Rebuilt schema_info - {len(full_table_schemas)} tables with schemas")
+                        except Exception as e:
+                            print(f"DEBUG: Could not rebuild schema_info: {e}")
+                            import traceback
+                            traceback.print_exc()
             
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
@@ -656,6 +698,17 @@ def chatbot_tab():
             try:
                 print(f"DEBUG: Calling chatbot.chat() (chatbot_tab) with query: {user_input}")
                 print(f"DEBUG: Schema context available: {st.session_state.chatbot.schema_context is not None if st.session_state.chatbot else False}")
+                if st.session_state.chatbot and st.session_state.chatbot.schema_context:
+                    tables = st.session_state.chatbot.schema_context.get('tables', [])
+                    print(f"DEBUG: Schema tables count: {len(tables)}")
+                    if tables:
+                        first_table = tables[0]
+                        if isinstance(first_table, dict):
+                            print(f"DEBUG: First table in context: {first_table.get('table_name', 'unknown')} with {len(first_table.get('columns', []))} columns")
+                        else:
+                            print(f"DEBUG: First table type: {type(first_table)}, value: {first_table}")
+                else:
+                    print(f"DEBUG: WARNING - No schema context in chatbot!")
                 print(f"DEBUG: Schema tables count: {len(st.session_state.get('schema_info', {}).get('tables', [])) if st.session_state.get('schema_info') else 0}")
                 with st.spinner("🤔 Thinking..."):
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
