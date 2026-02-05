@@ -376,8 +376,10 @@ class SQLChatbot:
                 prompt += "3. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
                 prompt += "4. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
                 prompt += "5. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
-                prompt += "6. Generate actual SQL statements directly - do NOT provide explanations, examples, or 'here's how you can' text.\n"
-                prompt += "7. If you cannot see the table names above, DO NOT generate SQL - return an error instead.\n\n"
+                prompt += "6. If user asks for 'records from DFU table' or 'records from schema X', they likely mean tables IN that schema. Generate SELECT statements for each table in that schema, or ask which specific table they want.\n"
+                prompt += "7. NEVER generate 'SELECT * FROM schema_name' - you cannot SELECT from a schema directly. Use 'SELECT * FROM schema_name.table_name' instead.\n"
+                prompt += "8. Generate actual SQL statements directly - do NOT provide explanations, examples, or 'here's how you can' text.\n"
+                prompt += "9. If you cannot see the table names above, DO NOT generate SQL - return an error instead.\n\n"
         
         prompt += f"User Question: {user_message}\n"
         
