@@ -255,23 +255,30 @@ def chatbot_tab():
     agent_sql = st.session_state.get("agent_sql_to_run")
     agent_execution_result = st.session_state.get("agent_sql_execution_result")
     
+    print(f"DEBUG: chatbot_tab - agent_sql exists: {agent_sql is not None}, agent_execution_result exists: {agent_execution_result is not None}")
+    if agent_sql:
+        print(f"DEBUG: agent_sql value: {agent_sql[:100] if agent_sql else 'None'}...")
+    
     if agent_sql:
         # Store execution info before clearing
         agent_source = st.session_state.get("agent_sql_source", "AI Agent")
         agent_timestamp = st.session_state.get("agent_sql_timestamp", None)
         
+        print(f"DEBUG: About to execute agent SQL - source: {agent_source}, execution_result: {agent_execution_result}")
+        
         # Execute SQL and store result in session state
         if agent_execution_result is None:
             # First time execution - run the SQL
+            print(f"DEBUG: First time execution - displaying info and executing SQL")
             st.info(f"▶ Running SQL suggested by {agent_source}")
             st.code(agent_sql, language='sql')
             
             try:
-                print(f"DEBUG: Executing agent SQL: {agent_sql[:100]}...")
+                print(f"DEBUG: About to call execute_query with SQL: {agent_sql[:100]}...")
                 # Run without agents to avoid recursive analysis
                 # execute_query will display results/success messages automatically
                 execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
-                print(f"DEBUG: Agent SQL execution completed")
+                print(f"DEBUG: execute_query returned successfully")
                 
                 # Store execution result
                 st.session_state["agent_sql_execution_result"] = {
@@ -315,10 +322,13 @@ def chatbot_tab():
                     except Exception as e:
                         st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
                 
-                # Clear the flag after successful execution
+                # Clear the flag after successful execution (but keep result for display)
+                print(f"DEBUG: Clearing agent_sql_to_run flag, keeping execution result")
                 st.session_state.pop("agent_sql_to_run", None)
                 st.session_state.pop("agent_sql_source", None)
                 st.session_state.pop("agent_sql_timestamp", None)
+                
+                # Don't rerun here - let the messages display
                 
             except Exception as e:
                 error_msg = f"❌ Failed to execute suggested SQL: {str(e)}"
@@ -329,6 +339,7 @@ def chatbot_tab():
                 st.exception(e)
                 
                 # Store error result
+                print(f"DEBUG: Storing error result in session state")
                 st.session_state["agent_sql_execution_result"] = {
                     "status": "error",
                     "sql": agent_sql,
@@ -337,7 +348,7 @@ def chatbot_tab():
                     "timestamp": agent_timestamp
                 }
                 
-                # Clear the flag after error
+                # Clear the flag after error (but keep result for display)
                 st.session_state.pop("agent_sql_to_run", None)
                 st.session_state.pop("agent_sql_source", None)
                 st.session_state.pop("agent_sql_timestamp", None)
