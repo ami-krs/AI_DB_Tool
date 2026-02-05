@@ -259,26 +259,38 @@ CRITICAL REQUIREMENTS:
 5. Check the schema carefully before suggesting column names
 6. For MULTIPLE UPDATE statements with foreign key constraints:
    - When updating PRIMARY KEYS that are referenced by FOREIGN KEYS in PostgreSQL:
-     * Option 1 (if constraint is DEFERRABLE): Use SET CONSTRAINTS to defer constraint checking:
+     * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
+     * SET CONSTRAINTS ALL DEFERRED only works if constraints are explicitly created as DEFERRABLE
+     * 
+     * Option 1 (RECOMMENDED - works for non-deferrable constraints): Use a CTE/subquery approach:
        BEGIN;
-       SET CONSTRAINTS ALL DEFERRED;
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
-       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-       COMMIT;
-     * Option 2 (if constraint is NOT DEFERRABLE): Use a CTE with a single UPDATE statement that updates both tables:
-       WITH updated_parent AS (
-         UPDATE parent_table SET primary_key_col = primary_key_col + 1000 RETURNING primary_key_col, primary_key_col - 1000 AS old_value
+       -- First, update child table using a mapping from parent
+       WITH parent_mapping AS (
+         SELECT department_id AS old_id, department_id + 1000 AS new_id 
+         FROM department
        )
-       UPDATE child_table 
-       SET foreign_key_col = (SELECT primary_key_col FROM updated_parent WHERE updated_parent.old_value = child_table.foreign_key_col)
-       WHERE foreign_key_col IN (SELECT old_value FROM updated_parent);
-       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-     * Option 3: Temporarily disable the constraint (requires ALTER TABLE permission):
-       ALTER TABLE child_table DISABLE TRIGGER ALL;
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
-       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-       ALTER TABLE child_table ENABLE TRIGGER ALL;
-   - For PostgreSQL, prefer Option 1 if possible, otherwise use Option 2
+       UPDATE employee 
+       SET department_id = (SELECT new_id FROM parent_mapping WHERE parent_mapping.old_id = employee.department_id)
+       WHERE department_id IN (SELECT old_id FROM parent_mapping);
+       -- Then update parent table
+       UPDATE department SET department_id = department_id + 1000;
+       COMMIT;
+     
+     * Option 2: Temporarily disable triggers (requires ALTER TABLE permission):
+       BEGIN;
+       ALTER TABLE employee DISABLE TRIGGER ALL;
+       UPDATE employee SET department_id = department_id + 1000;
+       UPDATE department SET department_id = department_id + 1000;
+       ALTER TABLE employee ENABLE TRIGGER ALL;
+       COMMIT;
+     
+     * Option 3 (only if constraint is DEFERRABLE): Use SET CONSTRAINTS:
+       BEGIN;
+       SET CONSTRAINTS employee_department_id_fkey DEFERRED;
+       UPDATE employee SET department_id = department_id + 1000;
+       UPDATE department SET department_id = department_id + 1000;
+       COMMIT;
+   - For PostgreSQL, use Option 1 (CTE approach) as it works for all constraints
 
 Focus on:
 - Root cause (one sentence)
@@ -343,30 +355,41 @@ REQUIRED:
 5. For MULTIPLE UPDATE statements with foreign key relationships:
    - If error mentions "foreign key constraint" or "referential integrity":
      * Identify which table is the PARENT (referenced) and which is the CHILD (referencing)
+     * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
+     * SET CONSTRAINTS ALL DEFERRED will NOT work for non-deferrable constraints
+     * 
      * For PostgreSQL, when updating PRIMARY KEYS referenced by FOREIGN KEYS:
-       Option 1 (preferred if constraint is DEFERRABLE):
+       Option 1 (RECOMMENDED - works for all constraints):
        BEGIN;
-       SET CONSTRAINTS ALL DEFERRED;
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       -- Create mapping of old to new values
+       WITH parent_mapping AS (
+         SELECT primary_key_col AS old_id, primary_key_col + 1000 AS new_id 
+         FROM parent_table
+       )
+       -- Update child table using the mapping
+       UPDATE child_table 
+       SET foreign_key_col = (SELECT new_id FROM parent_mapping 
+                               WHERE parent_mapping.old_id = child_table.foreign_key_col)
+       WHERE foreign_key_col IN (SELECT old_id FROM parent_mapping);
+       -- Then update parent table
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
        COMMIT;
        
-       Option 2 (if constraint is NOT DEFERRABLE, use CTE):
-       WITH updated_parent AS (
-         UPDATE parent_table SET primary_key_col = primary_key_col + 1000 
-         RETURNING primary_key_col, primary_key_col - 1000 AS old_value
-       )
-       UPDATE child_table 
-       SET foreign_key_col = (SELECT primary_key_col FROM updated_parent 
-                               WHERE updated_parent.old_value = child_table.foreign_key_col)
-       WHERE foreign_key_col IN (SELECT old_value FROM updated_parent);
-       
-       Option 3 (if you have ALTER TABLE permission):
+       Option 2 (if you have ALTER TABLE permission):
+       BEGIN;
        ALTER TABLE child_table DISABLE TRIGGER ALL;
        UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
        ALTER TABLE child_table ENABLE TRIGGER ALL;
-     * Try Option 1 first (SET CONSTRAINTS ALL DEFERRED), it's the cleanest solution
+       COMMIT;
+       
+       Option 3 (only if constraint is explicitly DEFERRABLE):
+       BEGIN;
+       SET CONSTRAINTS child_table_foreign_key_fkey DEFERRED;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       COMMIT;
+     * Use Option 1 (CTE approach) - it works for all constraints, deferrable or not
 
 Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         
