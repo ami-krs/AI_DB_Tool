@@ -516,6 +516,11 @@ def chatbot_tab():
                                 results_shown_for_latest = True
                         else:
                             print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
+                    except Exception as e:
+                        # Fallback if expander fails
+                        st.code(msg['sql_query'], language='sql')
+                        if st.button(f"Execute Query", key=f"exec_fallback_{unique_key_base}"):
+                            execute_generated_query(msg['sql_query'])
     
     # Fallback: If we have results but didn't show them in the loop, show them after chat history
     if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
@@ -541,11 +546,7 @@ def chatbot_tab():
             st.session_state.last_result_df, 
             unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
         )
-                    except Exception as e:
-                        # Fallback if expander fails
-                        st.code(msg['sql_query'], language='sql')
-                        if st.button(f"Execute Query", key=f"exec_fallback_{unique_key_base}"):
-                            execute_generated_query(msg['sql_query'])
+    
     # else:
     #     st.info("💬 Start chatting by typing a message below!")
     
