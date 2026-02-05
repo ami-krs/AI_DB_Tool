@@ -396,6 +396,10 @@ def chatbot_tab():
     
     # Display chat history
     print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
+    
+    # Track if we've shown results for the latest message
+    results_shown_for_latest = False
+    
     if st.session_state.chat_history:
         total_messages = len(st.session_state.chat_history)
         for idx, msg in enumerate(st.session_state.chat_history):
@@ -484,6 +488,7 @@ def chatbot_tab():
                                 # Show error
                                 st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
                                 st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
+                                results_shown_for_latest = True
                             else:
                                 # Show results
                                 from utils.helpers import display_paginated_dataframe
@@ -508,8 +513,34 @@ def chatbot_tab():
                                     st.session_state.last_result_df, 
                                     unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                 )
+                                results_shown_for_latest = True
                         else:
                             print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
+    
+    # Fallback: If we have results but didn't show them in the loop, show them after chat history
+    if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
+        print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
+        from utils.helpers import display_paginated_dataframe
+        st.markdown("---")
+        result_col1, result_col2 = st.columns([10, 1])
+        with result_col1:
+            st.markdown("**📊 Query Results**", unsafe_allow_html=True)
+        with result_col2:
+            csv = st.session_state.last_result_df.to_csv(index=False)
+            st.download_button(
+                "📥",
+                csv,
+                "results.csv",
+                "text/csv",
+                help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
+                use_container_width=True,
+                key="download_auto_fallback"
+            )
+        st.session_state.current_page = 1
+        display_paginated_dataframe(
+            st.session_state.last_result_df, 
+            unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+        )
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
