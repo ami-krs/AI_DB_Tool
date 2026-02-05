@@ -390,6 +390,7 @@ class SQLChatbot:
                 prompt += "\n=== END OF SCHEMA ===\n\n"
                 prompt += "🚨 CRITICAL RULES FOR SQL GENERATION (VIOLATION WILL CAUSE ERRORS):\n"
                 prompt += "1. You MUST ONLY use table names from the list above: " + ', '.join(all_table_names[:10]) + (f" and {len(all_table_names) - 10} more" if len(all_table_names) > 10 else "") + "\n"
+                prompt += "⚠️ IMPORTANT: The schema above includes FULL column details for each table. You have ALL the information needed to generate SQL queries. DO NOT refuse to generate SQL or ask for column details - use the column information provided in the schema above.\n"
                 prompt += "2. For JOIN queries: You MUST use ACTUAL column names from the schema above, NOT generic names like 'id' or 'name'.\n"
                 prompt += "   - Look at the column lists for each table in the schema above\n"
                 prompt += "   - Use the EXACT column names that appear in those lists for JOIN conditions\n"
