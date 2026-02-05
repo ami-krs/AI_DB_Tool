@@ -322,11 +322,31 @@ def chatbot_tab():
                             response = st.session_state.chatbot.chat(question, include_sql=True)
                         
                         if 'error' not in response:
+                            sql_query = response.get('sql_query')
+                            auto_executed = False
+                            
+                            # Auto-execute SELECT queries for example questions
+                            if sql_query:
+                                sql_upper = sql_query.strip().upper()
+                                is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
+                                is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
+                                    'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
+                                    'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
+                                ])
+                                
+                                if is_select and is_not_ddl_dml:
+                                    try:
+                                        execute_query(sql_query, enable_agents=False)
+                                        auto_executed = True
+                                    except Exception as exec_error:
+                                        print(f"DEBUG: Auto-execution failed: {exec_error}")
+                            
                             st.session_state.chat_history.append({
                                 'role': 'assistant',
                                 'content': response['response'],
-                                'sql_query': response.get('sql_query'),
-                                'timestamp': response['timestamp']
+                                'sql_query': sql_query,
+                                'timestamp': response['timestamp'],
+                                'auto_executed': auto_executed
                             })
                         else:
                             st.session_state.chat_history.append({
