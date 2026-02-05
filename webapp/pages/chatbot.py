@@ -375,12 +375,14 @@ def chatbot_tab():
     has_last_result = st.session_state.get('last_result_df') is not None
     has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
     has_auto_error = st.session_state.get('chatbot_auto_execution_error') is not None
-    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}")
+    has_show_results_flag = st.session_state.get('chatbot_show_results_for_query') is not None
+    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}, has_show_flag={has_show_results_flag}")
     
     with st.expander("🔍 Debug Info (Click to see)", expanded=False):
         st.write("**Session State Check:**")
         st.write(f"- `last_result_df` exists: {has_last_result}")
         st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
+        st.write(f"- `chatbot_show_results_for_query` exists: {has_show_results_flag}")
         st.write(f"- `chatbot_auto_execution_error` exists: {has_auto_error}")
         if has_last_result:
             st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
