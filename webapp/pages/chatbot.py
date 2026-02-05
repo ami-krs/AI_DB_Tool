@@ -251,18 +251,21 @@ def chatbot_tab():
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
+    # Check if we need to execute agent SQL (persist across reruns)
     agent_sql = st.session_state.get("agent_sql_to_run")
+    agent_execution_result = st.session_state.get("agent_sql_execution_result")
+    
     if agent_sql:
-        # Clear the flag immediately to prevent re-execution
-        st.session_state.pop("agent_sql_to_run", None)
-        agent_source = st.session_state.pop("agent_sql_source", "AI Agent")
-        agent_timestamp = st.session_state.pop("agent_sql_timestamp", None)
+        # Store execution info before clearing
+        agent_source = st.session_state.get("agent_sql_source", "AI Agent")
+        agent_timestamp = st.session_state.get("agent_sql_timestamp", None)
         
-        st.info(f"▶ Running SQL suggested by {agent_source}")
-        st.code(agent_sql, language='sql')
-        
-        # Add a container to ensure messages persist
-        with st.container():
+        # Execute SQL and store result in session state
+        if agent_execution_result is None:
+            # First time execution - run the SQL
+            st.info(f"▶ Running SQL suggested by {agent_source}")
+            st.code(agent_sql, language='sql')
+            
             try:
                 print(f"DEBUG: Executing agent SQL: {agent_sql[:100]}...")
                 # Run without agents to avoid recursive analysis
@@ -270,15 +273,20 @@ def chatbot_tab():
                 execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
                 print(f"DEBUG: Agent SQL execution completed")
                 
+                # Store execution result
+                st.session_state["agent_sql_execution_result"] = {
+                    "status": "success",
+                    "sql": agent_sql,
+                    "source": agent_source,
+                    "timestamp": agent_timestamp
+                }
+                
                 # For UPDATE/DELETE/INSERT, add extra confirmation message
                 sql_upper = agent_sql.strip().upper()
                 if any(sql_upper.startswith(cmd) for cmd in ['UPDATE', 'DELETE', 'INSERT']):
-                    # The execute_query function already shows success message with rows affected
-                    # But we add a helpful tip to verify changes
                     st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
                 
                 # After DDL operations (especially CREATE SCHEMA), refresh schema info
-                sql_upper = agent_sql.strip().upper()
                 if any(sql_upper.startswith(cmd) for cmd in ['CREATE SCHEMA', 'CREATE TABLE', 'DROP SCHEMA', 'DROP TABLE', 'ALTER']):
                     try:
                         # Refresh schema info to reflect new schema/table
@@ -306,6 +314,12 @@ def chatbot_tab():
                                     st.debug(f"Could not update chatbot schema context: {e}")
                     except Exception as e:
                         st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
+                
+                # Clear the flag after successful execution
+                st.session_state.pop("agent_sql_to_run", None)
+                st.session_state.pop("agent_sql_source", None)
+                st.session_state.pop("agent_sql_timestamp", None)
+                
             except Exception as e:
                 error_msg = f"❌ Failed to execute suggested SQL: {str(e)}"
                 st.error(error_msg)
@@ -313,6 +327,38 @@ def chatbot_tab():
                 import traceback
                 traceback.print_exc()
                 st.exception(e)
+                
+                # Store error result
+                st.session_state["agent_sql_execution_result"] = {
+                    "status": "error",
+                    "sql": agent_sql,
+                    "source": agent_source,
+                    "error": str(e),
+                    "timestamp": agent_timestamp
+                }
+                
+                # Clear the flag after error
+                st.session_state.pop("agent_sql_to_run", None)
+                st.session_state.pop("agent_sql_source", None)
+                st.session_state.pop("agent_sql_timestamp", None)
+        else:
+            # Result already stored - display it
+            result = agent_execution_result
+            st.info(f"▶ SQL suggested by {result.get('source', 'AI Agent')} - Execution Result")
+            st.code(result.get('sql', ''), language='sql')
+            
+            if result.get('status') == 'success':
+                st.success("✅ SQL executed successfully!")
+                sql_upper = result.get('sql', '').strip().upper()
+                if any(sql_upper.startswith(cmd) for cmd in ['UPDATE', 'DELETE', 'INSERT']):
+                    st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
+            else:
+                st.error(f"❌ Execution failed: {result.get('error', 'Unknown error')}")
+            
+            # Add button to clear the result
+            if st.button("Clear Result", key="clear_agent_result"):
+                st.session_state.pop("agent_sql_execution_result", None)
+                st.rerun()
     
     # Don't show API key message on page load - only show when user tries to use it
     
