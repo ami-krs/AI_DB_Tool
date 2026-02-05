@@ -451,23 +451,27 @@ def chatbot_tab():
                         
                         # More lenient SQL matching - strip and compare
                         auto_executed_sql = st.session_state.get('chatbot_last_auto_executed_query', '').strip()
+                        show_results_for = st.session_state.get('chatbot_show_results_for_query', '').strip()
                         msg_sql = msg['sql_query'].strip() if msg_has_sql else ''
                         msg_sql_matches = msg_has_sql and msg_sql == auto_executed_sql
+                        msg_should_show = msg_has_sql and msg_sql == show_results_for
                         msg_was_auto_executed = msg.get('auto_executed', False)
                         
                         print(f"DEBUG: Message {idx}/{total_messages-1} - is_last={is_last_message}, has_sql={msg_has_sql}")
-                        print(f"DEBUG: msg_sql[:50]={msg_sql[:50] if msg_sql else 'None'}, auto_sql[:50]={auto_executed_sql[:50] if auto_executed_sql else 'None'}")
-                        print(f"DEBUG: sql_matches={msg_sql_matches}, auto_executed={msg_was_auto_executed}")
+                        print(f"DEBUG: msg_sql[:50]={msg_sql[:50] if msg_sql else 'None'}")
+                        print(f"DEBUG: auto_sql[:50]={auto_executed_sql[:50] if auto_executed_sql else 'None'}")
+                        print(f"DEBUG: show_results_for[:50]={show_results_for[:50] if show_results_for else 'None'}")
+                        print(f"DEBUG: sql_matches={msg_sql_matches}, should_show={msg_should_show}, auto_executed={msg_was_auto_executed}")
                         print(f"DEBUG: has_last_result={has_last_result}, has_auto_query={has_auto_query}")
                         
                         # Show results if: (1) it's the last message AND (2) has SQL AND (3) we have results available
-                        # We check multiple conditions but prioritize showing results if they exist
+                        # Use the show_results_for flag as primary indicator, with fallbacks
                         should_show_results = (
                             is_last_message and 
                             msg_has_sql and 
                             has_last_result and 
                             has_auto_query and
-                            (msg_was_auto_executed or msg_sql_matches or True)  # Always show if it's last message with SQL and results exist
+                            (msg_should_show or msg_was_auto_executed or msg_sql_matches)  # Check flag first, then fallbacks
                         )
                         
                         print(f"DEBUG: should_show_results={should_show_results}")
@@ -654,8 +658,10 @@ def chatbot_tab():
                                     # Clear any previous error on success
                                     st.session_state.pop('chatbot_auto_execution_error', None)
                                     st.session_state.pop('chatbot_auto_execution_error_trace', None)
+                                    # Set flag to indicate results should be shown for this query
+                                    st.session_state['chatbot_show_results_for_query'] = sql_query
                                     auto_executed = True
-                                    print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}")
+                                    print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}, show_results_flag set")
                                 except Exception as exec_error:
                                     print(f"DEBUG: Auto-execution failed: {exec_error}")
                                     import traceback
