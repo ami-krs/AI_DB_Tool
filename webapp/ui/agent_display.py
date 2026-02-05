@@ -91,40 +91,33 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             with run_cols[0]:
                 run_button_clicked = st.button("Run", key=f"{key_base}_run", type="primary")
             
-            # Handle button click - check both button state and session state flag
+            # Handle button click - ALWAYS check button state, even if expander is collapsed
             button_key = f"{key_base}_run"
-            # Also check if button was clicked in previous run (stored in session state)
-            was_clicked = st.session_state.get(f"{button_key}_clicked", False)
             
-            if run_button_clicked or was_clicked:
-                # Mark that button was clicked
-                st.session_state[f"{button_key}_clicked"] = True
-                
+            if run_button_clicked:
                 # Get the current SQL value from session state (text_area updates session state automatically)
+                # The text_area widget updates session state on every interaction
                 current_sql = st.session_state.get(editor_key, sql_to_run)
                 
                 # Final fallback to suggested_sql
                 if not current_sql or not current_sql.strip():
                     current_sql = suggested_sql
                 
-                print(f"DEBUG: Run button clicked (run_button_clicked={run_button_clicked}, was_clicked={was_clicked})")
+                print(f"DEBUG: Run button clicked!")
                 print(f"DEBUG: editor_key: {editor_key}")
                 print(f"DEBUG: sql_to_run (from text_area return): {sql_to_run[:100] if sql_to_run else 'None'}...")
                 print(f"DEBUG: session_state[{editor_key}]: {st.session_state.get(editor_key, 'NOT FOUND')[:100] if st.session_state.get(editor_key) else 'NOT FOUND'}...")
                 print(f"DEBUG: suggested_sql (original): {suggested_sql[:100] if suggested_sql else 'None'}...")
                 print(f"DEBUG: current_sql (final): {current_sql[:100] if current_sql else 'None'}...")
                 
-                # Store SQL in session state - use direct assignment
+                # Store SQL in session state IMMEDIATELY - use direct assignment
+                # This must happen before any rerun
                 st.session_state["agent_sql_to_run"] = current_sql
                 st.session_state["agent_sql_source"] = response.agent_name
                 st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
                 # Clear any previous execution result
                 if "agent_sql_execution_result" in st.session_state:
                     del st.session_state["agent_sql_execution_result"]
-                
-                # Clear the clicked flag
-                if f"{button_key}_clicked" in st.session_state:
-                    del st.session_state[f"{button_key}_clicked"]
                 
                 # Verify it was stored immediately
                 stored_value = st.session_state.get("agent_sql_to_run")
@@ -142,6 +135,8 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
                 print(f"DEBUG:   agent_sql_to_run = {stored_value[:100] if stored_value else 'NOT SET'}...")
                 print(f"DEBUG:   agent_sql_source = {st.session_state.get('agent_sql_source', 'NOT SET')}")
                 print(f"DEBUG: Triggering rerun...")
+                
+                # Force rerun to execute the SQL
                 st.rerun()
         
         # Display metadata
