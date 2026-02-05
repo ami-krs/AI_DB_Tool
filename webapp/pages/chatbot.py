@@ -452,9 +452,11 @@ def chatbot_tab():
                         msg_was_auto_executed = msg.get('auto_executed', False)
                         
                         print(f"DEBUG: Message {idx} - is_last={is_last_message}, has_sql={msg_has_sql}, sql_matches={msg_sql_matches}, auto_executed={msg_was_auto_executed}")
+                        print(f"DEBUG: has_last_result={has_last_result}, has_auto_query={has_auto_query}")
                         
-                        # Show results if: (1) it's the last message AND (2) either auto_executed flag is set OR SQL matches the auto-executed query
-                        if is_last_message and msg_has_sql and (msg_was_auto_executed or msg_sql_matches):
+                        # Show results if: (1) it's the last message AND (2) has SQL AND (3) either auto_executed flag is set OR SQL matches the auto-executed query OR we have results
+                        # The last condition (has_last_result) is a fallback to show results even if flags don't match perfectly
+                        if is_last_message and msg_has_sql and (msg_was_auto_executed or msg_sql_matches or (has_last_result and has_auto_query)):
                             # Check if we have results or errors to display
                             if has_auto_error and has_auto_query:
                                 # Show error
