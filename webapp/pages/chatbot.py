@@ -276,6 +276,36 @@ def chatbot_tab():
                     # The execute_query function already shows success message with rows affected
                     # But we add a helpful tip to verify changes
                     st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
+                
+                # After DDL operations (especially CREATE SCHEMA), refresh schema info
+                sql_upper = agent_sql.strip().upper()
+                if any(sql_upper.startswith(cmd) for cmd in ['CREATE SCHEMA', 'CREATE TABLE', 'DROP SCHEMA', 'DROP TABLE', 'ALTER']):
+                    try:
+                        # Refresh schema info to reflect new schema/table
+                        if st.session_state.connected and st.session_state.db_manager:
+                            tables = st.session_state.db_manager.get_tables()
+                            schema_info = st.session_state.db_manager.get_database_info()
+                            if schema_info:
+                                schema_info['tables'] = tables or []
+                                schema_info['total_tables'] = len(tables) if tables else 0
+                                st.session_state.schema_info = schema_info
+                            else:
+                                st.session_state.schema_info = {
+                                    'tables': tables or [],
+                                    'db_type': st.session_state.get('db_type', 'unknown'),
+                                    'total_tables': len(tables) if tables else 0,
+                                    'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                                }
+                            st.success("🔄 Schema information refreshed!")
+                            
+                            # Also refresh chatbot schema context if available
+                            if st.session_state.chatbot:
+                                try:
+                                    st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
+                                except Exception as e:
+                                    st.debug(f"Could not update chatbot schema context: {e}")
+                    except Exception as e:
+                        st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
             except Exception as e:
                 error_msg = f"❌ Failed to execute suggested SQL: {str(e)}"
                 st.error(error_msg)
@@ -283,40 +313,6 @@ def chatbot_tab():
                 import traceback
                 traceback.print_exc()
                 st.exception(e)
-            
-            # After DDL operations (especially CREATE SCHEMA), refresh schema info
-            sql_upper = agent_sql.strip().upper()
-            if any(sql_upper.startswith(cmd) for cmd in ['CREATE SCHEMA', 'CREATE TABLE', 'DROP SCHEMA', 'DROP TABLE', 'ALTER']):
-                try:
-                    # Refresh schema info to reflect new schema/table
-                    if st.session_state.connected and st.session_state.db_manager:
-                        tables = st.session_state.db_manager.get_tables()
-                        schema_info = st.session_state.db_manager.get_database_info()
-                        if schema_info:
-                            schema_info['tables'] = tables or []
-                            schema_info['total_tables'] = len(tables) if tables else 0
-                            st.session_state.schema_info = schema_info
-                        else:
-                            st.session_state.schema_info = {
-                                'tables': tables or [],
-                                'db_type': st.session_state.get('db_type', 'unknown'),
-                                'total_tables': len(tables) if tables else 0,
-                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
-                            }
-                        st.success("🔄 Schema information refreshed!")
-                        
-                        # Also refresh chatbot schema context if available
-                        if st.session_state.chatbot:
-                            try:
-                                st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
-                            except Exception as e:
-                                st.debug(f"Could not update chatbot schema context: {e}")
-                except Exception as e:
-                    st.warning(f"⚠️ Schema created but could not refresh schema info: {e}")
-        except Exception as e:
-            st.error(f"❌ Failed to execute suggested SQL: {e}")
-            import traceback
-            st.exception(e)
     
     # Don't show API key message on page load - only show when user tries to use it
     
