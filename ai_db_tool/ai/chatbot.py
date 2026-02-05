@@ -268,8 +268,8 @@ class SQLChatbot:
             if include_sql:
                 # Look for SQL code block
                 if "```sql" in response_text:
-                sql_start = response_text.find("```sql")
-                sql_end = response_text.find("```", sql_start + 6)
+                    sql_start = response_text.find("```sql")
+                    sql_end = response_text.find("```", sql_start + 6)
                 if sql_end != -1:
                     sql_query = response_text[sql_start + 6:sql_end].strip()
                         # For INSERT requests, prioritize SQL - remove explanations before SQL
@@ -278,7 +278,7 @@ class SQLChatbot:
                             # Keep only SQL and anything after it, remove text before SQL
                             response_text = response_text[sql_start:]  # Keep SQL code block and anything after
                         else:
-                    response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+                            response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
                 else:
                     # If no SQL block found but response contains SQL-like text, try to extract it
                     if any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
