@@ -253,6 +253,24 @@ def chatbot_tab():
     agent_execution_result = st.session_state.get("agent_sql_execution_result")
     print(f"DEBUG: chatbot_tab START - agent_sql exists: {agent_sql is not None}, value: {agent_sql[:100] if agent_sql else 'None'}...")
     
+    # Also check for any agent SQL button clicks that might have happened
+    # This is a fallback in case the button click handler didn't run
+    if not agent_sql:
+        agent_button_keys = [k for k in st.session_state.keys() if k.endswith("_run") and "agent_sql" in k]
+        for button_key in agent_button_keys:
+            # Check if this button was clicked (Streamlit buttons return True on click)
+            # But we can't check button state directly, so we check if editor_key exists
+            editor_key = button_key.replace("_run", "_editor")
+            if editor_key in st.session_state:
+                # Button might have been clicked but handler didn't run
+                # Try to get SQL from editor
+                potential_sql = st.session_state.get(editor_key)
+                if potential_sql and potential_sql.strip():
+                    print(f"DEBUG: Found potential agent SQL from editor: {editor_key}")
+                    st.session_state["agent_sql_to_run"] = potential_sql
+                    agent_sql = potential_sql
+                    break
+    
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
