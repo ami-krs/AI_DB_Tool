@@ -487,6 +487,7 @@ def chatbot_tab():
                             if has_auto_error:
                                 # Show error
                                 st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
+                                st.code(st.session_state.get('chatbot_last_auto_executed_query', ''), language='sql')
                                 st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
                                 results_shown_for_latest = True
                             else:
