@@ -90,13 +90,13 @@ class BaseAgent(ABC):
                         {"role": "user", "content": user_prompt}
                     ],
                     temperature=0.3,
-                    max_tokens=150
+                    max_tokens=500
                 )
                 return response.choices[0].message.content
             elif self.provider == "anthropic":
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=150,
+                    max_tokens=500,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )
@@ -249,14 +249,21 @@ Provide: 1) Quick assessment, 2) Critical issues only, 3) One suggestion if need
 class DebugAgent(BaseAgent):
     """Agent specialized in debugging SQL queries and database issues"""
     
-    SYSTEM_PROMPT = """You are an expert SQL debugger. Provide BRIEF debugging (2-3 sentences max).
+    SYSTEM_PROMPT = """You are an expert SQL debugger. Provide BRIEF debugging (2-3 sentences max) AND a corrected SQL query.
+
+CRITICAL REQUIREMENTS:
+1. You MUST provide a corrected SQL query in a ```sql code block
+2. Use ONLY actual column names from the provided schema - NEVER use generic names like 'id' unless that column actually exists
+3. For JOIN queries: Use actual foreign key column names from the schema (e.g., 'department_id', 'employee_id')
+4. For UPDATE/DELETE: Use actual primary key column names from the schema
+5. Check the schema carefully before suggesting column names
 
 Focus on:
 - Root cause (one sentence)
-- One specific fix suggestion
-- One alternative if needed
+- One specific fix suggestion with corrected SQL
+- Use actual column names from schema
 
-Be very concise. Only mention critical debugging steps."""
+Be very concise. Provide corrected SQL using actual schema column names."""
     
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
         super().__init__("Debug Agent", api_key, provider, model)
