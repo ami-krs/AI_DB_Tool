@@ -543,6 +543,8 @@ def chatbot_tab():
                         auto_executed = False
                         if sql_query:
                             sql_upper = sql_query.strip().upper()
+                            print(f"DEBUG: Extracted SQL query: {sql_query[:200]}...")
+                            print(f"DEBUG: SQL query upper: {sql_upper[:200]}...")
                             # Check if it's a SELECT query (data retrieval)
                             is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
                             # Check if it's NOT DDL or DML (for safety)
@@ -551,15 +553,22 @@ def chatbot_tab():
                                 'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
                             ])
                             
+                            print(f"DEBUG: is_select={is_select}, is_not_ddl_dml={is_not_ddl_dml}")
+                            
                             if is_select and is_not_ddl_dml:
                                 # Auto-execute SELECT queries
                                 try:
                                     print(f"DEBUG: Auto-executing SELECT query: {sql_query[:100]}...")
                                     execute_query(sql_query, enable_agents=False)
                                     auto_executed = True
+                                    print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}")
                                 except Exception as exec_error:
                                     print(f"DEBUG: Auto-execution failed: {exec_error}")
+                                    import traceback
+                                    traceback.print_exc()
                                     # Continue to show SQL even if execution fails
+                        else:
+                            print(f"DEBUG: No SQL query extracted from response")
                         
                         st.session_state.chat_history.append({
                             'role': 'assistant',

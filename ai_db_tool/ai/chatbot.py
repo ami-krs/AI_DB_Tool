@@ -280,10 +280,26 @@ class SQLChatbot:
                 elif any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
                     # Try to find SQL statements even without code blocks
                     import re
-                    sql_pattern = r'(INSERT\s+INTO[^;]+(?:;[^;]+)*)'
-                    matches = re.findall(sql_pattern, response_text, re.IGNORECASE | re.DOTALL)
+                    # Pattern for SELECT statements (most common for auto-execution)
+                    select_pattern = r'(SELECT\s+[^;]+(?:;[^;]+)*)'
+                    # Pattern for INSERT statements
+                    insert_pattern = r'(INSERT\s+INTO[^;]+(?:;[^;]+)*)'
+                    # Pattern for other DML/DDL
+                    other_pattern = r'((?:UPDATE|DELETE\s+FROM|CREATE\s+TABLE|DROP\s+TABLE|ALTER\s+TABLE)\s+[^;]+(?:;[^;]+)*)'
+                    
+                    # Try SELECT first (most common for data retrieval)
+                    matches = re.findall(select_pattern, response_text, re.IGNORECASE | re.DOTALL)
+                    if not matches:
+                        # Try INSERT
+                        matches = re.findall(insert_pattern, response_text, re.IGNORECASE | re.DOTALL)
+                    if not matches:
+                        # Try other DML/DDL
+                        matches = re.findall(other_pattern, response_text, re.IGNORECASE | re.DOTALL)
+                    
                     if matches:
                         sql_query = '; '.join(matches)
+                        # Clean up SQL query (remove extra whitespace, newlines)
+                        sql_query = ' '.join(sql_query.split())
                         # Remove the SQL from response text
                         for match in matches:
                             response_text = response_text.replace(match, '').strip()
