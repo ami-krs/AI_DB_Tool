@@ -445,9 +445,16 @@ def chatbot_tab():
                                     execute_generated_query(sql_query)
                         
                         # Show auto-execution results right after the latest assistant message with SQL
-                        # Check if this is the last message and it was auto-executed
+                        # Check if this is the last message and matches the auto-executed query
                         is_last_message = (idx == total_messages - 1)
-                        if is_last_message and msg.get('auto_executed', False):
+                        msg_has_sql = 'sql_query' in msg and msg['sql_query']
+                        msg_sql_matches = msg_has_sql and msg['sql_query'] == st.session_state.get('chatbot_last_auto_executed_query')
+                        msg_was_auto_executed = msg.get('auto_executed', False)
+                        
+                        print(f"DEBUG: Message {idx} - is_last={is_last_message}, has_sql={msg_has_sql}, sql_matches={msg_sql_matches}, auto_executed={msg_was_auto_executed}")
+                        
+                        # Show results if: (1) it's the last message AND (2) either auto_executed flag is set OR SQL matches the auto-executed query
+                        if is_last_message and msg_has_sql and (msg_was_auto_executed or msg_sql_matches):
                             # Check if we have results or errors to display
                             if has_auto_error and has_auto_query:
                                 # Show error
