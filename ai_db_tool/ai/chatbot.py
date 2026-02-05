@@ -439,6 +439,20 @@ class SQLChatbot:
         if include_sql:
             # For INSERT/UPDATE/DELETE operations, emphasize generating actual SQL, not explanations
             user_upper = user_message.upper()
+            
+            # For UPDATE/DELETE operations, add explicit instructions
+            if any(keyword in user_upper for keyword in ['UPDATE', 'MODIFY', 'CHANGE', 'SET', 'EDIT']):
+                prompt += "\n\n=== CRITICAL INSTRUCTIONS FOR UPDATE/DELETE ===\n"
+                prompt += "The user wants to UPDATE or MODIFY data in a table.\n"
+                prompt += "1. Look at the schema above - find the table name mentioned by the user\n"
+                prompt += "2. Use the column names from that table's column list in the schema\n"
+                prompt += "3. Generate the UPDATE statement using those exact column names\n"
+                prompt += "4. DO NOT refuse - if the table is in the schema, you have all the information needed\n"
+                prompt += "5. If the user says 'department_id = department_id + 1000', use 'department_id' as the column name from the schema\n"
+                prompt += "6. Start your response IMMEDIATELY with ```sql\n"
+                prompt += "7. DO NOT say 'I cannot generate' or 'column details not available' - just generate the SQL\n"
+                prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
+            
             if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
                 prompt += "\n\n=== CRITICAL INSTRUCTIONS ===\n"
                 prompt += "The user wants ACTUAL SQL INSERT statements for their specific database tables.\n"
