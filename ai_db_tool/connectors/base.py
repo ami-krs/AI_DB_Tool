@@ -152,41 +152,56 @@ class DatabaseManager:
             raise ValueError("No active connection")
         
         try:
-            df = pd.read_sql(query, engine)
+            # Use pd.read_sql with coerce_float=False to prevent type coercion issues
+            # and handle duplicate columns more gracefully
+            df = pd.read_sql(query, engine, coerce_float=False)
             
             # Handle duplicate column names (common in JOIN queries)
             # This prevents errors when multiple tables have columns with the same name
             if df is not None and len(df.columns) > 0:
+                # Check for duplicate column names
                 if df.columns.duplicated().any():
                     # Rename duplicate columns by appending suffix
-                    cols = pd.Series(df.columns)
-                    for dup in cols[cols.duplicated()].unique():
-                        # Find all occurrences of this duplicate column
-                        indices = [i for i, col in enumerate(df.columns) if col == dup]
-                        # Keep first occurrence as-is, rename others
-                        for idx, pos in enumerate(indices[1:], 1):
-                            df.columns.values[pos] = f"{dup}_{idx}"
+                    cols = list(df.columns)
+                    seen = {}
+                    new_cols = []
+                    for col in cols:
+                        if col in seen:
+                            seen[col] += 1
+                            new_cols.append(f"{col}_{seen[col]}")
+                        else:
+                            seen[col] = 0
+                            new_cols.append(col)
+                    df.columns = new_cols
             
             return df
-        except ValueError as e:
-            # Check if it's a duplicate column error from pandas
+        except (ValueError, KeyError) as e:
+            # Check if it's a duplicate column error
             error_str = str(e)
             if "duplicate" in error_str.lower() and "column" in error_str.lower():
-                # Try to extract column names and handle them
-                # Re-execute with column renaming in SQL if possible, or handle in pandas
+                # Try to handle by reading raw results and manually constructing DataFrame
                 try:
-                    # Re-read with explicit column handling
-                    df = pd.read_sql(query, engine)
-                    # Force rename duplicates even if pandas didn't catch them
-                    cols = pd.Series(df.columns)
-                    if cols.duplicated().any():
-                        for dup in cols[cols.duplicated()].unique():
-                            indices = [i for i, col in enumerate(df.columns) if col == dup]
-                            for idx, pos in enumerate(indices[1:], 1):
-                                df.columns.values[pos] = f"{dup}_{idx}"
-                    return df
-                except:
-                    raise ValueError(f"Query execution failed: {e}")
+                    with engine.connect() as conn:
+                        result = conn.execute(text(query))
+                        # Get column names from result
+                        columns = list(result.keys())
+                        # Handle duplicates in column names
+                        seen = {}
+                        new_cols = []
+                        for col in columns:
+                            if col in seen:
+                                seen[col] += 1
+                                new_cols.append(f"{col}_{seen[col]}")
+                            else:
+                                seen[col] = 0
+                                new_cols.append(col)
+                        # Fetch all rows
+                        rows = result.fetchall()
+                        # Create DataFrame with renamed columns
+                        df = pd.DataFrame(rows, columns=new_cols)
+                        return df
+                except Exception as inner_e:
+                    raise ValueError(f"Query execution failed: {e} (inner: {inner_e})")
             else:
                 raise ValueError(f"Query execution failed: {e}")
         except SQLAlchemyError as e:
