@@ -262,28 +262,31 @@ CRITICAL REQUIREMENTS:
      * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
      * SET CONSTRAINTS ALL DEFERRED only works if constraints are explicitly created as DEFERRABLE
      * 
-     * Option 1 (RECOMMENDED - works for non-deferrable constraints): Use a CTE/subquery approach:
-       BEGIN;
-       -- Create mapping of old to new values (don't update yet, just create the mapping)
-       WITH parent_mapping AS (
-         SELECT department_id AS old_id, department_id + 1000 AS new_id 
-         FROM department
-       )
-       -- Update child table using the mapping
-       UPDATE employee 
-       SET department_id = (SELECT new_id FROM parent_mapping WHERE parent_mapping.old_id = employee.department_id)
-       WHERE department_id IN (SELECT old_id FROM parent_mapping);
-       -- Then update parent table to final values
-       UPDATE department SET department_id = department_id + 1000;
-       COMMIT;
-     
-     * Option 2: Temporarily disable triggers (requires ALTER TABLE permission):
+     * Option 1 (RECOMMENDED - most reliable): Temporarily disable triggers:
        BEGIN;
        ALTER TABLE employee DISABLE TRIGGER ALL;
        UPDATE employee SET department_id = department_id + 1000;
        UPDATE department SET department_id = department_id + 1000;
        ALTER TABLE employee ENABLE TRIGGER ALL;
        COMMIT;
+       Note: This requires ALTER TABLE permission. If you don't have permission, you'll need to ask a DBA.
+     
+     * Option 2: Use a three-step approach with NULL values (if column allows NULL):
+       BEGIN;
+       -- Step 1: Set foreign key to NULL temporarily
+       UPDATE employee SET department_id = NULL;
+       -- Step 2: Update parent table
+       UPDATE department SET department_id = department_id + 1000;
+       -- Step 3: Update child to match parent using mapping
+       WITH parent_mapping AS (
+         SELECT department_id AS new_id, department_id - 1000 AS old_id 
+         FROM department
+       )
+       UPDATE employee 
+       SET department_id = (SELECT new_id FROM parent_mapping WHERE parent_mapping.old_id = employee.department_id)
+       WHERE employee.department_id IS NULL;
+       COMMIT;
+       Note: Only works if the foreign key column allows NULL values.
      
      * Option 3 (only if constraint is DEFERRABLE): Use SET CONSTRAINTS:
        BEGIN;
@@ -291,7 +294,7 @@ CRITICAL REQUIREMENTS:
        UPDATE employee SET department_id = department_id + 1000;
        UPDATE department SET department_id = department_id + 1000;
        COMMIT;
-   - For PostgreSQL, use Option 1 (CTE approach) as it works for all constraints
+   - For PostgreSQL, use Option 1 (disable triggers) as it's the most reliable solution
 
 Focus on:
 - Root cause (one sentence)
