@@ -371,14 +371,12 @@ def chatbot_tab():
     # Add marker before chat messages
     st.markdown('<div id="chat-container-start"></div>', unsafe_allow_html=True)
     
-    # Re-display results from auto-executed query if they exist in session state
-    # Do this BEFORE chat history so results appear above chat messages
+    # DEBUG: Show debug info in UI (temporary - remove after fixing)
     has_last_result = st.session_state.get('last_result_df') is not None
     has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
     has_auto_error = st.session_state.get('chatbot_auto_execution_error') is not None
     print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}")
     
-    # DEBUG: Show debug info in UI (temporary - remove after fixing)
     with st.expander("🔍 Debug Info (Click to see)", expanded=False):
         st.write("**Session State Check:**")
         st.write(f"- `last_result_df` exists: {has_last_result}")
@@ -394,46 +392,10 @@ def chatbot_tab():
         st.write(f"- Query history length: {len(st.session_state.get('query_history', []))}")
         st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
     
-    # Show error from auto-execution if it exists
-    if has_auto_error and has_auto_query:
-        st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
-        st.code(st.session_state.chatbot_last_auto_executed_query, language='sql')
-        st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
-        # Clear error after displaying (but keep query for reference)
-        # Don't clear immediately - let user see it, clear on next successful query
-    
-    if has_last_result and has_auto_query and not has_auto_error:
-        # Results exist from auto-execution, re-display them
-        from utils.helpers import display_paginated_dataframe
-        print(f"DEBUG: Re-displaying results - rows: {len(st.session_state.last_result_df)}")
-        st.markdown("---")
-        result_col1, result_col2 = st.columns([10, 1])
-        with result_col1:
-            st.markdown("**📊 Query Results**", unsafe_allow_html=True)
-        with result_col2:
-            csv = st.session_state.last_result_df.to_csv(index=False)
-            st.download_button(
-                "📥",
-                csv,
-                "results.csv",
-                "text/csv",
-                help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
-                use_container_width=True
-            )
-        st.session_state.current_page = 1
-        display_paginated_dataframe(
-            st.session_state.last_result_df, 
-            unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-        )
-        st.markdown("---")
-    elif has_last_result:
-        print(f"DEBUG: last_result_df exists but no chatbot_last_auto_executed_query flag")
-    elif has_auto_query:
-        print(f"DEBUG: chatbot_last_auto_executed_query flag exists but no last_result_df")
-    
     # Display chat history
     print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     if st.session_state.chat_history:
+        total_messages = len(st.session_state.chat_history)
         for idx, msg in enumerate(st.session_state.chat_history):
             print(f"DEBUG: Displaying message {idx}: role={msg.get('role')}, has_content={bool(msg.get('content'))}, has_sql={bool(msg.get('sql_query'))}")
             # Generate unique key using index and timestamp if available
@@ -469,10 +431,10 @@ def chatbot_tab():
                         with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{unique_key_base}"):
                             st.code(sql_query, language='sql')
                             
-                            # For SELECT queries, show that it was auto-executed (results appear above)
+                            # For SELECT queries, show that it was auto-executed (results appear below)
                             if is_select and is_not_ddl_dml:
                                 if msg.get('auto_executed', False):
-                                    st.success("✅ Query executed automatically. Results shown above.")
+                                    st.success("✅ Query executed automatically. Results shown below.")
                                 else:
                                     # If not auto-executed yet, execute it now
                                     if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
@@ -481,6 +443,40 @@ def chatbot_tab():
                                 # For DDL/DML, always require manual execution
                                 if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
                                     execute_generated_query(sql_query)
+                        
+                        # Show auto-execution results right after the latest assistant message with SQL
+                        # Check if this is the last message and it was auto-executed
+                        is_last_message = (idx == total_messages - 1)
+                        if is_last_message and msg.get('auto_executed', False):
+                            # Check if we have results or errors to display
+                            if has_auto_error and has_auto_query:
+                                # Show error
+                                st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
+                                st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
+                            elif has_last_result and has_auto_query:
+                                # Show results
+                                from utils.helpers import display_paginated_dataframe
+                                print(f"DEBUG: Re-displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
+                                st.markdown("---")
+                                result_col1, result_col2 = st.columns([10, 1])
+                                with result_col1:
+                                    st.markdown("**📊 Query Results**", unsafe_allow_html=True)
+                                with result_col2:
+                                    csv = st.session_state.last_result_df.to_csv(index=False)
+                                    st.download_button(
+                                        "📥",
+                                        csv,
+                                        "results.csv",
+                                        "text/csv",
+                                        help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
+                                        use_container_width=True,
+                                        key=f"download_auto_{unique_key_base}"
+                                    )
+                                st.session_state.current_page = 1
+                                display_paginated_dataframe(
+                                    st.session_state.last_result_df, 
+                                    unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                )
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
