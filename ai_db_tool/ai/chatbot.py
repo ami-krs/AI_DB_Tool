@@ -366,7 +366,7 @@ class SQLChatbot:
                             table_name = table.get('table_name', 'unknown')
                             columns_list = table.get('columns', [])
                             if columns_list:
-                        # Handle columns as list of dicts or list of strings
+                                # Handle columns as list of dicts or list of strings
                                 if isinstance(columns_list[0], dict):
                                     # Format: column_name (type) [nullable/not null] [primary key]
                                     col_details = []
