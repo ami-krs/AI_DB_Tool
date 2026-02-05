@@ -166,15 +166,19 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
                 if not engine:
                     raise ValueError("No active connection")
                 
-                # Execute directly without transaction wrapper since statement contains BEGIN/COMMIT
+                # Execute directly using raw connection to avoid nested transactions
+                # When statement contains BEGIN/COMMIT, we need to execute it as-is
+                from sqlalchemy import text
                 with engine.connect() as conn:
-                    # Use text() to execute raw SQL
-                    from sqlalchemy import text
+                    # Execute the entire transaction block
+                    # Note: For transaction blocks, we execute all statements in the block
+                    # The COMMIT in the statement will commit the transaction
                     result_obj = conn.execute(text(statement))
-                    # For transaction blocks, we need to commit explicitly
+                    # Explicitly commit to ensure changes are persisted
+                    # (Even though the statement contains COMMIT, we commit here too for safety)
                     conn.commit()
                     affected_rows = result_obj.rowcount if hasattr(result_obj, 'rowcount') else 0
-                    print(f"DEBUG: Transaction block executed, affected_rows={affected_rows}")
+                    print(f"DEBUG: Transaction block executed and committed, affected_rows={affected_rows}")
                 
                 result['success'] = True
                 result['type'] = 'DML' if is_dml else 'DDL' if is_ddl else 'DML'
@@ -183,6 +187,8 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
             except Exception as e:
                 result['error'] = str(e)
                 print(f"DEBUG: Transaction block execution failed: {e}")
+                import traceback
+                print(traceback.format_exc())
                 return result
         
         if is_ddl or is_dml:
