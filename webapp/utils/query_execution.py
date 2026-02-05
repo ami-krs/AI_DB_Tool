@@ -143,6 +143,10 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
     
     statement_upper = statement.strip().upper()
     
+    # Check if statement contains transaction control (BEGIN/COMMIT/ROLLBACK)
+    # If so, we need to execute it differently to avoid nested transactions
+    has_transaction_control = any(cmd in statement_upper for cmd in ['BEGIN', 'COMMIT', 'ROLLBACK', 'END'])
+    
     # Determine query type
     is_ddl = any(statement_upper.startswith(cmd) for cmd in [
         'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 
@@ -153,6 +157,34 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
     is_select = statement_upper.startswith('SELECT')
     
     try:
+        if has_transaction_control:
+            # Execute transaction block directly without engine.begin() wrapper
+            # to avoid nested transaction issues
+            print(f"DEBUG: Executing statement with transaction control (BEGIN/COMMIT)")
+            try:
+                engine = st.session_state.db_manager.get_engine()
+                if not engine:
+                    raise ValueError("No active connection")
+                
+                # Execute directly without transaction wrapper since statement contains BEGIN/COMMIT
+                with engine.connect() as conn:
+                    # Use text() to execute raw SQL
+                    from sqlalchemy import text
+                    result_obj = conn.execute(text(statement))
+                    # For transaction blocks, we need to commit explicitly
+                    conn.commit()
+                    affected_rows = result_obj.rowcount if hasattr(result_obj, 'rowcount') else 0
+                    print(f"DEBUG: Transaction block executed, affected_rows={affected_rows}")
+                
+                result['success'] = True
+                result['type'] = 'DML' if is_dml else 'DDL' if is_ddl else 'DML'
+                result['rows_affected'] = affected_rows if affected_rows >= 0 else 0
+                return result
+            except Exception as e:
+                result['error'] = str(e)
+                print(f"DEBUG: Transaction block execution failed: {e}")
+                return result
+        
         if is_ddl or is_dml:
             # Execute non-query operations
             affected_rows = st.session_state.db_manager.execute_non_query(statement)
