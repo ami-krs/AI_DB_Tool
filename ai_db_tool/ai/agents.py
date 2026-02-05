@@ -262,31 +262,36 @@ CRITICAL REQUIREMENTS:
      * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
      * SET CONSTRAINTS ALL DEFERRED only works if constraints are explicitly created as DEFERRABLE
      * 
-     * Option 1 (RECOMMENDED - most reliable): Temporarily disable triggers:
+     * IMPORTANT: System triggers (RI_ConstraintTrigger) for foreign keys cannot be disabled
+     * DISABLE TRIGGER ALL will fail with "permission denied: is a system trigger"
+     * 
+     * Option 1 (if foreign key column allows NULL):
        BEGIN;
-       ALTER TABLE employee DISABLE TRIGGER ALL;
-       UPDATE employee SET department_id = department_id + 1000;
-       UPDATE department SET department_id = department_id + 1000;
-       ALTER TABLE employee ENABLE TRIGGER ALL;
-       COMMIT;
-       Note: This requires ALTER TABLE permission. If you don't have permission, you'll need to ask a DBA.
-     
-     * Option 2: Use a three-step approach with NULL values (if column allows NULL):
-       BEGIN;
-       -- Step 1: Set foreign key to NULL temporarily
+       -- Step 1: Set foreign key to NULL temporarily (breaks constraint temporarily)
        UPDATE employee SET department_id = NULL;
-       -- Step 2: Update parent table
+       -- Step 2: Update parent table to new values
        UPDATE department SET department_id = department_id + 1000;
-       -- Step 3: Update child to match parent using mapping
+       -- Step 3: Update child to match parent using reverse mapping
        WITH parent_mapping AS (
          SELECT department_id AS new_id, department_id - 1000 AS old_id 
          FROM department
        )
        UPDATE employee 
-       SET department_id = (SELECT new_id FROM parent_mapping WHERE parent_mapping.old_id = employee.department_id)
+       SET department_id = (SELECT new_id FROM parent_mapping 
+                             WHERE parent_mapping.old_id = employee.department_id)
        WHERE employee.department_id IS NULL;
        COMMIT;
        Note: Only works if the foreign key column allows NULL values.
+     
+     * Option 2 (requires DBA/superuser): Drop and recreate constraint:
+       BEGIN;
+       ALTER TABLE employee DROP CONSTRAINT employee_department_id_fkey;
+       UPDATE employee SET department_id = department_id + 1000;
+       UPDATE department SET department_id = department_id + 1000;
+       ALTER TABLE employee ADD CONSTRAINT employee_department_id_fkey 
+         FOREIGN KEY (department_id) REFERENCES department(department_id);
+       COMMIT;
+       Note: This requires DROP/ADD CONSTRAINT permissions. Not recommended for production.
      
      * Option 3 (only if constraint is DEFERRABLE): Use SET CONSTRAINTS:
        BEGIN;
@@ -294,7 +299,12 @@ CRITICAL REQUIREMENTS:
        UPDATE employee SET department_id = department_id + 1000;
        UPDATE department SET department_id = department_id + 1000;
        COMMIT;
-   - For PostgreSQL, use Option 1 (disable triggers) as it's the most reliable solution
+       Note: Only works if constraint was created as DEFERRABLE.
+     
+     * Option 4: Ask a DBA to make the constraint DEFERRABLE:
+       ALTER TABLE employee ALTER CONSTRAINT employee_department_id_fkey DEFERRABLE INITIALLY DEFERRED;
+       Then use Option 3.
+   - For PostgreSQL, try Option 1 (NULL approach) first if column allows NULL, otherwise you may need DBA help
 
 Focus on:
 - Root cause (one sentence)
@@ -363,22 +373,16 @@ REQUIRED:
      * SET CONSTRAINTS ALL DEFERRED will NOT work for non-deferrable constraints
      * 
      * For PostgreSQL, when updating PRIMARY KEYS referenced by FOREIGN KEYS:
-       Option 1 (RECOMMENDED - most reliable, requires ALTER TABLE permission):
-       BEGIN;
-       ALTER TABLE child_table DISABLE TRIGGER ALL;
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
-       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-       ALTER TABLE child_table ENABLE TRIGGER ALL;
-       COMMIT;
-       Note: This temporarily disables all triggers on the child table, allowing the updates to proceed.
+       IMPORTANT: System triggers (RI_ConstraintTrigger) for foreign keys cannot be disabled.
+       DISABLE TRIGGER ALL will fail with "permission denied: is a system trigger".
        
-       Option 2 (if foreign key column allows NULL):
+       Option 1 (if foreign key column allows NULL):
        BEGIN;
        -- Step 1: Set foreign key to NULL temporarily
        UPDATE child_table SET foreign_key_col = NULL;
        -- Step 2: Update parent table
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-       -- Step 3: Update child to match parent using mapping
+       -- Step 3: Update child to match parent using reverse mapping
        WITH parent_mapping AS (
          SELECT primary_key_col AS new_id, primary_key_col - 1000 AS old_id 
          FROM parent_table
@@ -390,13 +394,26 @@ REQUIRED:
        COMMIT;
        Note: Only works if the foreign key column allows NULL values.
        
-       Option 3 (only if constraint is explicitly DEFERRABLE):
+       Option 2 (requires DBA/superuser - not recommended for production):
+       BEGIN;
+       ALTER TABLE child_table DROP CONSTRAINT child_table_foreign_key_fkey;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       ALTER TABLE child_table ADD CONSTRAINT child_table_foreign_key_fkey 
+         FOREIGN KEY (foreign_key_col) REFERENCES parent_table(primary_key_col);
+       COMMIT;
+       
+       Option 3 (only if constraint is DEFERRABLE):
        BEGIN;
        SET CONSTRAINTS child_table_foreign_key_fkey DEFERRED;
        UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
        COMMIT;
-     * Use Option 1 (disable triggers) - it's the most reliable solution for non-deferrable constraints
+       
+       Option 4: Ask DBA to make constraint DEFERRABLE:
+       ALTER TABLE child_table ALTER CONSTRAINT child_table_foreign_key_fkey DEFERRABLE INITIALLY DEFERRED;
+       Then use Option 3.
+     * Try Option 1 (NULL approach) first if column allows NULL, otherwise you may need DBA help
 
 Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         
