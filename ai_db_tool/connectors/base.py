@@ -152,7 +152,43 @@ class DatabaseManager:
             raise ValueError("No active connection")
         
         try:
-            return pd.read_sql(query, engine)
+            df = pd.read_sql(query, engine)
+            
+            # Handle duplicate column names (common in JOIN queries)
+            # This prevents errors when multiple tables have columns with the same name
+            if df is not None and len(df.columns) > 0:
+                if df.columns.duplicated().any():
+                    # Rename duplicate columns by appending suffix
+                    cols = pd.Series(df.columns)
+                    for dup in cols[cols.duplicated()].unique():
+                        # Find all occurrences of this duplicate column
+                        indices = [i for i, col in enumerate(df.columns) if col == dup]
+                        # Keep first occurrence as-is, rename others
+                        for idx, pos in enumerate(indices[1:], 1):
+                            df.columns.values[pos] = f"{dup}_{idx}"
+            
+            return df
+        except ValueError as e:
+            # Check if it's a duplicate column error from pandas
+            error_str = str(e)
+            if "duplicate" in error_str.lower() and "column" in error_str.lower():
+                # Try to extract column names and handle them
+                # Re-execute with column renaming in SQL if possible, or handle in pandas
+                try:
+                    # Re-read with explicit column handling
+                    df = pd.read_sql(query, engine)
+                    # Force rename duplicates even if pandas didn't catch them
+                    cols = pd.Series(df.columns)
+                    if cols.duplicated().any():
+                        for dup in cols[cols.duplicated()].unique():
+                            indices = [i for i, col in enumerate(df.columns) if col == dup]
+                            for idx, pos in enumerate(indices[1:], 1):
+                                df.columns.values[pos] = f"{dup}_{idx}"
+                    return df
+                except:
+                    raise ValueError(f"Query execution failed: {e}")
+            else:
+                raise ValueError(f"Query execution failed: {e}")
         except SQLAlchemyError as e:
             raise ValueError(f"Query execution failed: {e}")
     
