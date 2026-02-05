@@ -262,7 +262,15 @@ def chatbot_tab():
         st.code(agent_sql, language='sql')
         try:
             # Run without agents to avoid recursive analysis
-            execute_query(agent_sql, enable_agents=False)
+            # execute_query will display results/success messages automatically
+            execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
+            
+            # For UPDATE/DELETE/INSERT, add extra confirmation message
+            sql_upper = agent_sql.strip().upper()
+            if any(sql_upper.startswith(cmd) for cmd in ['UPDATE', 'DELETE', 'INSERT']):
+                # The execute_query function already shows success message with rows affected
+                # But we add a helpful tip to verify changes
+                st.info("💡 **Tip:** Run a SELECT query to verify the changes were applied correctly.")
             
             # After DDL operations (especially CREATE SCHEMA), refresh schema info
             sql_upper = agent_sql.strip().upper()
