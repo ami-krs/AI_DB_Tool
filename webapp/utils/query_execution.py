@@ -633,7 +633,8 @@ def execute_generated_query(query: str):
         # If validation fails for any reason, don't block execution
         pass
 
-    execute_query(query)
+    # Use unique suffix to prevent duplicate element keys when same query is executed manually after auto-execution
+    execute_query(query, unique_suffix="chatbot_manual")
 
 def show_table_details():
     """Show detailed table information"""
