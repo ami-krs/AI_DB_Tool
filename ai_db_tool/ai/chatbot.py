@@ -268,17 +268,17 @@ class SQLChatbot:
             if include_sql:
                 # Look for SQL code block
                 if "```sql" in response_text:
-                    sql_start = response_text.find("```sql")
-                    sql_end = response_text.find("```", sql_start + 6)
-                    if sql_end != -1:
-                        sql_query = response_text[sql_start + 6:sql_end].strip()
+                sql_start = response_text.find("```sql")
+                sql_end = response_text.find("```", sql_start + 6)
+                if sql_end != -1:
+                    sql_query = response_text[sql_start + 6:sql_end].strip()
                         # For INSERT requests, prioritize SQL - remove explanations before SQL
                         user_upper = user_message.upper()
                         if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
                             # Keep only SQL and anything after it, remove text before SQL
                             response_text = response_text[sql_start:]  # Keep SQL code block and anything after
                         else:
-                            response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+                    response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
                 # If no SQL block found but response contains SQL-like text, try to extract it
                 elif any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
                     # Try to find SQL statements even without code blocks
@@ -354,19 +354,19 @@ class SQLChatbot:
                     # Tables are just names - we need to fetch full schema
                     prompt += f"Available Tables ({len(tables)} tables found):\n"
                     for table_name in tables[:20]:  # Show up to 20 tables
-                        prompt += f"- {table_name}\n"
+                    prompt += f"- {table_name}\n"
                     prompt += "\n⚠️ WARNING: Column details not available. Please ensure schema context includes column information.\n\n"
                 else:
                     # Tables have full schema info
                     prompt += f"Tables with full schema ({len(tables)} tables):\n"
                     for table in tables[:20]:  # Show up to 20 tables
                         if isinstance(table, dict):
-                            # If table is a dict with schema info, extract table_name and columns
-                            table_name = table.get('table_name', 'unknown')
-                            columns_list = table.get('columns', [])
-                            if columns_list:
-                                # Handle columns as list of dicts or list of strings
-                                if isinstance(columns_list[0], dict):
+                    # If table is a dict with schema info, extract table_name and columns
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        # Handle columns as list of dicts or list of strings
+                        if isinstance(columns_list[0], dict):
                                     # Format: column_name (type) [nullable/not null] [primary key]
                                     col_details = []
                                     for col in columns_list:
@@ -379,14 +379,14 @@ class SQLChatbot:
                                             col_str += f" {pk}"
                                         col_details.append(col_str)
                                     columns = ', '.join(col_details)
-                                else:
-                                    columns = ', '.join([str(col) for col in columns_list])
+                        else:
+                            columns = ', '.join([str(col) for col in columns_list])
                                 prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
-                            else:
+                    else:
                                 prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
                             prompt += f"\nTable: {table} (no column info available)\n"
-                        else:
+                else:
                             prompt += f"\nTable: {str(table)}\n"
                 prompt += "\n=== END OF SCHEMA ===\n\n"
                 prompt += "🚨 CRITICAL RULES FOR SQL GENERATION (VIOLATION WILL CAUSE ERRORS):\n"
@@ -396,8 +396,10 @@ class SQLChatbot:
                 prompt += "   - Use the EXACT column names that appear in those lists for JOIN conditions\n"
                 prompt += "   - For foreign key relationships, look for columns that might link tables (e.g., 'department_id' in employee table matching 'id' in department table)\n"
                 prompt += "   - If you see columns like 'employee_id', 'department_id', 'customer_id', etc., use those for JOINs\n"
-                prompt += "   - NEVER use generic 'id = id' - always use the actual foreign key column names from the schema\n"
-                prompt += "   - Example: If employee table has 'department_id' and department table has 'id', use: 'employee.department_id = department.id'\n"
+                prompt += "   - NEVER use generic 'id = id' or 'department.id = employee.department_id' unless 'id' actually exists in the department table's column list\n"
+                prompt += "   - If department table does NOT have an 'id' column, find the actual primary key column name from the schema (might be 'department_id', 'dept_id', etc.)\n"
+                prompt += "   - Example: If employee table has 'department_id' and department table has 'department_id' (not 'id'), use: 'employee.department_id = department.department_id'\n"
+                prompt += "   - ALWAYS check the column list for each table before using any column name in JOIN conditions\n"
                 prompt += "3. For INSERT/UPDATE/DELETE: You MUST ONLY use column names that appear in the column lists above for each table.\n"
                 prompt += "   - For UPDATE queries: Check the column list for the table you're updating and use ONLY those exact column names\n"
                 prompt += "   - For WHERE clauses in UPDATE/DELETE: Use ONLY column names that exist in the table's column list\n"
