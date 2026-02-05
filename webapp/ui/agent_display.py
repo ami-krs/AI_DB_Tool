@@ -89,10 +89,22 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
                     # The active page (e.g., chatbot) will pick this up and execute it
                     # so that results are shown in the normal results area.
                     # Use the current value from text_area to get the edited SQL
+                    # First try to get from session state (user may have edited it)
                     current_sql = st.session_state.get(f"{key_base}_editor", sql_to_run)
+                    # If that's empty, use the original SQL
+                    if not current_sql or not current_sql.strip():
+                        current_sql = sql_to_run
+                    
+                    print(f"DEBUG: Run button clicked - storing SQL: {current_sql[:100] if current_sql else 'None'}...")
+                    print(f"DEBUG: SQL from session state: {st.session_state.get(f'{key_base}_editor', 'NOT FOUND')}")
+                    print(f"DEBUG: Original SQL: {sql_to_run[:100] if sql_to_run else 'None'}...")
+                    
                     st.session_state["agent_sql_to_run"] = current_sql
                     st.session_state["agent_sql_source"] = response.agent_name
                     st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
+                    # Clear any previous execution result
+                    st.session_state.pop("agent_sql_execution_result", None)
+                    print(f"DEBUG: Stored agent_sql_to_run in session state, triggering rerun")
                     st.rerun()
         
         # Display metadata
