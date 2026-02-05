@@ -257,11 +257,16 @@ CRITICAL REQUIREMENTS:
 3. For JOIN queries: Use actual foreign key column names from the schema (e.g., 'department_id', 'employee_id')
 4. For UPDATE/DELETE: Use actual primary key column names from the schema
 5. Check the schema carefully before suggesting column names
+6. For MULTIPLE UPDATE statements: Order them correctly to respect foreign key constraints
+   - If a table has a foreign key referencing another table, update the REFERENCED table (parent) FIRST, then the REFERENCING table (child)
+   - OR: Update the child table to point to new values first, then update the parent table
+   - If foreign key violations occur, consider using a transaction or temporarily disabling constraints
 
 Focus on:
 - Root cause (one sentence)
 - One specific fix suggestion with corrected SQL
 - Use actual column names from schema
+- Order UPDATE statements correctly for foreign key constraints
 
 Be very concise. Provide corrected SQL using actual schema column names."""
     
