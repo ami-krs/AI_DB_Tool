@@ -322,8 +322,18 @@ REQUIRED:
 2. Provide a CORRECTED SQL query in a ```sql code block using ONLY actual column names from the schema above
 3. Replace any generic column names (like 'id') with actual column names from the schema
 4. For JOIN queries: Use actual foreign key columns from the schema (e.g., 'department_id', 'employee_id')
+5. For MULTIPLE UPDATE statements with foreign key relationships:
+   - If error mentions "foreign key constraint" or "referential integrity":
+     * Identify which table is the PARENT (referenced) and which is the CHILD (referencing)
+     * For foreign key violations: Update the PARENT table FIRST, then the CHILD table
+     * OR: If updating both parent and child primary keys, wrap in a transaction:
+       BEGIN;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       COMMIT;
+   - The UPDATE order is CRITICAL when foreign key constraints exist
 
-Be brief but provide the corrected SQL query."""
+Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
