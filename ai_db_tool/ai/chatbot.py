@@ -108,7 +108,9 @@ Guidelines:
 - When user asks to insert/populate records, generate the actual INSERT statements for their specific tables
 - Do NOT say "here's how you can" or "assuming you have" - just generate the SQL directly
 - For "insert records in all tables" requests, generate INSERT statements for each table listed in the schema
-- Ask clarifying questions ONLY when absolutely necessary (e.g., missing critical information)
+- For JOIN queries: ALWAYS generate SQL even if column details are incomplete. Use common column naming patterns (id, name, key, etc.) or table prefixes to create reasonable JOIN conditions.
+- NEVER refuse to generate JOIN queries due to missing column details - always make reasonable assumptions and generate the SQL.
+- Ask clarifying questions ONLY when absolutely necessary (e.g., missing critical information that cannot be reasonably inferred)
 - Provide brief explanations ONLY when the SQL is complex or needs context
 - Never execute destructive operations unless explicitly requested
 - Remember context from previous messages in the conversation
@@ -388,14 +390,19 @@ class SQLChatbot:
                 prompt += "\n=== END OF SCHEMA ===\n\n"
                 prompt += "🚨 CRITICAL RULES FOR SQL GENERATION (VIOLATION WILL CAUSE ERRORS):\n"
                 prompt += "1. You MUST ONLY use table names from the list above: " + ', '.join(all_table_names[:10]) + (f" and {len(all_table_names) - 10} more" if len(all_table_names) > 10 else "") + "\n"
-                prompt += "2. You MUST ONLY use column names that appear in the column lists above for each table.\n"
-                prompt += "3. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
-                prompt += "4. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
-                prompt += "5. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
-                prompt += "6. If user asks for 'records from DFU table' or 'records from schema X', they likely mean tables IN that schema. Generate SELECT statements for each table in that schema, or ask which specific table they want.\n"
-                prompt += "7. NEVER generate 'SELECT * FROM schema_name' - you cannot SELECT from a schema directly. Use 'SELECT * FROM schema_name.table_name' instead.\n"
-                prompt += "8. Generate actual SQL statements directly - do NOT provide explanations, examples, or 'here's how you can' text.\n"
-                prompt += "9. If you cannot see the table names above, DO NOT generate SQL - return an error instead.\n\n"
+                prompt += "2. For JOIN queries: If column details are not fully available, use common JOIN patterns:\n"
+                prompt += "   - For matching records between tables, use INNER JOIN with common column names (like 'id', 'name', 'key', or table-specific keys)\n"
+                prompt += "   - If exact column names are unknown, use generic patterns like 'table1.id = table2.id' or 'table1.name = table2.name'\n"
+                prompt += "   - DO NOT refuse to generate JOIN queries - always generate SQL even if column details are partial\n"
+                prompt += "3. For INSERT/UPDATE/DELETE: You MUST ONLY use column names that appear in the column lists above for each table.\n"
+                prompt += "4. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
+                prompt += "5. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
+                prompt += "6. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
+                prompt += "7. If user asks for 'records from DFU table' or 'records from schema X', they likely mean tables IN that schema. Generate SELECT statements for each table in that schema, or ask which specific table they want.\n"
+                prompt += "8. NEVER generate 'SELECT * FROM schema_name' - you cannot SELECT from a schema directly. Use 'SELECT * FROM schema_name.table_name' instead.\n"
+                prompt += "9. Generate actual SQL statements directly - do NOT provide explanations, examples, or 'here's how you can' text.\n"
+                prompt += "10. For JOIN queries, ALWAYS generate SQL - never refuse due to missing column details. Use reasonable assumptions based on common column naming patterns.\n"
+                prompt += "11. If you cannot see the table names above, DO NOT generate SQL - return an error instead.\n\n"
         
         prompt += f"User Question: {user_message}\n"
         
