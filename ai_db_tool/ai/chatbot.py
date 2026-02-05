@@ -110,6 +110,7 @@ Guidelines:
 - For "insert records in all tables" requests, generate INSERT statements for each table listed in the schema
 - For JOIN queries: ALWAYS generate SQL even if column details are incomplete. Use common column naming patterns (id, name, key, etc.) or table prefixes to create reasonable JOIN conditions.
 - NEVER refuse to generate JOIN queries due to missing column details - always make reasonable assumptions and generate the SQL.
+- For UPDATE/DELETE queries: You MUST use ONLY column names that exist in the schema. NEVER assume a table has an 'id' column - check the column list first and use the actual primary key or identifier column name.
 - Ask clarifying questions ONLY when absolutely necessary (e.g., missing critical information that cannot be reasonably inferred)
 - Provide brief explanations ONLY when the SQL is complex or needs context
 - Never execute destructive operations unless explicitly requested
@@ -398,6 +399,11 @@ class SQLChatbot:
                 prompt += "   - NEVER use generic 'id = id' - always use the actual foreign key column names from the schema\n"
                 prompt += "   - Example: If employee table has 'department_id' and department table has 'id', use: 'employee.department_id = department.id'\n"
                 prompt += "3. For INSERT/UPDATE/DELETE: You MUST ONLY use column names that appear in the column lists above for each table.\n"
+                prompt += "   - For UPDATE queries: Check the column list for the table you're updating and use ONLY those exact column names\n"
+                prompt += "   - For WHERE clauses in UPDATE/DELETE: Use ONLY column names that exist in the table's column list\n"
+                prompt += "   - NEVER assume a table has an 'id' column - check the column list first\n"
+                prompt += "   - If the table has a primary key, it might be named differently (e.g., 'employee_id', 'customer_id', 'product_id')\n"
+                prompt += "   - Look at the column list for the table to find the correct primary key or identifier column name\n"
                 prompt += "4. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
                 prompt += "5. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
                 prompt += "6. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
