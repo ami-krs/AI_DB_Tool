@@ -471,13 +471,13 @@ def chatbot_tab():
                         print(f"DEBUG: has_last_result={has_last_result}, has_auto_query={has_auto_query}")
                         
                         # Show results if: (1) it's the last message AND (2) has SQL AND (3) we have results available
-                        # Use the show_results_for flag as primary indicator, with fallbacks
+                        # Simplified condition - if it's the last message with SQL and results exist, show them
                         should_show_results = (
                             is_last_message and 
                             msg_has_sql and 
                             has_last_result and 
-                            has_auto_query and
-                            (msg_should_show or msg_was_auto_executed or msg_sql_matches)  # Check flag first, then fallbacks
+                            has_auto_query
+                            # Removed strict matching - if results exist and it's the last message, show them
                         )
                         
                         print(f"DEBUG: should_show_results={should_show_results}")
