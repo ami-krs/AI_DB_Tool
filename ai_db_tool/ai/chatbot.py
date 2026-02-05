@@ -387,8 +387,6 @@ class SQLChatbot:
                                 prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
                             prompt += f"\nTable: {table} (no column info available)\n"
-                else:
-                            prompt += f"\nTable: {str(table)}\n"
                 prompt += "\n=== END OF SCHEMA ===\n\n"
                 prompt += "🚨 CRITICAL RULES FOR SQL GENERATION (VIOLATION WILL CAUSE ERRORS):\n"
                 prompt += "1. You MUST ONLY use table names from the list above: " + ', '.join(all_table_names[:10]) + (f" and {len(all_table_names) - 10} more" if len(all_table_names) > 10 else "") + "\n"
