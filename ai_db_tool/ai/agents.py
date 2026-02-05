@@ -276,15 +276,49 @@ Be very concise. Provide corrected SQL using actual schema column names."""
         schema_info = context.get('schema_info', {})
         db_type = context.get('db_type', 'unknown')
         
-        user_prompt = f"""Briefly debug this SQL error (2-3 sentences max):
+        # Build schema context for the prompt
+        schema_context = ""
+        if schema_info and schema_info.get('tables'):
+            tables = schema_info.get('tables', [])
+            schema_context = f"\n\n=== DATABASE SCHEMA (USE ONLY THESE COLUMN NAMES) ===\n"
+            schema_context += f"Database Type: {db_type}\n"
+            schema_context += f"Total Tables: {schema_info.get('total_tables', len(tables))}\n\n"
+            
+            # Add table and column information
+            for table in tables[:10]:  # Limit to first 10 tables
+                if isinstance(table, dict):
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        if isinstance(columns_list[0], dict):
+                            col_names = [col.get('name', str(col)) for col in columns_list]
+                        else:
+                            col_names = [str(col) for col in columns_list]
+                        schema_context += f"Table: {table_name}\n  Columns: {', '.join(col_names[:20])}\n"
+                    else:
+                        schema_context += f"Table: {table_name} (no column info)\n"
+                elif isinstance(table, str):
+                    schema_context += f"Table: {table}\n"
+            
+            schema_context += "\n=== END SCHEMA ===\n"
+            schema_context += "\nCRITICAL: Use ONLY the column names listed above. NEVER use generic names like 'id' unless that exact column exists in the table's column list.\n"
+        
+        user_prompt = f"""Debug this SQL error and provide a corrected query:
 
 Database: {db_type} ({schema_info.get('total_tables', 0)} tables)
+{schema_context}
 Query: ```sql
 {query}
 ```
 Error: {error} - {error_message}
 
-Provide: 1) Root cause, 2) One fix, 3) One alternative if needed. Be very brief."""
+REQUIRED:
+1. Root cause (one sentence)
+2. Provide a CORRECTED SQL query in a ```sql code block using ONLY actual column names from the schema above
+3. Replace any generic column names (like 'id') with actual column names from the schema
+4. For JOIN queries: Use actual foreign key columns from the schema (e.g., 'department_id', 'employee_id')
+
+Be brief but provide the corrected SQL query."""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         
