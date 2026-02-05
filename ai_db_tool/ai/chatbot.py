@@ -270,8 +270,8 @@ class SQLChatbot:
                 if "```sql" in response_text:
                     sql_start = response_text.find("```sql")
                     sql_end = response_text.find("```", sql_start + 6)
-                if sql_end != -1:
-                    sql_query = response_text[sql_start + 6:sql_end].strip()
+                    if sql_end != -1:
+                        sql_query = response_text[sql_start + 6:sql_end].strip()
                         # For INSERT requests, prioritize SQL - remove explanations before SQL
                         user_upper = user_message.upper()
                         if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
