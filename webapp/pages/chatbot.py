@@ -377,6 +377,19 @@ def chatbot_tab():
     has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
     print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}")
     
+    # DEBUG: Show debug info in UI (temporary - remove after fixing)
+    with st.expander("🔍 Debug Info (Click to see)", expanded=False):
+        st.write("**Session State Check:**")
+        st.write(f"- `last_result_df` exists: {has_last_result}")
+        st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
+        if has_last_result:
+            st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
+            st.write(f"- Result columns: {list(st.session_state.last_result_df.columns)[:5]}...")
+        if has_auto_query:
+            st.write(f"- Last auto-executed query: {st.session_state.chatbot_last_auto_executed_query[:100]}...")
+        st.write(f"- Query history length: {len(st.session_state.get('query_history', []))}")
+        st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
+    
     if has_last_result and has_auto_query:
         # Results exist from auto-execution, re-display them
         from utils.helpers import display_paginated_dataframe
