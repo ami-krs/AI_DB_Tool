@@ -270,15 +270,22 @@ def chatbot_tab():
         if agent_execution_result is None:
             # First time execution - run the SQL
             print(f"DEBUG: First time execution - displaying info and executing SQL")
-            st.info(f"▶ Running SQL suggested by {agent_source}")
+            
+            # Show visible execution status
+            execution_status = st.empty()
+            execution_status.info(f"▶ **Executing SQL suggested by {agent_source}...**")
             st.code(agent_sql, language='sql')
             
             try:
                 print(f"DEBUG: About to call execute_query with SQL: {agent_sql[:100]}...")
+                execution_status.info(f"▶ **Executing SQL...** (This may take a moment)")
+                
                 # Run without agents to avoid recursive analysis
                 # execute_query will display results/success messages automatically
                 execute_query(agent_sql, enable_agents=False, unique_suffix="agent_suggested")
                 print(f"DEBUG: execute_query returned successfully")
+                
+                execution_status.success("✅ **SQL execution completed!**")
                 
                 # Store execution result
                 st.session_state["agent_sql_execution_result"] = {
@@ -332,10 +339,12 @@ def chatbot_tab():
                 
             except Exception as e:
                 error_msg = f"❌ Failed to execute suggested SQL: {str(e)}"
+                execution_status.error(f"❌ **Execution failed!** {error_msg}")
                 st.error(error_msg)
                 print(f"DEBUG: Agent SQL execution error: {e}")
                 import traceback
-                traceback.print_exc()
+                error_trace = traceback.format_exc()
+                print(error_trace)
                 st.exception(e)
                 
                 # Store error result
@@ -345,6 +354,7 @@ def chatbot_tab():
                     "sql": agent_sql,
                     "source": agent_source,
                     "error": str(e),
+                    "error_trace": error_trace,
                     "timestamp": agent_timestamp
                 }
                 
