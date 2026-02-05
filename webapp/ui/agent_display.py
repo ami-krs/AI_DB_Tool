@@ -76,35 +76,45 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             st.caption("Edit and run the suggested SQL. This runs **once** in the main results area (agents disabled).")
 
             key_base = f"agent_sql_{response.agent_name}_{int(response.timestamp.timestamp())}"
+            # Get current value from session state if it exists, otherwise use suggested SQL
+            editor_key = f"{key_base}_editor"
+            initial_value = st.session_state.get(editor_key, suggested_sql)
+            
             sql_to_run = st.text_area(
                 "Suggested SQL",
-                value=suggested_sql,
+                value=initial_value,
                 height=120,
-                key=f"{key_base}_editor",
+                key=editor_key,
             )
+            
             run_cols = st.columns([1, 4])
             with run_cols[0]:
                 if st.button("Run", key=f"{key_base}_run", type="primary"):
-                    # Store SQL in session state and trigger a rerun.
-                    # The active page (e.g., chatbot) will pick this up and execute it
-                    # so that results are shown in the normal results area.
-                    # Use the current value from text_area to get the edited SQL
-                    # First try to get from session state (user may have edited it)
-                    current_sql = st.session_state.get(f"{key_base}_editor", sql_to_run)
-                    # If that's empty, use the original SQL
+                    # Get the current SQL value - text_area returns the current value
+                    # Also check session state in case of any edge cases
+                    current_sql = sql_to_run if sql_to_run and sql_to_run.strip() else st.session_state.get(editor_key, suggested_sql)
+                    
+                    # Final fallback to suggested_sql
                     if not current_sql or not current_sql.strip():
-                        current_sql = sql_to_run
+                        current_sql = suggested_sql
                     
-                    print(f"DEBUG: Run button clicked - storing SQL: {current_sql[:100] if current_sql else 'None'}...")
-                    print(f"DEBUG: SQL from session state: {st.session_state.get(f'{key_base}_editor', 'NOT FOUND')}")
-                    print(f"DEBUG: Original SQL: {sql_to_run[:100] if sql_to_run else 'None'}...")
+                    print(f"DEBUG: Run button clicked")
+                    print(f"DEBUG: sql_to_run (from text_area return): {sql_to_run[:100] if sql_to_run else 'None'}...")
+                    print(f"DEBUG: session_state[{editor_key}]: {st.session_state.get(editor_key, 'NOT FOUND')[:100] if st.session_state.get(editor_key) else 'NOT FOUND'}...")
+                    print(f"DEBUG: suggested_sql (original): {suggested_sql[:100] if suggested_sql else 'None'}...")
+                    print(f"DEBUG: current_sql (final): {current_sql[:100] if current_sql else 'None'}...")
                     
+                    # Store SQL in session state
                     st.session_state["agent_sql_to_run"] = current_sql
                     st.session_state["agent_sql_source"] = response.agent_name
                     st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
                     # Clear any previous execution result
                     st.session_state.pop("agent_sql_execution_result", None)
-                    print(f"DEBUG: Stored agent_sql_to_run in session state, triggering rerun")
+                    
+                    print(f"DEBUG: Stored in session state:")
+                    print(f"DEBUG:   agent_sql_to_run = {st.session_state.get('agent_sql_to_run', 'NOT SET')[:100] if st.session_state.get('agent_sql_to_run') else 'NOT SET'}...")
+                    print(f"DEBUG:   agent_sql_source = {st.session_state.get('agent_sql_source', 'NOT SET')}")
+                    print(f"DEBUG: Triggering rerun...")
                     st.rerun()
         
         # Display metadata
