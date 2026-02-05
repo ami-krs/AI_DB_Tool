@@ -257,16 +257,27 @@ CRITICAL REQUIREMENTS:
 3. For JOIN queries: Use actual foreign key column names from the schema (e.g., 'department_id', 'employee_id')
 4. For UPDATE/DELETE: Use actual primary key column names from the schema
 5. Check the schema carefully before suggesting column names
-6. For MULTIPLE UPDATE statements: Order them correctly to respect foreign key constraints
-   - If a table has a foreign key referencing another table, update the REFERENCED table (parent) FIRST, then the REFERENCING table (child)
-   - OR: Update the child table to point to new values first, then update the parent table
-   - If foreign key violations occur, consider using a transaction or temporarily disabling constraints
+6. For MULTIPLE UPDATE statements with foreign key constraints:
+   - When updating PRIMARY KEYS that are referenced by FOREIGN KEYS, use a THREE-STEP approach:
+     * Step 1: Update child table's foreign key to a TEMPORARY offset (e.g., +10000) to break the constraint
+     * Step 2: Update parent table's primary key to the final value (e.g., +1000)
+     * Step 3: Update child table's foreign key to match parent (subtract temporary offset, add final offset)
+   - Example for updating department_id in both employee and department:
+     BEGIN;
+     -- Step 1: Move child to temporary values
+     UPDATE employee SET department_id = department_id + 10000;
+     -- Step 2: Update parent to final values
+     UPDATE department SET department_id = department_id + 1000;
+     -- Step 3: Update child to match parent (subtract 10000, add 1000 = subtract 9000)
+     UPDATE employee SET department_id = department_id - 9000;
+     COMMIT;
+   - This avoids foreign key violations by using temporary intermediate values
 
 Focus on:
 - Root cause (one sentence)
 - One specific fix suggestion with corrected SQL
 - Use actual column names from schema
-- Order UPDATE statements correctly for foreign key constraints
+- Use three-step approach for updating referenced primary keys
 
 Be very concise. Provide corrected SQL using actual schema column names."""
     
@@ -325,13 +336,17 @@ REQUIRED:
 5. For MULTIPLE UPDATE statements with foreign key relationships:
    - If error mentions "foreign key constraint" or "referential integrity":
      * Identify which table is the PARENT (referenced) and which is the CHILD (referencing)
-     * For foreign key violations: Update the PARENT table FIRST, then the CHILD table
-     * OR: If updating both parent and child primary keys, wrap in a transaction:
+     * When updating PRIMARY KEYS that are referenced by FOREIGN KEYS, use a THREE-STEP approach:
        BEGIN;
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       -- Step 1: Update child to temporary values (large offset like +10000)
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 10000;
+       -- Step 2: Update parent to final values
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       -- Step 3: Update child to match parent (subtract 9000 to get final value)
+       UPDATE child_table SET foreign_key_col = foreign_key_col - 9000;
        COMMIT;
-   - The UPDATE order is CRITICAL when foreign key constraints exist
+     * This uses temporary intermediate values to avoid constraint violations
+   - The three-step approach is CRITICAL when updating referenced primary keys
 
 Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         
