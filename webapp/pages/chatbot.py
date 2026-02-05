@@ -524,6 +524,14 @@ def chatbot_tab():
                             execute_generated_query(msg['sql_query'])
     
     # Fallback: If we have results but didn't show them in the loop, show them after chat history
+    # Also check if there's an error that should be shown
+    if has_auto_error and has_auto_query and not results_shown_for_latest:
+        print(f"DEBUG: 🔄 Fallback - showing error after chat history loop")
+        st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
+        st.code(st.session_state.get('chatbot_last_auto_executed_query', ''), language='sql')
+        st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
+        results_shown_for_latest = True
+    
     if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
         from utils.helpers import display_paginated_dataframe
