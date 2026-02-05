@@ -355,19 +355,19 @@ class SQLChatbot:
                     # Tables are just names - we need to fetch full schema
                     prompt += f"Available Tables ({len(tables)} tables found):\n"
                     for table_name in tables[:20]:  # Show up to 20 tables
-                        prompt += f"- {table_name}\n"
+                    prompt += f"- {table_name}\n"
                     prompt += "\n⚠️ WARNING: Column details not available. Please ensure schema context includes column information.\n\n"
                 else:
                     # Tables have full schema info
                     prompt += f"Tables with full schema ({len(tables)} tables):\n"
                     for table in tables[:20]:  # Show up to 20 tables
                         if isinstance(table, dict):
-                            # If table is a dict with schema info, extract table_name and columns
-                            table_name = table.get('table_name', 'unknown')
-                            columns_list = table.get('columns', [])
-                            if columns_list:
-                                # Handle columns as list of dicts or list of strings
-                                if isinstance(columns_list[0], dict):
+                    # If table is a dict with schema info, extract table_name and columns
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        # Handle columns as list of dicts or list of strings
+                        if isinstance(columns_list[0], dict):
                                     # Format: column_name (type) [nullable/not null] [primary key]
                                     col_details = []
                                     for col in columns_list:
@@ -380,10 +380,10 @@ class SQLChatbot:
                                             col_str += f" {pk}"
                                         col_details.append(col_str)
                                     columns = ', '.join(col_details)
-                                else:
-                                    columns = ', '.join([str(col) for col in columns_list])
+                        else:
+                            columns = ', '.join([str(col) for col in columns_list])
                                 prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
-                            else:
+                    else:
                                 prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
                             prompt += f"\nTable: {table} (no column info available)\n"
@@ -393,12 +393,15 @@ class SQLChatbot:
                 prompt += "2. For JOIN queries: You MUST use ACTUAL column names from the schema above, NOT generic names like 'id' or 'name'.\n"
                 prompt += "   - Look at the column lists for each table in the schema above\n"
                 prompt += "   - Use the EXACT column names that appear in those lists for JOIN conditions\n"
-                prompt += "   - For foreign key relationships, look for columns that might link tables (e.g., 'department_id' in employee table matching 'id' in department table)\n"
-                prompt += "   - If you see columns like 'employee_id', 'department_id', 'customer_id', etc., use those for JOINs\n"
-                prompt += "   - NEVER use generic 'id = id' or 'department.id = employee.department_id' unless 'id' actually exists in the department table's column list\n"
-                prompt += "   - If department table does NOT have an 'id' column, find the actual primary key column name from the schema (might be 'department_id', 'dept_id', etc.)\n"
-                prompt += "   - Example: If employee table has 'department_id' and department table has 'department_id' (not 'id'), use: 'employee.department_id = department.department_id'\n"
-                prompt += "   - ALWAYS check the column list for each table before using any column name in JOIN conditions\n"
+                prompt += "   - For foreign key relationships, identify which TABLE contains the foreign key column\n"
+                prompt += "   - CRITICAL: Foreign key columns (like 'department_id', 'division_id') are typically in the CHILD table, NOT the parent table\n"
+                prompt += "   - Example: If 'employee' table has 'department_id' column, then JOIN should be: 'employee.department_id = department.department_id' (assuming department has 'department_id' as primary key)\n"
+                prompt += "   - Example: If 'employee' table has 'division_id' column, then JOIN should be: 'employee.division_id = division.division_id' (NOT 'department.division_id')\n"
+                prompt += "   - ALWAYS check which table actually HAS the foreign key column before using it in JOIN conditions\n"
+                prompt += "   - NEVER assume a table has a foreign key column - check the column list for that specific table first\n"
+                prompt += "   - If you see columns like 'employee_id', 'department_id', 'division_id', etc., check which table they belong to in the schema\n"
+                prompt += "   - NEVER use generic 'id = id' or assume foreign keys exist in parent tables\n"
+                prompt += "   - If a table does NOT have an 'id' column, find the actual primary key column name from the schema (might be 'department_id', 'dept_id', etc.)\n"
                 prompt += "   - CRITICAL: Use table aliases in SELECT clause to avoid duplicate column names (e.g., 'SELECT e.employee_id, e.name, d.department_id AS dept_id, d.name AS dept_name')\n"
                 prompt += "   - When selecting columns from multiple tables, prefix column names with table aliases to prevent duplicate column name errors\n"
                 prompt += "3. For INSERT/UPDATE/DELETE: You MUST ONLY use column names that appear in the column lists above for each table.\n"
