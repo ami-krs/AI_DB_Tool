@@ -448,24 +448,40 @@ def chatbot_tab():
                         # Check if this is the last message and matches the auto-executed query
                         is_last_message = (idx == total_messages - 1)
                         msg_has_sql = 'sql_query' in msg and msg['sql_query']
-                        msg_sql_matches = msg_has_sql and msg['sql_query'] == st.session_state.get('chatbot_last_auto_executed_query')
+                        
+                        # More lenient SQL matching - strip and compare
+                        auto_executed_sql = st.session_state.get('chatbot_last_auto_executed_query', '').strip()
+                        msg_sql = msg['sql_query'].strip() if msg_has_sql else ''
+                        msg_sql_matches = msg_has_sql and msg_sql == auto_executed_sql
                         msg_was_auto_executed = msg.get('auto_executed', False)
                         
-                        print(f"DEBUG: Message {idx} - is_last={is_last_message}, has_sql={msg_has_sql}, sql_matches={msg_sql_matches}, auto_executed={msg_was_auto_executed}")
+                        print(f"DEBUG: Message {idx}/{total_messages-1} - is_last={is_last_message}, has_sql={msg_has_sql}")
+                        print(f"DEBUG: msg_sql[:50]={msg_sql[:50] if msg_sql else 'None'}, auto_sql[:50]={auto_executed_sql[:50] if auto_executed_sql else 'None'}")
+                        print(f"DEBUG: sql_matches={msg_sql_matches}, auto_executed={msg_was_auto_executed}")
                         print(f"DEBUG: has_last_result={has_last_result}, has_auto_query={has_auto_query}")
                         
-                        # Show results if: (1) it's the last message AND (2) has SQL AND (3) either auto_executed flag is set OR SQL matches the auto-executed query OR we have results
-                        # The last condition (has_last_result) is a fallback to show results even if flags don't match perfectly
-                        if is_last_message and msg_has_sql and (msg_was_auto_executed or msg_sql_matches or (has_last_result and has_auto_query)):
+                        # Show results if: (1) it's the last message AND (2) has SQL AND (3) we have results available
+                        # We check multiple conditions but prioritize showing results if they exist
+                        should_show_results = (
+                            is_last_message and 
+                            msg_has_sql and 
+                            has_last_result and 
+                            has_auto_query and
+                            (msg_was_auto_executed or msg_sql_matches or True)  # Always show if it's last message with SQL and results exist
+                        )
+                        
+                        print(f"DEBUG: should_show_results={should_show_results}")
+                        
+                        if should_show_results:
                             # Check if we have results or errors to display
-                            if has_auto_error and has_auto_query:
+                            if has_auto_error:
                                 # Show error
                                 st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
                                 st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
-                            elif has_last_result and has_auto_query:
+                            else:
                                 # Show results
                                 from utils.helpers import display_paginated_dataframe
-                                print(f"DEBUG: Re-displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
+                                print(f"DEBUG: ✅ Displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
                                 st.markdown("---")
                                 result_col1, result_col2 = st.columns([10, 1])
                                 with result_col1:
@@ -486,6 +502,8 @@ def chatbot_tab():
                                     st.session_state.last_result_df, 
                                     unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                 )
+                        else:
+                            print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
