@@ -224,13 +224,12 @@ class DatabaseManager:
         
         try:
             # Use engine.begin() which automatically commits on success and rolls back on exception
+            # The context manager handles commit/rollback automatically
             with engine.begin() as conn:
                 result = conn.execute(text(query))
                 rowcount = result.rowcount
-                # Explicitly commit (though begin() context manager does this automatically)
-                # This ensures the transaction is committed before returning
-                conn.commit()
-                print(f"DEBUG: execute_non_query - {rowcount} rows affected, transaction committed")
+                # Note: conn.commit() is NOT needed here - engine.begin() auto-commits on exit
+                print(f"DEBUG: execute_non_query - {rowcount} rows affected, transaction will auto-commit on context exit")
                 return rowcount
         except SQLAlchemyError as e:
             error_msg = f"Query execution failed: {e}"
