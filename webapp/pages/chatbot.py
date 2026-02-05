@@ -375,22 +375,34 @@ def chatbot_tab():
     # Do this BEFORE chat history so results appear above chat messages
     has_last_result = st.session_state.get('last_result_df') is not None
     has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
-    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}")
+    has_auto_error = st.session_state.get('chatbot_auto_execution_error') is not None
+    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}")
     
     # DEBUG: Show debug info in UI (temporary - remove after fixing)
     with st.expander("🔍 Debug Info (Click to see)", expanded=False):
         st.write("**Session State Check:**")
         st.write(f"- `last_result_df` exists: {has_last_result}")
         st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
+        st.write(f"- `chatbot_auto_execution_error` exists: {has_auto_error}")
         if has_last_result:
             st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
             st.write(f"- Result columns: {list(st.session_state.last_result_df.columns)[:5]}...")
         if has_auto_query:
             st.write(f"- Last auto-executed query: {st.session_state.chatbot_last_auto_executed_query[:100]}...")
+        if has_auto_error:
+            st.write(f"- Auto-execution error: {st.session_state.chatbot_auto_execution_error[:200]}...")
         st.write(f"- Query history length: {len(st.session_state.get('query_history', []))}")
         st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
     
-    if has_last_result and has_auto_query:
+    # Show error from auto-execution if it exists
+    if has_auto_error and has_auto_query:
+        st.error(f"❌ Auto-execution failed: {st.session_state.chatbot_auto_execution_error}")
+        st.code(st.session_state.chatbot_last_auto_executed_query, language='sql')
+        st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
+        # Clear error after displaying (but keep query for reference)
+        # Don't clear immediately - let user see it, clear on next successful query
+    
+    if has_last_result and has_auto_query and not has_auto_error:
         # Results exist from auto-execution, re-display them
         from utils.helpers import display_paginated_dataframe
         print(f"DEBUG: Re-displaying results - rows: {len(st.session_state.last_result_df)}")
@@ -610,21 +622,32 @@ def chatbot_tab():
                                     # Store the query BEFORE execution so it's available after rerun
                                     st.session_state['chatbot_last_auto_executed_query'] = sql_query
                                     st.session_state['chatbot_auto_executed_timestamp'] = timestamp
+                                    st.session_state['chatbot_auto_execution_error'] = None  # Clear any previous error
                                     print(f"DEBUG: Flag set before execute_query")
                                     execute_query(sql_query, enable_agents=False)
                                     # Verify results were stored
                                     has_results = st.session_state.get('last_result_df') is not None
                                     print(f"DEBUG: After execute_query - has_results={has_results}, last_result_df type: {type(st.session_state.get('last_result_df'))}")
+                                    # Clear any previous error on success
+                                    st.session_state.pop('chatbot_auto_execution_error', None)
+                                    st.session_state.pop('chatbot_auto_execution_error_trace', None)
                                     auto_executed = True
                                     print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}")
                                 except Exception as exec_error:
                                     print(f"DEBUG: Auto-execution failed: {exec_error}")
                                     import traceback
+                                    error_trace = traceback.format_exc()
                                     traceback.print_exc()
-                                    # Clear the flag on error
-                                    st.session_state.pop('chatbot_last_auto_executed_query', None)
-                                    st.session_state.pop('chatbot_auto_executed_timestamp', None)
-                                    # Continue to show SQL even if execution fails
+                                    # Store error in session state so it can be displayed after rerun
+                                    st.session_state['chatbot_auto_execution_error'] = str(exec_error)
+                                    st.session_state['chatbot_auto_execution_error_trace'] = error_trace
+                                    # Keep the query flag so we can show the error with context
+                                    # Don't clear chatbot_last_auto_executed_query - we need it to show error
+                                    auto_executed = False
+                                    # Show error immediately (before rerun)
+                                    st.error(f"❌ Auto-execution failed: {str(exec_error)}")
+                                    st.code(sql_query, language='sql')
+                                    print(f"DEBUG: Error stored in session state for display after rerun")
                         else:
                             print(f"DEBUG: No SQL query extracted from response")
                         
