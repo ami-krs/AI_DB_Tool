@@ -354,10 +354,33 @@ def chatbot_tab():
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
                     try:
+                        sql_query = msg['sql_query']
+                        sql_upper = sql_query.strip().upper()
+                        
+                        # Check if it's a SELECT query (data retrieval)
+                        is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
+                        # Check if it's NOT DDL or DML (for safety)
+                        is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
+                            'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
+                            'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
+                        ])
+                        
+                        # Show SQL
                         with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{unique_key_base}"):
-                            st.code(msg['sql_query'], language='sql')
-                            if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
-                                execute_generated_query(msg['sql_query'])
+                            st.code(sql_query, language='sql')
+                            
+                            # For SELECT queries, show that it was auto-executed (results appear above)
+                            if is_select and is_not_ddl_dml:
+                                if msg.get('auto_executed', False):
+                                    st.success("✅ Query executed automatically. Results shown above.")
+                                else:
+                                    # If not auto-executed yet, execute it now
+                                    if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
+                                        execute_generated_query(sql_query)
+                            else:
+                                # For DDL/DML, always require manual execution
+                                if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
+                                    execute_generated_query(sql_query)
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
