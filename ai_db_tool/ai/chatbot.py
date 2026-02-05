@@ -362,9 +362,9 @@ class SQLChatbot:
                     prompt += f"Tables with full schema ({len(tables)} tables):\n"
                     for table in tables[:20]:  # Show up to 20 tables
                         if isinstance(table, dict):
-                    # If table is a dict with schema info, extract table_name and columns
-                    table_name = table.get('table_name', 'unknown')
-                    columns_list = table.get('columns', [])
+                            # If table is a dict with schema info, extract table_name and columns
+                            table_name = table.get('table_name', 'unknown')
+                            columns_list = table.get('columns', [])
                     if columns_list:
                         # Handle columns as list of dicts or list of strings
                         if isinstance(columns_list[0], dict):
