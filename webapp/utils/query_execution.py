@@ -164,9 +164,23 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
         elif is_select:
             # Execute SELECT query
             df = st.session_state.db_manager.execute_query(statement)
+            
+            # Handle duplicate column names (common in JOIN queries)
+            if df is not None and len(df.columns) > 0:
+                # Check for duplicate column names
+                if df.columns.duplicated().any():
+                    # Rename duplicate columns by appending suffix
+                    cols = pd.Series(df.columns)
+                    for dup in cols[cols.duplicated()].unique():
+                        # Find all occurrences of this duplicate column
+                        indices = [i for i, col in enumerate(df.columns) if col == dup]
+                        # Keep first occurrence as-is, rename others
+                        for idx, pos in enumerate(indices[1:], 1):
+                            df.columns.values[pos] = f"{dup}_{idx}"
+            
             result['success'] = True
             result['type'] = 'SELECT'
-            result['rows_retrieved'] = len(df)
+            result['rows_retrieved'] = len(df) if df is not None else 0
             result['dataframe'] = df
             return result
         
@@ -174,9 +188,23 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
             # Unknown query type - try SELECT first, then non-query
             try:
                 df = st.session_state.db_manager.execute_query(statement)
+                
+                # Handle duplicate column names (common in JOIN queries)
+                if df is not None and len(df.columns) > 0:
+                    # Check for duplicate column names
+                    if df.columns.duplicated().any():
+                        # Rename duplicate columns by appending suffix
+                        cols = pd.Series(df.columns)
+                        for dup in cols[cols.duplicated()].unique():
+                            # Find all occurrences of this duplicate column
+                            indices = [i for i, col in enumerate(df.columns) if col == dup]
+                            # Keep first occurrence as-is, rename others
+                            for idx, pos in enumerate(indices[1:], 1):
+                                df.columns.values[pos] = f"{dup}_{idx}"
+                
                 result['success'] = True
                 result['type'] = 'SELECT'
-                result['rows_retrieved'] = len(df)
+                result['rows_retrieved'] = len(df) if df is not None else 0
                 result['dataframe'] = df
                 return result
             except:
