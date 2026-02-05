@@ -292,6 +292,10 @@ def render_agents_setting():
 
 def render_connection_setting():
     """Render Database Connection form"""
+    # Load saved connection config to pre-populate form
+    from config.database_config import load_db_config
+    saved_config = load_db_config()
+    
     # Add CSS to make Connect/Disconnect buttons compact and fit in one line
     st.markdown("""
     <style>
@@ -328,12 +332,25 @@ def render_connection_setting():
     </style>
     """, unsafe_allow_html=True)
     
+    # Determine default database type index
+    db_types = ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"]
+    default_index = 4  # Default to sqlite
+    if saved_config:
+        try:
+            default_index = db_types.index(saved_config.db_type) if saved_config.db_type in db_types else 4
+        except:
+            default_index = 4
+    
     db_type = st.selectbox(
         "Database Type",
-        ["postgresql", "mysql", "sqlserver", "oracle", "sqlite"],
-        index=4,  # Default to sqlite
+        db_types,
+        index=default_index,
         key="db_type_popup"
     )
+    
+    # Show info if saved config exists and matches current db_type
+    if saved_config and saved_config.db_type == db_type and not st.session_state.connected:
+        st.info(f"💾 Saved connection found for {db_type}. Fields pre-filled below. Click 'Connect' to use saved credentials.")
     
     with st.form("connection_form_popup", clear_on_submit=False):
         if db_type == "sqlite":
@@ -357,11 +374,29 @@ def render_connection_setting():
             username = ""
             password = ""
         else:
-            host = st.text_input("Host", value="localhost", autocomplete="url", key="host_popup")
-            port = st.number_input("Port", value=5432 if db_type == "postgresql" else 3306, key="port_popup")
-            database = st.text_input("Database Name", autocomplete="off", key="database_popup")
-            username = st.text_input("Username", autocomplete="username", key="username_popup")
-            password = st.text_input("Password", type="password", autocomplete="current-password", key="password_popup")
+            # Pre-populate with saved config if available and matches db_type
+            default_host = saved_config.host if (saved_config and saved_config.db_type == db_type) else "localhost"
+            default_port = saved_config.port if (saved_config and saved_config.db_type == db_type) else (5432 if db_type == "postgresql" else 3306)
+            default_database = saved_config.database if (saved_config and saved_config.db_type == db_type) else ""
+            default_username = saved_config.username if (saved_config and saved_config.db_type == db_type) else ""
+            # Don't pre-fill password for security, but show hint if saved
+            password_hint = "•••••••• (saved)" if (saved_config and saved_config.db_type == db_type and saved_config.password) else ""
+            
+            host = st.text_input("Host", value=default_host, autocomplete="url", key="host_popup")
+            port = st.number_input("Port", value=int(default_port), key="port_popup")
+            database = st.text_input("Database Name", value=default_database, autocomplete="off", key="database_popup")
+            username = st.text_input("Username", value=default_username, autocomplete="username", key="username_popup")
+            password = st.text_input(
+                "Password", 
+                type="password", 
+                autocomplete="current-password", 
+                key="password_popup",
+                help=password_hint if password_hint else None
+            )
+            
+            # If password is empty but saved config has password, use saved password
+            if not password and saved_config and saved_config.db_type == db_type and saved_config.password:
+                password = saved_config.password
         
         col1, col2 = st.columns(2)
         with col1:
