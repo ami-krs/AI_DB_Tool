@@ -248,40 +248,6 @@ def chatbot_tab():
     print(f"DEBUG: chatbot_tab() called - chat_history length: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
-    
-    # Re-display results from auto-executed query if they exist in session state
-    # execute_query stores results in st.session_state.last_result_df
-    has_last_result = st.session_state.get('last_result_df') is not None
-    has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
-    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}")
-    
-    if has_last_result and has_auto_query:
-        # Results exist from auto-execution, re-display them
-        from utils.helpers import display_paginated_dataframe
-        print(f"DEBUG: Re-displaying results - rows: {len(st.session_state.last_result_df)}")
-        st.markdown("---")
-        result_col1, result_col2 = st.columns([10, 1])
-        with result_col1:
-            st.markdown("**📊 Query Results**", unsafe_allow_html=True)
-        with result_col2:
-            csv = st.session_state.last_result_df.to_csv(index=False)
-            st.download_button(
-                "📥",
-                csv,
-                "results.csv",
-                "text/csv",
-                help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
-                use_container_width=True
-            )
-        st.session_state.current_page = 1
-        display_paginated_dataframe(
-            st.session_state.last_result_df, 
-            unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-        )
-    elif has_last_result:
-        print(f"DEBUG: last_result_df exists but no chatbot_last_auto_executed_query flag")
-    elif has_auto_query:
-        print(f"DEBUG: chatbot_last_auto_executed_query flag exists but no last_result_df")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
@@ -404,6 +370,41 @@ def chatbot_tab():
     
     # Add marker before chat messages
     st.markdown('<div id="chat-container-start"></div>', unsafe_allow_html=True)
+    
+    # Re-display results from auto-executed query if they exist in session state
+    # Do this BEFORE chat history so results appear above chat messages
+    has_last_result = st.session_state.get('last_result_df') is not None
+    has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
+    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}")
+    
+    if has_last_result and has_auto_query:
+        # Results exist from auto-execution, re-display them
+        from utils.helpers import display_paginated_dataframe
+        print(f"DEBUG: Re-displaying results - rows: {len(st.session_state.last_result_df)}")
+        st.markdown("---")
+        result_col1, result_col2 = st.columns([10, 1])
+        with result_col1:
+            st.markdown("**📊 Query Results**", unsafe_allow_html=True)
+        with result_col2:
+            csv = st.session_state.last_result_df.to_csv(index=False)
+            st.download_button(
+                "📥",
+                csv,
+                "results.csv",
+                "text/csv",
+                help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
+                use_container_width=True
+            )
+        st.session_state.current_page = 1
+        display_paginated_dataframe(
+            st.session_state.last_result_df, 
+            unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+        )
+        st.markdown("---")
+    elif has_last_result:
+        print(f"DEBUG: last_result_df exists but no chatbot_last_auto_executed_query flag")
+    elif has_auto_query:
+        print(f"DEBUG: chatbot_last_auto_executed_query flag exists but no last_result_df")
     
     # Display chat history
     print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
