@@ -264,15 +264,16 @@ CRITICAL REQUIREMENTS:
      * 
      * Option 1 (RECOMMENDED - works for non-deferrable constraints): Use a CTE/subquery approach:
        BEGIN;
-       -- First, update child table using a mapping from parent
+       -- Create mapping of old to new values (don't update yet, just create the mapping)
        WITH parent_mapping AS (
          SELECT department_id AS old_id, department_id + 1000 AS new_id 
          FROM department
        )
+       -- Update child table using the mapping
        UPDATE employee 
        SET department_id = (SELECT new_id FROM parent_mapping WHERE parent_mapping.old_id = employee.department_id)
        WHERE department_id IN (SELECT old_id FROM parent_mapping);
-       -- Then update parent table
+       -- Then update parent table to final values
        UPDATE department SET department_id = department_id + 1000;
        COMMIT;
      
@@ -361,7 +362,7 @@ REQUIRED:
      * For PostgreSQL, when updating PRIMARY KEYS referenced by FOREIGN KEYS:
        Option 1 (RECOMMENDED - works for all constraints):
        BEGIN;
-       -- Create mapping of old to new values
+       -- Create mapping of old to new values (SELECT only, no UPDATE in CTE)
        WITH parent_mapping AS (
          SELECT primary_key_col AS old_id, primary_key_col + 1000 AS new_id 
          FROM parent_table
@@ -371,7 +372,7 @@ REQUIRED:
        SET foreign_key_col = (SELECT new_id FROM parent_mapping 
                                WHERE parent_mapping.old_id = child_table.foreign_key_col)
        WHERE foreign_key_col IN (SELECT old_id FROM parent_mapping);
-       -- Then update parent table
+       -- Then update parent table to final values
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
        COMMIT;
        
