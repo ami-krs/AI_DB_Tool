@@ -246,6 +246,13 @@ def chatbot_compact():
 def chatbot_tab():
     """AI Chatbot interface"""
     print(f"DEBUG: chatbot_tab() called - chat_history length: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
+    
+    # Check for agent SQL FIRST, before any other rendering
+    # This ensures we catch it immediately after button click
+    agent_sql = st.session_state.get("agent_sql_to_run")
+    agent_execution_result = st.session_state.get("agent_sql_execution_result")
+    print(f"DEBUG: chatbot_tab START - agent_sql exists: {agent_sql is not None}, value: {agent_sql[:100] if agent_sql else 'None'}...")
+    
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
@@ -260,12 +267,13 @@ def chatbot_tab():
         if agent_result_debug:
             st.write(f"**Result status:** {agent_result_debug.get('status', 'unknown')}")
         st.write(f"**agent_sql_source:** {st.session_state.get('agent_sql_source', 'None')}")
+        # Show all agent-related keys
+        agent_keys = [k for k in st.session_state.keys() if 'agent' in k.lower()]
+        st.write(f"**All agent-related keys:** {agent_keys}")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
     # Check if we need to execute agent SQL (persist across reruns)
-    agent_sql = st.session_state.get("agent_sql_to_run")
-    agent_execution_result = st.session_state.get("agent_sql_execution_result")
     
     print(f"DEBUG: chatbot_tab - agent_sql exists: {agent_sql is not None}, agent_execution_result exists: {agent_execution_result is not None}")
     if agent_sql:
