@@ -355,7 +355,7 @@ class SQLChatbot:
                     # Tables are just names - we need to fetch full schema
                     prompt += f"Available Tables ({len(tables)} tables found):\n"
                     for table_name in tables[:20]:  # Show up to 20 tables
-                    prompt += f"- {table_name}\n"
+                        prompt += f"- {table_name}\n"
                     prompt += "\n⚠️ WARNING: Column details not available. Please ensure schema context includes column information.\n\n"
                 else:
                     # Tables have full schema info
