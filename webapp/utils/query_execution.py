@@ -277,6 +277,53 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             print(traceback.format_exc())
             orchestrator = None
     
+    # Check if query contains a transaction block (BEGIN...COMMIT)
+    # If so, execute it as a single statement to preserve transaction semantics
+    query_upper = query.strip().upper()
+    has_begin = 'BEGIN' in query_upper
+    has_commit = 'COMMIT' in query_upper or 'END' in query_upper
+    
+    # If it's a transaction block, execute as single statement
+    if has_begin and has_commit:
+        # Execute the entire transaction as a single statement
+        print(f"DEBUG: Detected transaction block (BEGIN...COMMIT), executing as single statement")
+        start_time = time.time()
+        result = execute_single_statement(query)
+        execution_time = time.time() - start_time
+        
+        if not result['success']:
+            st.error(f"❌ Transaction execution failed: {result['error']}")
+            st.code(query, language='sql')
+            
+            # Debug Agent: Analyze the error
+            if orchestrator:
+                try:
+                    from ui.agent_display import display_agent_response
+                    schema_info = st.session_state.get('schema_info', {})
+                    db_type = st.session_state.get('db_type', 'unknown')
+                    with st.spinner("🐛 Debugging error with AI..."):
+                        debug_response = orchestrator.debug_error(
+                            query, 
+                            result.get('error', 'Unknown error'),
+                            str(result.get('error', '')),
+                            schema_info,
+                            db_type
+                        )
+                        if debug_response:
+                            display_agent_response(debug_response, expanded=True)
+                except Exception as e:
+                    st.debug(f"Debug analysis failed: {e}")
+            
+            return
+        
+        # Show success message
+        if result.get('rows_affected', 0) >= 0:
+            st.success(f"✅ Transaction executed successfully! {result.get('rows_affected', 0)} row(s) affected.")
+        else:
+            st.success(f"✅ Transaction executed successfully!")
+        
+        return
+    
     # Split into multiple statements
     try:
         statements = split_sql_statements(query)

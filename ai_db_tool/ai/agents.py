@@ -258,20 +258,27 @@ CRITICAL REQUIREMENTS:
 4. For UPDATE/DELETE: Use actual primary key column names from the schema
 5. Check the schema carefully before suggesting column names
 6. For MULTIPLE UPDATE statements with foreign key constraints:
-   - When updating PRIMARY KEYS that are referenced by FOREIGN KEYS, use a THREE-STEP approach:
-     * Step 1: Update child table's foreign key to a TEMPORARY offset (e.g., +10000) to break the constraint
-     * Step 2: Update parent table's primary key to the final value (e.g., +1000)
-     * Step 3: Update child table's foreign key to match parent (subtract temporary offset, add final offset)
-   - Example for updating department_id in both employee and department:
-     BEGIN;
-     -- Step 1: Move child to temporary values
-     UPDATE employee SET department_id = department_id + 10000;
-     -- Step 2: Update parent to final values
-     UPDATE department SET department_id = department_id + 1000;
-     -- Step 3: Update child to match parent (subtract 10000, add 1000 = subtract 9000)
-     UPDATE employee SET department_id = department_id - 9000;
-     COMMIT;
-   - This avoids foreign key violations by using temporary intermediate values
+   - When updating PRIMARY KEYS that are referenced by FOREIGN KEYS in PostgreSQL:
+     * Option 1 (if constraint is DEFERRABLE): Use SET CONSTRAINTS to defer constraint checking:
+       BEGIN;
+       SET CONSTRAINTS ALL DEFERRED;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       COMMIT;
+     * Option 2 (if constraint is NOT DEFERRABLE): Use a CTE with a single UPDATE statement that updates both tables:
+       WITH updated_parent AS (
+         UPDATE parent_table SET primary_key_col = primary_key_col + 1000 RETURNING primary_key_col, primary_key_col - 1000 AS old_value
+       )
+       UPDATE child_table 
+       SET foreign_key_col = (SELECT primary_key_col FROM updated_parent WHERE updated_parent.old_value = child_table.foreign_key_col)
+       WHERE foreign_key_col IN (SELECT old_value FROM updated_parent);
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+     * Option 3: Temporarily disable the constraint (requires ALTER TABLE permission):
+       ALTER TABLE child_table DISABLE TRIGGER ALL;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       ALTER TABLE child_table ENABLE TRIGGER ALL;
+   - For PostgreSQL, prefer Option 1 if possible, otherwise use Option 2
 
 Focus on:
 - Root cause (one sentence)
@@ -336,17 +343,30 @@ REQUIRED:
 5. For MULTIPLE UPDATE statements with foreign key relationships:
    - If error mentions "foreign key constraint" or "referential integrity":
      * Identify which table is the PARENT (referenced) and which is the CHILD (referencing)
-     * When updating PRIMARY KEYS that are referenced by FOREIGN KEYS, use a THREE-STEP approach:
+     * For PostgreSQL, when updating PRIMARY KEYS referenced by FOREIGN KEYS:
+       Option 1 (preferred if constraint is DEFERRABLE):
        BEGIN;
-       -- Step 1: Update child to temporary values (large offset like +10000)
-       UPDATE child_table SET foreign_key_col = foreign_key_col + 10000;
-       -- Step 2: Update parent to final values
+       SET CONSTRAINTS ALL DEFERRED;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
        UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
-       -- Step 3: Update child to match parent (subtract 9000 to get final value)
-       UPDATE child_table SET foreign_key_col = foreign_key_col - 9000;
        COMMIT;
-     * This uses temporary intermediate values to avoid constraint violations
-   - The three-step approach is CRITICAL when updating referenced primary keys
+       
+       Option 2 (if constraint is NOT DEFERRABLE, use CTE):
+       WITH updated_parent AS (
+         UPDATE parent_table SET primary_key_col = primary_key_col + 1000 
+         RETURNING primary_key_col, primary_key_col - 1000 AS old_value
+       )
+       UPDATE child_table 
+       SET foreign_key_col = (SELECT primary_key_col FROM updated_parent 
+                               WHERE updated_parent.old_value = child_table.foreign_key_col)
+       WHERE foreign_key_col IN (SELECT old_value FROM updated_parent);
+       
+       Option 3 (if you have ALTER TABLE permission):
+       ALTER TABLE child_table DISABLE TRIGGER ALL;
+       UPDATE child_table SET foreign_key_col = foreign_key_col + 1000;
+       UPDATE parent_table SET primary_key_col = primary_key_col + 1000;
+       ALTER TABLE child_table ENABLE TRIGGER ALL;
+     * Try Option 1 first (SET CONSTRAINTS ALL DEFERRED), it's the cleanest solution
 
 Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         
