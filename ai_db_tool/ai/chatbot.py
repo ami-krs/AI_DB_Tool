@@ -380,11 +380,11 @@ class SQLChatbot:
                                             col_str += f" {pk}"
                                         col_details.append(col_str)
                                     columns = ', '.join(col_details)
-                        else:
+                                else:
                             columns = ', '.join([str(col) for col in columns_list])
-                            prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
-                    else:
-                            prompt += f"\nTable: {table_name} (no column info available)\n"
+                                prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
+                            else:
+                                prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
                             prompt += f"\nTable: {table} (no column info available)\n"
                 prompt += "\n=== END OF SCHEMA ===\n\n"
