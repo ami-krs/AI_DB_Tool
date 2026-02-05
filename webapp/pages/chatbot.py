@@ -538,11 +538,35 @@ def chatbot_tab():
                         sql_query = response.get('sql_query', response.get('sql', None))
                         timestamp = response.get('timestamp', datetime.now().isoformat())
                         print(f"DEBUG: Adding response to chat history - content length: {len(response_content) if response_content else 0}, has sql: {bool(sql_query)}")
+                        
+                        # Check if SQL is a SELECT query (data retrieval) - auto-execute it
+                        auto_executed = False
+                        if sql_query:
+                            sql_upper = sql_query.strip().upper()
+                            # Check if it's a SELECT query (data retrieval)
+                            is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
+                            # Check if it's NOT DDL or DML (for safety)
+                            is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
+                                'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
+                                'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
+                            ])
+                            
+                            if is_select and is_not_ddl_dml:
+                                # Auto-execute SELECT queries
+                                try:
+                                    print(f"DEBUG: Auto-executing SELECT query: {sql_query[:100]}...")
+                                    execute_query(sql_query, enable_agents=False)
+                                    auto_executed = True
+                                except Exception as exec_error:
+                                    print(f"DEBUG: Auto-execution failed: {exec_error}")
+                                    # Continue to show SQL even if execution fails
+                        
                         st.session_state.chat_history.append({
                             'role': 'assistant',
                             'content': response_content,
                             'sql_query': sql_query,
-                            'timestamp': timestamp
+                            'timestamp': timestamp,
+                            'auto_executed': auto_executed  # Track if query was auto-executed
                         })
                         st.rerun()
                     except Exception as process_error:
