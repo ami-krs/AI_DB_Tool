@@ -471,7 +471,15 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         else:  # DML
             if result['rows_affected'] >= 0:
-                st.success(f"✅ Query executed successfully! {result['rows_affected']} row(s) affected.")
+                if result['rows_affected'] == 0:
+                    st.warning(f"⚠️ Query executed successfully, but 0 row(s) were affected. This might mean:")
+                    st.info("""
+                    - The WHERE clause didn't match any rows
+                    - The values being set are the same as existing values
+                    - Check your WHERE conditions and verify the data exists
+                    """)
+                else:
+                    st.success(f"✅ Query executed successfully! {result['rows_affected']} row(s) affected.")
             else:
                 st.success(f"✅ Query executed successfully!")
         
