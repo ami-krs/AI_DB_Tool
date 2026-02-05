@@ -89,7 +89,8 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
             
             run_cols = st.columns([1, 4])
             with run_cols[0]:
-                if st.button("Run", key=f"{key_base}_run", type="primary"):
+                run_button_clicked = st.button("Run", key=f"{key_base}_run", type="primary")
+                if run_button_clicked:
                     # Get the current SQL value - text_area returns the current value
                     # Also check session state in case of any edge cases
                     current_sql = sql_to_run if sql_to_run and sql_to_run.strip() else st.session_state.get(editor_key, suggested_sql)
@@ -104,15 +105,25 @@ def display_agent_response(response: AgentResponse, expanded: bool = False):
                     print(f"DEBUG: suggested_sql (original): {suggested_sql[:100] if suggested_sql else 'None'}...")
                     print(f"DEBUG: current_sql (final): {current_sql[:100] if current_sql else 'None'}...")
                     
-                    # Store SQL in session state
+                    # Store SQL in session state BEFORE rerun
                     st.session_state["agent_sql_to_run"] = current_sql
                     st.session_state["agent_sql_source"] = response.agent_name
                     st.session_state["agent_sql_timestamp"] = response.timestamp.isoformat()
                     # Clear any previous execution result
                     st.session_state.pop("agent_sql_execution_result", None)
                     
+                    # Verify it was stored
+                    stored_value = st.session_state.get("agent_sql_to_run")
+                    print(f"DEBUG: Verification - agent_sql_to_run in session_state: {stored_value is not None}")
+                    if stored_value:
+                        print(f"DEBUG:   Stored value: {stored_value[:100]}...")
+                    else:
+                        print(f"DEBUG:   ERROR - Value was NOT stored!")
+                        st.error("❌ Error: Failed to store SQL in session state. Please try again.")
+                        st.stop()
+                    
                     print(f"DEBUG: Stored in session state:")
-                    print(f"DEBUG:   agent_sql_to_run = {st.session_state.get('agent_sql_to_run', 'NOT SET')[:100] if st.session_state.get('agent_sql_to_run') else 'NOT SET'}...")
+                    print(f"DEBUG:   agent_sql_to_run = {stored_value[:100] if stored_value else 'NOT SET'}...")
                     print(f"DEBUG:   agent_sql_source = {st.session_state.get('agent_sql_source', 'NOT SET')}")
                     print(f"DEBUG: Triggering rerun...")
                     st.rerun()
