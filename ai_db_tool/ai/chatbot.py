@@ -268,9 +268,9 @@ class SQLChatbot:
             if include_sql:
                 # Look for SQL code block
                 if "```sql" in response_text:
-                sql_start = response_text.find("```sql")
-                sql_end = response_text.find("```", sql_start + 6)
-                if sql_end != -1:
+                    sql_start = response_text.find("```sql")
+                    sql_end = response_text.find("```", sql_start + 6)
+                    if sql_end != -1:
                     sql_query = response_text[sql_start + 6:sql_end].strip()
                         # For INSERT requests, prioritize SQL - remove explanations before SQL
                         user_upper = user_message.upper()
@@ -278,7 +278,7 @@ class SQLChatbot:
                             # Keep only SQL and anything after it, remove text before SQL
                             response_text = response_text[sql_start:]  # Keep SQL code block and anything after
                         else:
-                    response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+                            response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
                 else:
                     # If no SQL block found but response contains SQL-like text, try to extract it
                     if any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
@@ -355,17 +355,17 @@ class SQLChatbot:
                     # Tables are just names - we need to fetch full schema
                     prompt += f"Available Tables ({len(tables)} tables found):\n"
                     for table_name in tables[:20]:  # Show up to 20 tables
-                    prompt += f"- {table_name}\n"
+                        prompt += f"- {table_name}\n"
                     prompt += "\n⚠️ WARNING: Column details not available. Please ensure schema context includes column information.\n\n"
                 else:
                     # Tables have full schema info
                     prompt += f"Tables with full schema ({len(tables)} tables):\n"
                     for table in tables[:20]:  # Show up to 20 tables
                         if isinstance(table, dict):
-                    # If table is a dict with schema info, extract table_name and columns
-                    table_name = table.get('table_name', 'unknown')
-                    columns_list = table.get('columns', [])
-                    if columns_list:
+                            # If table is a dict with schema info, extract table_name and columns
+                            table_name = table.get('table_name', 'unknown')
+                            columns_list = table.get('columns', [])
+                            if columns_list:
                         # Handle columns as list of dicts or list of strings
                         if isinstance(columns_list[0], dict):
                                     # Format: column_name (type) [nullable/not null] [primary key]
@@ -382,9 +382,9 @@ class SQLChatbot:
                                     columns = ', '.join(col_details)
                         else:
                             columns = ', '.join([str(col) for col in columns_list])
-                                prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
+                            prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
                     else:
-                                prompt += f"\nTable: {table_name} (no column info available)\n"
+                            prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
                             prompt += f"\nTable: {table} (no column info available)\n"
                 prompt += "\n=== END OF SCHEMA ===\n\n"
