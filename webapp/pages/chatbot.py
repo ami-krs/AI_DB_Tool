@@ -249,6 +249,18 @@ def chatbot_tab():
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
+    # Debug section for agent SQL execution (visible on page)
+    with st.expander("🔍 Agent SQL Execution Debug", expanded=False):
+        agent_sql_debug = st.session_state.get("agent_sql_to_run")
+        agent_result_debug = st.session_state.get("agent_sql_execution_result")
+        st.write(f"**agent_sql_to_run exists:** {agent_sql_debug is not None}")
+        if agent_sql_debug:
+            st.write(f"**agent_sql value:** {agent_sql_debug[:200]}...")
+        st.write(f"**agent_sql_execution_result exists:** {agent_result_debug is not None}")
+        if agent_result_debug:
+            st.write(f"**Result status:** {agent_result_debug.get('status', 'unknown')}")
+        st.write(f"**agent_sql_source:** {st.session_state.get('agent_sql_source', 'None')}")
+
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
     # Check if we need to execute agent SQL (persist across reruns)
