@@ -2,7 +2,7 @@
 import streamlit as st
 from ai_db_tool.connectors import DatabaseManager
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
-from config.database_config import load_db_config
+from config.database_config import load_db_config, set_default_db_config
 from utils.helpers import get_api_key
 
 def initialize_session_state():
@@ -21,6 +21,9 @@ def initialize_session_state():
 
     # Auto-load saved database connection on startup
     if not st.session_state.connected:
+        # Ensure default config exists (will create if needed)
+        set_default_db_config()
+        
         saved_config = load_db_config()
         if saved_config:
             try:
