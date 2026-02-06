@@ -20,6 +20,39 @@ def ensure_config_dir():
     """Ensure config directory exists"""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
+def set_default_db_config():
+    """Set default database configuration (Neon DB) if no config exists"""
+    try:
+        if CONFIG_FILE.exists():
+            # Config already exists, don't overwrite
+            return
+        
+        ensure_config_dir()
+        
+        # Default Neon DB configuration
+        default_config = {
+            'db_type': 'postgresql',
+            'host': 'ep-steep-art-a1qpswkj-pooler.ap-southeast-1.aws.neon.tech',
+            'port': 5432,
+            'database': 'neondb',
+            'username': 'neondb_owner',
+            'password': 'npg_Or5NcJkh1YVS',
+            'extra_params': {
+                'sslmode': 'require',
+                'connect_timeout': '10',
+                'application_name': 'ai_db_tool'
+            }
+        }
+        
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(default_config, f, indent=2)
+        
+        print(f"DEBUG: Created default database config at {CONFIG_FILE}")
+        return True
+    except Exception as e:
+        print(f"DEBUG: Could not create default config: {e}")
+        return False
+
 def get_persistent_sqlite_path():
     """
     Get persistent SQLite database path (returns absolute path as string)
@@ -82,7 +115,11 @@ def load_db_config() -> Optional[DatabaseConfig]:
     """Load database configuration from persistent storage"""
     try:
         if not CONFIG_FILE.exists():
-            return None
+            # Try to create default config if it doesn't exist
+            set_default_db_config()
+            # If still doesn't exist after trying to create, return None
+            if not CONFIG_FILE.exists():
+                return None
         
         with open(CONFIG_FILE, 'r') as f:
             config_dict = json.load(f)
