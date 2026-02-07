@@ -288,6 +288,40 @@ def chatbot_tab():
         # Show all agent-related keys
         agent_keys = [k for k in st.session_state.keys() if 'agent' in k.lower()]
         st.write(f"**All agent-related keys:** {agent_keys}")
+    
+    # Visualization Debug Info - moved to top to persist after checkbox clicks
+    with st.expander("🔍 Visualization Debug Info", expanded=True):
+        # Find all visualization-related keys
+        viz_keys = [k for k in st.session_state.keys() if 'viz' in k.lower() or 'visualization' in k.lower()]
+        st.write(f"**All Viz-related Keys:** `{viz_keys}`")
+        
+        # Show debug info for each visualization instance
+        for key in viz_keys:
+            if 'viz_debug' in key:
+                debug_info = st.session_state.get(key, {})
+                st.write(f"---")
+                st.write(f"**Debug Key:** `{key}`")
+                if isinstance(debug_info, dict):
+                    st.write(f"**Button Clicked:** `{debug_info.get('button_clicked', False)}`")
+                    st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
+                    st.write(f"**State After Click:** `{debug_info.get('state_after', False)}`")
+                    st.write(f"**Click Count:** `{debug_info.get('click_count', 0)}`")
+                    st.write(f"**Last Checkbox State:** `{debug_info.get('last_checkbox_state', False)}`")
+            
+            elif 'viz_btn' in key:
+                checkbox_state = st.session_state.get(key, False)
+                st.write(f"---")
+                st.write(f"**Checkbox Key:** `{key}`")
+                st.write(f"**Checkbox State:** `{checkbox_state}`")
+            
+            elif 'viz_active' in key:
+                state_value = st.session_state.get(key, False)
+                st.write(f"---")
+                st.write(f"**State Key:** `{key}`")
+                st.write(f"**State Value:** `{state_value}`")
+        
+        if not viz_keys:
+            st.write("**No visualization-related keys found in session state**")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top
