@@ -273,13 +273,17 @@ def display_paginated_dataframe(df, unique_suffix=None):
     # No need to show it here as it disappears when checkbox is clicked
     
     # Display visualization if active (right after dataframe and toggle)
-    # Read state directly from checkbox key (more reliable)
+    # Read state directly from checkbox key (this is the source of truth)
     button_key = f"viz_btn_{viz_icon_key}"
     viz_active = st.session_state.get(button_key, False)
-    # Sync with our state key for consistency
-    if viz_active != st.session_state.get(viz_state_key, False):
+    
+    # Always sync state key with checkbox (checkbox is authoritative)
+    current_state_key_value = st.session_state.get(viz_state_key, False)
+    if current_state_key_value != viz_active:
+        print(f"DEBUG: Syncing state key {viz_state_key} from {current_state_key_value} to {viz_active} (checkbox state)")
         st.session_state[viz_state_key] = viz_active
     
+    # Display visualization based on checkbox state (not state key)
     if viz_active:
         print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
         st.markdown("---")  # Separator before visualization
