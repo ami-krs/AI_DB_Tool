@@ -235,19 +235,32 @@ def display_paginated_dataframe(df, unique_suffix=None):
         # Store debug info
         st.session_state[debug_key] = debug_info
     
-    # DEBUG: Show debug info in expander
-    with st.expander("🔍 Visualization Debug Info", expanded=False):
+    # DEBUG: Show debug info in expander (always visible for debugging)
+    with st.expander("🔍 Visualization Debug Info", expanded=True):
         debug_info = st.session_state.get(debug_key, {})
-        st.write(f"**Button Key:** `{viz_icon_key}`")
+        current_state = st.session_state.get(viz_state_key, False)
+        button_key_display = f"viz_btn_{viz_icon_key}"
+        
+        st.write(f"**Button Key:** `{button_key_display}`")
         st.write(f"**State Key:** `{viz_state_key}`")
-        st.write(f"**Current State:** `{st.session_state.get(viz_state_key, False)}`")
-        st.write(f"**Button Clicked:** `{debug_info.get('button_clicked', False)}`")
+        st.write(f"**Current State:** `{current_state}`")
+        st.write(f"**Button Clicked (Last):** `{debug_info.get('button_clicked', False)}`")
         st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
         st.write(f"**State After Click:** `{debug_info.get('state_after', False)}`")
         st.write(f"**Click Count:** `{debug_info.get('click_count', 0)}`")
         st.write(f"**DataFrame Rows:** `{len(df)}`")
         st.write(f"**Paginated Rows:** `{len(paginated_df)}`")
         st.write(f"**Unique Suffix:** `{unique_suffix}`")
+        
+        # Show all session state keys related to visualization
+        viz_keys = [k for k in st.session_state.keys() if 'viz' in k.lower() or 'visualization' in k.lower()]
+        st.write(f"**All Viz-related Keys:** `{viz_keys}`")
+        
+        # Test button to manually toggle state
+        if st.button("🔧 Test Toggle State", key=f"test_toggle_{unique_suffix}"):
+            old_state = st.session_state.get(viz_state_key, False)
+            st.session_state[viz_state_key] = not old_state
+            st.rerun()
     
     # Display visualization if active (right after dataframe)
     viz_active = st.session_state.get(viz_state_key, False)
