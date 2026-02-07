@@ -204,7 +204,8 @@ def display_paginated_dataframe(df, unique_suffix=None):
             'button_clicked': False,
             'state_before': False,
             'state_after': False,
-            'click_count': 0
+            'click_count': 0,
+            'last_checkbox_state': False
         }
     
     debug_info = st.session_state[debug_key]
@@ -213,6 +214,10 @@ def display_paginated_dataframe(df, unique_suffix=None):
     # Initialize checkbox state in session state if not exists
     if button_key not in st.session_state:
         st.session_state[button_key] = current_state
+    
+    # Get previous checkbox state before rendering
+    previous_checkbox_state = st.session_state.get(button_key, False)
+    debug_info['last_checkbox_state'] = previous_checkbox_state
     
     # Use checkbox for more reliable toggle behavior
     # Position it in a small column on the right side
@@ -223,29 +228,34 @@ def display_paginated_dataframe(df, unique_suffix=None):
         # Checkbox - value is automatically stored in st.session_state[button_key]
         checkbox_value = st.checkbox(
             "📊",
-            value=st.session_state.get(button_key, current_state),
+            value=previous_checkbox_state,
             help="Toggle Data Visualization",
             key=button_key,
             label_visibility="collapsed"
         )
         
-        # Read the actual value from session state (checkbox updates it automatically)
+        # Read the actual value from session state AFTER checkbox is rendered
+        # This is the value that Streamlit stored when checkbox was clicked
         actual_state = st.session_state.get(button_key, False)
         
-        # Update our state key if checkbox value changed
-        if actual_state != current_state:
-            old_state = current_state
+        # Detect state change by comparing with previous state
+        if actual_state != previous_checkbox_state:
+            old_state = previous_checkbox_state
             debug_info['button_clicked'] = True
             debug_info['state_before'] = old_state
             debug_info['click_count'] = debug_info.get('click_count', 0) + 1
             st.session_state[viz_state_key] = actual_state
             debug_info['state_after'] = actual_state
+            debug_info['last_checkbox_state'] = actual_state
             print(f"DEBUG: Visualization toggle changed - key: {button_key}, state: {old_state} -> {actual_state}")
             st.session_state[debug_key] = debug_info
         else:
             # Sync state if they're out of sync
             if st.session_state.get(viz_state_key, False) != actual_state:
                 st.session_state[viz_state_key] = actual_state
+            # Update last checkbox state
+            debug_info['last_checkbox_state'] = actual_state
+            st.session_state[debug_key] = debug_info
     
     # DEBUG: Show debug info in expander (always visible for debugging)
     with st.expander("🔍 Visualization Debug Info", expanded=True):
@@ -262,10 +272,12 @@ def display_paginated_dataframe(df, unique_suffix=None):
         st.write(f"**Checkbox State (from session):** `{checkbox_state}`")
         st.write(f"**State Key Value:** `{state_key_value}`")
         st.write(f"**States Match:** `{checkbox_state == state_key_value}`")
+        st.write(f"**Last Checkbox State (tracked):** `{debug_info.get('last_checkbox_state', False)}`")
         st.write(f"**Button Clicked (Last):** `{debug_info.get('button_clicked', False)}`")
         st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
         st.write(f"**State After Click:** `{debug_info.get('state_after', False)}`")
         st.write(f"**Click Count:** `{debug_info.get('click_count', 0)}`")
+        st.write(f"**Checkbox Changed:** `{checkbox_state != debug_info.get('last_checkbox_state', False)}`")
         st.write(f"**DataFrame Rows:** `{len(df)}`")
         st.write(f"**Paginated Rows:** `{len(paginated_df)}`")
         st.write(f"**Unique Suffix:** `{unique_suffix}`")
