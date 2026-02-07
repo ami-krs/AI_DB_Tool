@@ -633,23 +633,9 @@ def chatbot_tab():
                                         key=f"download_auto_{unique_key_base}"
                                     )
                                 
-                                # Display search box if active (BEFORE dataframe)
+                                # Search and visualization are now handled inside display_paginated_dataframe
                                 display_df = st.session_state.last_result_df.copy()
-                                search_active = st.session_state.get(search_state_key, False)
-                                if search_active:
-                                    search_input_key = f"search_input_{search_key}"
-                                    search_term = st.text_input(
-                                        "🔍 Search in results:",
-                                        key=search_input_key,
-                                        placeholder="Type to search across all columns..."
-                                    )
-                                    if search_term:
-                                        display_df = search_dataframe(display_df, search_term)
-                                        if len(display_df) < len(st.session_state.last_result_df):
-                                            st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
-                                
                                 st.session_state.current_page = 1
-                                # Visualization is now handled inside display_paginated_dataframe
                                 display_paginated_dataframe(
                                     display_df, 
                                     unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
@@ -693,23 +679,9 @@ def chatbot_tab():
                 key="download_auto_fallback"
             )
         
-        # Display search box if active (BEFORE dataframe)
+        # Search and visualization are now handled inside display_paginated_dataframe
         display_df = st.session_state.last_result_df.copy()
-        search_active = st.session_state.get(search_state_key, False)
-        if search_active:
-            search_input_key = f"search_input_{search_key}"
-            search_term = st.text_input(
-                "🔍 Search in results:",
-                key=search_input_key,
-                placeholder="Type to search across all columns..."
-            )
-            if search_term:
-                display_df = search_dataframe(display_df, search_term)
-                if len(display_df) < len(st.session_state.last_result_df):
-                    st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
-        
         st.session_state.current_page = 1
-        # Visualization is now handled inside display_paginated_dataframe
         display_paginated_dataframe(
             display_df, 
             unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
