@@ -138,9 +138,51 @@ def display_paginated_dataframe(df, unique_suffix=None):
                 st.session_state.current_page = total_pages
                 st.rerun()
     
-    # Display paginated data
+    # Display paginated data with small visualization icon
     paginated_df = df.iloc[start_idx:end_idx]
-    st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    
+    # Add small visualization icon button above dataframe (styled like Streamlit's built-in icons)
+    viz_icon_key = f"viz_icon_{unique_suffix}"
+    viz_state_key = f"viz_active_{viz_icon_key}"
+    if viz_state_key not in st.session_state:
+        st.session_state[viz_state_key] = False
+    
+    # Create a container with the dataframe and a floating visualization icon
+    st.markdown("""
+    <style>
+        .dataframe-viz-container {
+            position: relative;
+        }
+        .viz-icon-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .viz-icon-button:hover {
+            background: rgba(240, 240, 240, 0.95);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Small icon button in a column layout to position it near the dataframe
+    icon_col, df_col = st.columns([0.05, 0.95])
+    with icon_col:
+        st.markdown("<br>", unsafe_allow_html=True)  # Align with dataframe
+        if st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=False):
+            st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+    with df_col:
+        st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    
+    # Display visualization if active (right after dataframe)
+    if st.session_state.get(viz_state_key, False):
+        visualize_dataframe(df, unique_suffix=f"viz_{unique_suffix}")
     
     # Show info if paginated
     if total_pages > 1:

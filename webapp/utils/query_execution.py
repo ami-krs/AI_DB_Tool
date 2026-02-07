@@ -429,46 +429,12 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with action icons in same line - tighter spacing
-            result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
+            # Compact Results header with download icon (visualization icon is now in display_paginated_dataframe)
+            result_col1, result_col2 = st.columns([9, 0.4], gap="small")
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
-                # Search icon button - smaller size
-                search_key = f"search_toggle_{len(st.session_state.query_history)}"
-                if unique_suffix:
-                    search_key = f"search_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
-                search_state_key = f"search_active_{search_key}"
-                if search_state_key not in st.session_state:
-                    st.session_state[search_state_key] = False
-                search_toggle = st.button(
-                    "🔍",
-                    help="Search/Filter Results",
-                    use_container_width=True,
-                    key=search_key
-                )
-                # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
-                if search_toggle:
-                    st.session_state[search_state_key] = not st.session_state[search_state_key]
-            with result_col3:
-                # Visualization icon button - smaller size
-                viz_key = f"viz_toggle_{len(st.session_state.query_history)}"
-                if unique_suffix:
-                    viz_key = f"viz_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
-                viz_state_key = f"viz_active_{viz_key}"
-                if viz_state_key not in st.session_state:
-                    st.session_state[viz_state_key] = False
-                viz_toggle = st.button(
-                    "📊",
-                    help="Data Visualization",
-                    use_container_width=True,
-                    key=viz_key
-                )
-                # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
-                if viz_toggle:
-                    st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-            with result_col4:
-                # Download CSV button - same size
+                # Download CSV button
                 csv = result['dataframe'].to_csv(index=False)
                 download_key = f"download_csv_{len(st.session_state.query_history)}"
                 if unique_suffix:
@@ -745,44 +711,10 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     if last_select_result is not None:
         st.markdown("---")
         # Compact Results header with action icons in same line - tighter spacing
-        result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
+        result_col1, result_col2 = st.columns([9, 0.4], gap="small")
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
-            # Search icon button - smaller size
-            search_key = f"search_toggle_last_{len(st.session_state.query_history)}"
-            if unique_suffix:
-                search_key = f"search_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
-            search_state_key = f"search_active_{search_key}"
-            if search_state_key not in st.session_state:
-                st.session_state[search_state_key] = False
-            search_toggle = st.button(
-                "🔍",
-                help="Search/Filter Results",
-                use_container_width=True,
-                key=search_key
-            )
-            # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
-            if search_toggle:
-                st.session_state[search_state_key] = not st.session_state[search_state_key]
-        with result_col3:
-            # Visualization icon button - smaller size
-            viz_key = f"viz_toggle_last_{len(st.session_state.query_history)}"
-            if unique_suffix:
-                viz_key = f"viz_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
-            viz_state_key = f"viz_active_{viz_key}"
-            if viz_state_key not in st.session_state:
-                st.session_state[viz_state_key] = False
-            viz_toggle = st.button(
-                "📊",
-                help="Data Visualization",
-                use_container_width=True,
-                key=viz_key
-            )
-            # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
-            if viz_toggle:
-                st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-        with result_col4:
             # Download CSV button - same size
             csv = last_select_result.to_csv(index=False)
             download_key = f"download_csv_last_{len(st.session_state.query_history)}"
@@ -814,18 +746,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 if len(display_df) < len(last_select_result):
                     st.info(f"Showing {len(display_df):,} of {len(last_select_result):,} rows matching '{search_term}'")
         
-        # Display visualization if active (BEFORE dataframe)
-        viz_active = st.session_state.get(viz_state_key, False)
-        if viz_active:
-            from utils.helpers import visualize_dataframe
-            try:
-                visualize_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
-            except Exception as e:
-                st.error(f"Error displaying visualization: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
-        
         st.session_state.current_page = 1
+        # Visualization is now handled inside display_paginated_dataframe
         display_paginated_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
 
 def execute_generated_query(query: str):
