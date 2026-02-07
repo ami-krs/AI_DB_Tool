@@ -447,10 +447,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     use_container_width=True,
                     key=search_key
                 )
-                # Toggle search state
+                # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
                 if search_toggle:
                     st.session_state[search_state_key] = not st.session_state[search_state_key]
-                    st.rerun()
             with result_col3:
                 # Visualization icon button - smaller size
                 viz_key = f"viz_toggle_{len(st.session_state.query_history)}"
@@ -465,10 +464,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     use_container_width=True,
                     key=viz_key
                 )
-                # Toggle visualization state
+                # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
                 if viz_toggle:
                     st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-                    st.rerun()
             with result_col4:
                 # Download CSV button - same size
                 csv = result['dataframe'].to_csv(index=False)
@@ -764,10 +762,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 use_container_width=True,
                 key=search_key
             )
-            # Toggle search state
+            # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
             if search_toggle:
                 st.session_state[search_state_key] = not st.session_state[search_state_key]
-                st.rerun()
         with result_col3:
             # Visualization icon button - smaller size
             viz_key = f"viz_toggle_last_{len(st.session_state.query_history)}"
@@ -782,10 +779,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 use_container_width=True,
                 key=viz_key
             )
-            # Toggle visualization state
+            # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
             if viz_toggle:
                 st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-                st.rerun()
         with result_col4:
             # Download CSV button - same size
             csv = last_select_result.to_csv(index=False)
@@ -804,7 +800,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Display search box if active (BEFORE dataframe)
         display_df = last_select_result.copy()
-        if st.session_state.get(search_state_key, False):
+        search_active = st.session_state.get(search_state_key, False)
+        if search_active:
             from utils.helpers import search_dataframe
             search_input_key = f"search_input_{search_key}"
             search_term = st.text_input(
@@ -818,9 +815,15 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     st.info(f"Showing {len(display_df):,} of {len(last_select_result):,} rows matching '{search_term}'")
         
         # Display visualization if active (BEFORE dataframe)
-        if st.session_state.get(viz_state_key, False):
+        viz_active = st.session_state.get(viz_state_key, False)
+        if viz_active:
             from utils.helpers import visualize_dataframe
-            visualize_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
+            try:
+                visualize_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
+            except Exception as e:
+                st.error(f"Error displaying visualization: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         st.session_state.current_page = 1
         display_paginated_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")

@@ -632,9 +632,9 @@ def chatbot_tab():
                                         use_container_width=True,
                                         key=search_key
                                     )
+                                    # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
                                     if search_toggle:
                                         st.session_state[search_state_key] = not st.session_state[search_state_key]
-                                        st.rerun()
                                 with result_col3:
                                     # Visualization icon button
                                     viz_key = f"viz_toggle_chatbot_{unique_key_base}"
@@ -647,9 +647,9 @@ def chatbot_tab():
                                         use_container_width=True,
                                         key=viz_key
                                     )
+                                    # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
                                     if viz_toggle:
                                         st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-                                        st.rerun()
                                 with result_col4:
                                     # Download CSV button
                                     csv = st.session_state.last_result_df.to_csv(index=False)
@@ -665,7 +665,8 @@ def chatbot_tab():
                                 
                                 # Display search box if active (BEFORE dataframe)
                                 display_df = st.session_state.last_result_df.copy()
-                                if st.session_state.get(search_state_key, False):
+                                search_active = st.session_state.get(search_state_key, False)
+                                if search_active:
                                     search_input_key = f"search_input_{search_key}"
                                     search_term = st.text_input(
                                         "🔍 Search in results:",
@@ -678,8 +679,14 @@ def chatbot_tab():
                                             st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
                                 
                                 # Display visualization if active (BEFORE dataframe)
-                                if st.session_state.get(viz_state_key, False):
-                                    visualize_dataframe(display_df, unique_suffix=f"chatbot_auto_result_{unique_key_base}")
+                                viz_active = st.session_state.get(viz_state_key, False)
+                                if viz_active:
+                                    try:
+                                        visualize_dataframe(display_df, unique_suffix=f"chatbot_auto_result_{unique_key_base}")
+                                    except Exception as e:
+                                        st.error(f"Error displaying visualization: {str(e)}")
+                                        import traceback
+                                        st.code(traceback.format_exc())
                                 
                                 st.session_state.current_page = 1
                                 display_paginated_dataframe(
@@ -724,9 +731,9 @@ def chatbot_tab():
                 use_container_width=True,
                 key=search_key
             )
+            # Toggle search state (no rerun needed - Streamlit handles button clicks automatically)
             if search_toggle:
                 st.session_state[search_state_key] = not st.session_state[search_state_key]
-                st.rerun()
         with result_col3:
             # Visualization icon button
             viz_key = "viz_toggle_chatbot_fallback"
@@ -739,9 +746,9 @@ def chatbot_tab():
                 use_container_width=True,
                 key=viz_key
             )
+            # Toggle visualization state (no rerun needed - Streamlit handles button clicks automatically)
             if viz_toggle:
                 st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-                st.rerun()
         with result_col4:
             # Download CSV button
             csv = st.session_state.last_result_df.to_csv(index=False)
@@ -757,7 +764,8 @@ def chatbot_tab():
         
         # Display search box if active (BEFORE dataframe)
         display_df = st.session_state.last_result_df.copy()
-        if st.session_state.get(search_state_key, False):
+        search_active = st.session_state.get(search_state_key, False)
+        if search_active:
             search_input_key = f"search_input_{search_key}"
             search_term = st.text_input(
                 "🔍 Search in results:",
@@ -770,8 +778,14 @@ def chatbot_tab():
                     st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
         
         # Display visualization if active (BEFORE dataframe)
-        if st.session_state.get(viz_state_key, False):
-            visualize_dataframe(display_df, unique_suffix="chatbot_auto_result_fallback")
+        viz_active = st.session_state.get(viz_state_key, False)
+        if viz_active:
+            try:
+                visualize_dataframe(display_df, unique_suffix="chatbot_auto_result_fallback")
+            except Exception as e:
+                st.error(f"Error displaying visualization: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         st.session_state.current_page = 1
         display_paginated_dataframe(
