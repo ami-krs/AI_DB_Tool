@@ -253,9 +253,15 @@ def display_paginated_dataframe(df, unique_suffix=None):
         current_state = st.session_state.get(viz_state_key, False)
         button_key_display = f"viz_btn_{viz_icon_key}"
         
-        st.write(f"**Button Key:** `{button_key_display}`")
+        # Get checkbox state directly
+        checkbox_state = st.session_state.get(button_key_display, False)
+        state_key_value = st.session_state.get(viz_state_key, False)
+        
+        st.write(f"**Checkbox Key:** `{button_key_display}`")
         st.write(f"**State Key:** `{viz_state_key}`")
-        st.write(f"**Current State:** `{current_state}`")
+        st.write(f"**Checkbox State (from session):** `{checkbox_state}`")
+        st.write(f"**State Key Value:** `{state_key_value}`")
+        st.write(f"**States Match:** `{checkbox_state == state_key_value}`")
         st.write(f"**Button Clicked (Last):** `{debug_info.get('button_clicked', False)}`")
         st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
         st.write(f"**State After Click:** `{debug_info.get('state_after', False)}`")
@@ -268,15 +274,26 @@ def display_paginated_dataframe(df, unique_suffix=None):
         viz_keys = [k for k in st.session_state.keys() if 'viz' in k.lower() or 'visualization' in k.lower()]
         st.write(f"**All Viz-related Keys:** `{viz_keys}`")
         
-        # Test button to manually toggle state
+        # Show checkbox key value directly
+        if button_key_display in st.session_state:
+            st.write(f"**Checkbox Key Value (direct):** `{st.session_state[button_key_display]}`")
+        
+        # Test button to manually toggle state (uses checkbox key directly)
         if st.button("🔧 Test Toggle State", key=f"test_toggle_{unique_suffix}"):
-            old_state = st.session_state.get(viz_state_key, False)
+            button_key = f"viz_btn_{viz_icon_key}"
+            old_state = st.session_state.get(button_key, False)
+            st.session_state[button_key] = not old_state
             st.session_state[viz_state_key] = not old_state
             st.rerun()
     
     # Display visualization if active (right after dataframe and toggle)
-    # Get the current state after checkbox update
-    viz_active = st.session_state.get(viz_state_key, False)
+    # Read state directly from checkbox key (more reliable)
+    button_key = f"viz_btn_{viz_icon_key}"
+    viz_active = st.session_state.get(button_key, False)
+    # Sync with our state key for consistency
+    if viz_active != st.session_state.get(viz_state_key, False):
+        st.session_state[viz_state_key] = viz_active
+    
     if viz_active:
         print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
         st.markdown("---")  # Separator before visualization
