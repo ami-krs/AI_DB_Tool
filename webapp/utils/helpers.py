@@ -209,14 +209,19 @@ def display_paginated_dataframe(df, unique_suffix=None):
             
             # DEBUG: Track button clicks
             if button_clicked:
-                debug_info = st.session_state[debug_key]
+                debug_info = st.session_state.get(debug_key, {})
+                old_state = st.session_state.get(viz_state_key, False)
                 debug_info['button_clicked'] = True
-                debug_info['state_before'] = st.session_state.get(viz_state_key, False)
+                debug_info['state_before'] = old_state
                 debug_info['click_count'] = debug_info.get('click_count', 0) + 1
-                st.session_state[viz_state_key] = not st.session_state.get(viz_state_key, False)
-                debug_info['state_after'] = st.session_state.get(viz_state_key, False)
+                # Toggle state
+                new_state = not old_state
+                st.session_state[viz_state_key] = new_state
+                debug_info['state_after'] = new_state
                 st.session_state[debug_key] = debug_info
-                print(f"DEBUG: Visualization button clicked - key: {viz_icon_key}, state: {debug_info['state_before']} -> {debug_info['state_after']}")
+                print(f"DEBUG: Visualization button clicked - key: {viz_icon_key}, state: {old_state} -> {new_state}")
+                # Force rerun to apply state change
+                st.rerun()
     
     # DEBUG: Show debug info in expander
     with st.expander("🔍 Visualization Debug Info", expanded=False):
