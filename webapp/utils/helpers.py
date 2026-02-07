@@ -195,8 +195,7 @@ def display_paginated_dataframe(df, unique_suffix=None):
     # Display dataframe first
     st.dataframe(paginated_df, hide_index=True, use_container_width=True)
     
-    # Add visualization toggle button right after dataframe (not in columns to avoid layout issues)
-    # Use a checkbox-style toggle that's more reliable than a button
+    # Add visualization toggle checkbox right after dataframe
     button_key = f"viz_btn_{viz_icon_key}"
     
     # Initialize debug info if needed
@@ -211,31 +210,42 @@ def display_paginated_dataframe(df, unique_suffix=None):
     debug_info = st.session_state[debug_key]
     current_state = st.session_state.get(viz_state_key, False)
     
-    # Use a checkbox toggle instead of button for more reliable state management
+    # Initialize checkbox state in session state if not exists
+    if button_key not in st.session_state:
+        st.session_state[button_key] = current_state
+    
+    # Use checkbox for more reliable toggle behavior
     # Position it in a small column on the right side
-    toggle_col1, toggle_col2 = st.columns([0.95, 0.05])
+    toggle_col1, toggle_col2 = st.columns([0.97, 0.03])
     with toggle_col1:
-        st.empty()  # Spacer
+        st.empty()  # Spacer to align with dataframe
     with toggle_col2:
-        # Use checkbox for more reliable toggle behavior
-        new_state = st.checkbox(
+        # Checkbox - value is automatically stored in st.session_state[button_key]
+        checkbox_value = st.checkbox(
             "📊",
-            value=current_state,
+            value=st.session_state.get(button_key, current_state),
             help="Toggle Data Visualization",
             key=button_key,
             label_visibility="collapsed"
         )
         
-        # Update state if checkbox value changed
-        if new_state != current_state:
+        # Read the actual value from session state (checkbox updates it automatically)
+        actual_state = st.session_state.get(button_key, False)
+        
+        # Update our state key if checkbox value changed
+        if actual_state != current_state:
             old_state = current_state
             debug_info['button_clicked'] = True
             debug_info['state_before'] = old_state
             debug_info['click_count'] = debug_info.get('click_count', 0) + 1
-            st.session_state[viz_state_key] = new_state
-            debug_info['state_after'] = new_state
-            print(f"DEBUG: Visualization toggle changed - key: {button_key}, state: {old_state} -> {new_state}")
+            st.session_state[viz_state_key] = actual_state
+            debug_info['state_after'] = actual_state
+            print(f"DEBUG: Visualization toggle changed - key: {button_key}, state: {old_state} -> {actual_state}")
             st.session_state[debug_key] = debug_info
+        else:
+            # Sync state if they're out of sync
+            if st.session_state.get(viz_state_key, False) != actual_state:
+                st.session_state[viz_state_key] = actual_state
     
     # DEBUG: Show debug info in expander (always visible for debugging)
     with st.expander("🔍 Visualization Debug Info", expanded=True):
