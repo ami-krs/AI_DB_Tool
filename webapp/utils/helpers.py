@@ -138,23 +138,65 @@ def display_paginated_dataframe(df, unique_suffix=None):
                 st.session_state.current_page = total_pages
                 st.rerun()
     
-    # Display paginated data with small visualization icon
+    # Display paginated data with small visualization icon positioned with hover icons
     paginated_df = df.iloc[start_idx:end_idx]
     
-    # Add small visualization icon button next to dataframe (like Streamlit's built-in hover icons)
+    # Add small visualization icon button positioned with Streamlit's built-in hover icons
     viz_icon_key = f"viz_icon_{unique_suffix}"
     viz_state_key = f"viz_active_{viz_icon_key}"
     if viz_state_key not in st.session_state:
         st.session_state[viz_state_key] = False
     
-    # Small icon button in a column layout to position it near the dataframe
-    icon_col, df_col = st.columns([0.03, 0.97])
-    with icon_col:
-        st.markdown("<br>", unsafe_allow_html=True)  # Align with dataframe top
-        if st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=True):
-            st.session_state[viz_state_key] = not st.session_state[viz_state_key]
-    with df_col:
-        st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    # Create a container with relative positioning to overlay the icon
+    st.markdown("""
+    <style>
+        /* Style for visualization icon overlay - positioned like Streamlit's hover icons */
+        .dataframe-viz-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        .viz-icon-floating {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .viz-icon-floating:hover {
+            background: rgba(240, 240, 240, 0.98);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transform: scale(1.05);
+        }
+        /* Ensure dataframe container is relative */
+        div[data-testid="stDataFrame"] {
+            position: relative;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Wrap dataframe in a container with the floating icon
+    with st.container():
+        # Create columns to position icon in top-right
+        df_main_col, df_icon_col = st.columns([0.98, 0.02])
+        
+        with df_main_col:
+            # Display dataframe
+            st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+        
+        with df_icon_col:
+            # Position icon at the top, aligned with dataframe top
+            st.markdown("<div style='height: 0px;'></div>", unsafe_allow_html=True)
+            # Small button styled like Streamlit's hover icons
+            if st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=True):
+                st.session_state[viz_state_key] = not st.session_state[viz_state_key]
     
     # Display visualization if active (right after dataframe)
     if st.session_state.get(viz_state_key, False):
