@@ -193,35 +193,47 @@ def display_paginated_dataframe(df, unique_suffix=None):
     """, unsafe_allow_html=True)
     
     # Wrap dataframe in a container with the floating icon
-    with st.container():
-        # Create columns to position icon in top-right
-        df_main_col, df_icon_col = st.columns([0.98, 0.02])
+    # Create columns to position icon in top-right
+    df_main_col, df_icon_col = st.columns([0.98, 0.02])
+    
+    with df_main_col:
+        # Display dataframe
+        st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    
+    with df_icon_col:
+        # Position icon at the top, aligned with dataframe top
+        st.markdown("<div style='height: 0px;'></div>", unsafe_allow_html=True)
+        # Small button styled like Streamlit's hover icons
+        # Use a more unique key to avoid conflicts
+        button_key = f"viz_btn_{viz_icon_key}"
+        button_clicked = st.button("📊", help="Data Visualization", key=button_key, use_container_width=True)
         
-        with df_main_col:
-            # Display dataframe
-            st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+        # DEBUG: Track button clicks - check immediately after button
+        debug_info = st.session_state.get(debug_key, {
+            'button_clicked': False,
+            'state_before': False,
+            'state_after': False,
+            'click_count': 0
+        })
         
-        with df_icon_col:
-            # Position icon at the top, aligned with dataframe top
-            st.markdown("<div style='height: 0px;'></div>", unsafe_allow_html=True)
-            # Small button styled like Streamlit's hover icons
-            button_clicked = st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=True)
-            
-            # DEBUG: Track button clicks
-            if button_clicked:
-                debug_info = st.session_state.get(debug_key, {})
-                old_state = st.session_state.get(viz_state_key, False)
-                debug_info['button_clicked'] = True
-                debug_info['state_before'] = old_state
-                debug_info['click_count'] = debug_info.get('click_count', 0) + 1
-                # Toggle state
-                new_state = not old_state
-                st.session_state[viz_state_key] = new_state
-                debug_info['state_after'] = new_state
-                st.session_state[debug_key] = debug_info
-                print(f"DEBUG: Visualization button clicked - key: {viz_icon_key}, state: {old_state} -> {new_state}")
-                # Force rerun to apply state change
-                st.rerun()
+        # Update debug info with current state
+        current_state = st.session_state.get(viz_state_key, False)
+        debug_info['current_state'] = current_state
+        
+        # Check if button was clicked (this happens before the rerun)
+        if button_clicked:
+            old_state = st.session_state.get(viz_state_key, False)
+            debug_info['button_clicked'] = True
+            debug_info['state_before'] = old_state
+            debug_info['click_count'] = debug_info.get('click_count', 0) + 1
+            # Toggle state
+            new_state = not old_state
+            st.session_state[viz_state_key] = new_state
+            debug_info['state_after'] = new_state
+            print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {old_state} -> {new_state}")
+        
+        # Store debug info
+        st.session_state[debug_key] = debug_info
     
     # DEBUG: Show debug info in expander
     with st.expander("🔍 Visualization Debug Info", expanded=False):
