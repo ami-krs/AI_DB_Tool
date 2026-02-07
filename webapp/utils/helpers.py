@@ -192,47 +192,49 @@ def display_paginated_dataframe(df, unique_suffix=None):
     </style>
     """, unsafe_allow_html=True)
     
-    # Create columns to position icon in top-right - make icon column wider for better clickability
-    df_main_col, df_icon_col = st.columns([0.95, 0.05])
+    # Display dataframe first
+    st.dataframe(paginated_df, hide_index=True, use_container_width=True)
     
-    with df_main_col:
-        # Display dataframe
-        st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    # Add visualization toggle button right after dataframe (not in columns to avoid layout issues)
+    # Use a checkbox-style toggle that's more reliable than a button
+    button_key = f"viz_btn_{viz_icon_key}"
     
-    with df_icon_col:
-        # Position icon at the top, aligned with dataframe top
-        st.markdown("<div style='height: 0px;'></div>", unsafe_allow_html=True)
-        # Small button styled like Streamlit's hover icons
-        # Use a more unique key to avoid conflicts
-        button_key = f"viz_btn_{viz_icon_key}"
+    # Initialize debug info if needed
+    if debug_key not in st.session_state:
+        st.session_state[debug_key] = {
+            'button_clicked': False,
+            'state_before': False,
+            'state_after': False,
+            'click_count': 0
+        }
+    
+    debug_info = st.session_state[debug_key]
+    current_state = st.session_state.get(viz_state_key, False)
+    
+    # Use a checkbox toggle instead of button for more reliable state management
+    # Position it in a small column on the right side
+    toggle_col1, toggle_col2 = st.columns([0.95, 0.05])
+    with toggle_col1:
+        st.empty()  # Spacer
+    with toggle_col2:
+        # Use checkbox for more reliable toggle behavior
+        new_state = st.checkbox(
+            "📊",
+            value=current_state,
+            help="Toggle Data Visualization",
+            key=button_key,
+            label_visibility="collapsed"
+        )
         
-        # Initialize debug info if needed
-        if debug_key not in st.session_state:
-            st.session_state[debug_key] = {
-                'button_clicked': False,
-                'state_before': False,
-                'state_after': False,
-                'click_count': 0
-            }
-        
-        debug_info = st.session_state[debug_key]
-        current_state = st.session_state.get(viz_state_key, False)
-        
-        # Small button - make it more visible and clickable
-        button_clicked = st.button("📊", help="Data Visualization", key=button_key, use_container_width=True)
-        
-        # Check if button was clicked (this happens before the rerun)
-        if button_clicked:
-            old_state = st.session_state.get(viz_state_key, False)
+        # Update state if checkbox value changed
+        if new_state != current_state:
+            old_state = current_state
             debug_info['button_clicked'] = True
             debug_info['state_before'] = old_state
             debug_info['click_count'] = debug_info.get('click_count', 0) + 1
-            # Toggle state
-            new_state = not old_state
             st.session_state[viz_state_key] = new_state
             debug_info['state_after'] = new_state
-            print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {old_state} -> {new_state}")
-            # Store updated debug info
+            print(f"DEBUG: Visualization toggle changed - key: {button_key}, state: {old_state} -> {new_state}")
             st.session_state[debug_key] = debug_info
     
     # DEBUG: Show debug info in expander (always visible for debugging)
