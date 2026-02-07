@@ -429,11 +429,46 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with download icon in same line
-            result_col1, result_col2 = st.columns([10, 1])
+            # Compact Results header with action icons in same line
+            result_col1, result_col2, result_col3, result_col4 = st.columns([8, 1, 1, 1])
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
+                # Search icon button
+                search_key = f"search_toggle_{len(st.session_state.query_history)}"
+                if unique_suffix:
+                    search_key = f"search_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
+                search_state_key = f"search_active_{search_key}"
+                if search_state_key not in st.session_state:
+                    st.session_state[search_state_key] = False
+                search_toggle = st.button(
+                    "🔍",
+                    help="Search/Filter Results",
+                    use_container_width=True,
+                    key=search_key
+                )
+                # Toggle search state
+                if search_toggle:
+                    st.session_state[search_state_key] = not st.session_state[search_state_key]
+            with result_col3:
+                # Visualization icon button
+                viz_key = f"viz_toggle_{len(st.session_state.query_history)}"
+                if unique_suffix:
+                    viz_key = f"viz_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
+                viz_state_key = f"viz_active_{viz_key}"
+                if viz_state_key not in st.session_state:
+                    st.session_state[viz_state_key] = False
+                viz_toggle = st.button(
+                    "📊",
+                    help="Data Visualization",
+                    use_container_width=True,
+                    key=viz_key
+                )
+                # Toggle visualization state
+                if viz_toggle:
+                    st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+            with result_col4:
+                # Download CSV button
                 csv = result['dataframe'].to_csv(index=False)
                 download_key = f"download_csv_{len(st.session_state.query_history)}"
                 if unique_suffix:
@@ -448,8 +483,28 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     key=download_key
                 )
             
+            # Display search box if active
+            display_df = result['dataframe'].copy()
+            if st.session_state.get(search_state_key, False):
+                from utils.helpers import search_dataframe
+                search_input_key = f"search_input_{search_key}"
+                search_term = st.text_input(
+                    "🔍 Search in results:",
+                    key=search_input_key,
+                    placeholder="Type to search across all columns..."
+                )
+                if search_term:
+                    display_df = search_dataframe(display_df, search_term)
+                    if len(display_df) < len(result['dataframe']):
+                        st.info(f"Showing {len(display_df):,} of {len(result['dataframe']):,} rows matching '{search_term}'")
+            
+            # Display visualization if active
+            if st.session_state.get(viz_state_key, False):
+                from utils.helpers import visualize_dataframe
+                visualize_dataframe(display_df, unique_suffix=f"query_result_{len(st.session_state.query_history)}")
+            
             st.session_state.current_page = 1
-            display_paginated_dataframe(result['dataframe'], unique_suffix=f"query_result_{len(st.session_state.query_history)}")
+            display_paginated_dataframe(display_df, unique_suffix=f"query_result_{len(st.session_state.query_history)}")
             st.session_state.last_result_df = result['dataframe']
             st.session_state.last_result = result['dataframe']
             st.success(f"✅ Query executed successfully! Retrieved {result['rows_retrieved']:,} rows.")
@@ -689,11 +744,46 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with download icon in same line
-        result_col1, result_col2 = st.columns([10, 1])
+        # Compact Results header with action icons in same line
+        result_col1, result_col2, result_col3, result_col4 = st.columns([8, 1, 1, 1])
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
+            # Search icon button
+            search_key = f"search_toggle_last_{len(st.session_state.query_history)}"
+            if unique_suffix:
+                search_key = f"search_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
+            search_state_key = f"search_active_{search_key}"
+            if search_state_key not in st.session_state:
+                st.session_state[search_state_key] = False
+            search_toggle = st.button(
+                "🔍",
+                help="Search/Filter Results",
+                use_container_width=True,
+                key=search_key
+            )
+            # Toggle search state
+            if search_toggle:
+                st.session_state[search_state_key] = not st.session_state[search_state_key]
+        with result_col3:
+            # Visualization icon button
+            viz_key = f"viz_toggle_last_{len(st.session_state.query_history)}"
+            if unique_suffix:
+                viz_key = f"viz_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
+            viz_state_key = f"viz_active_{viz_key}"
+            if viz_state_key not in st.session_state:
+                st.session_state[viz_state_key] = False
+            viz_toggle = st.button(
+                "📊",
+                help="Data Visualization",
+                use_container_width=True,
+                key=viz_key
+            )
+            # Toggle visualization state
+            if viz_toggle:
+                st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+        with result_col4:
+            # Download CSV button
             csv = last_select_result.to_csv(index=False)
             download_key = f"download_csv_last_{len(st.session_state.query_history)}"
             if unique_suffix:
@@ -708,8 +798,28 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 key=download_key
             )
         
+        # Display search box if active
+        display_df = last_select_result.copy()
+        if st.session_state.get(search_state_key, False):
+            from utils.helpers import search_dataframe
+            search_input_key = f"search_input_{search_key}"
+            search_term = st.text_input(
+                "🔍 Search in results:",
+                key=search_input_key,
+                placeholder="Type to search across all columns..."
+            )
+            if search_term:
+                display_df = search_dataframe(display_df, search_term)
+                if len(display_df) < len(last_select_result):
+                    st.info(f"Showing {len(display_df):,} of {len(last_select_result):,} rows matching '{search_term}'")
+        
+        # Display visualization if active
+        if st.session_state.get(viz_state_key, False):
+            from utils.helpers import visualize_dataframe
+            visualize_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
+        
         st.session_state.current_page = 1
-        display_paginated_dataframe(last_select_result, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
+        display_paginated_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
 
 def execute_generated_query(query: str):
     """Execute AI-generated query"""
