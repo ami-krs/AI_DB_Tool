@@ -449,26 +449,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     key=download_key
                 )
             
-            # Display search box if active (BEFORE dataframe)
+            # Search and visualization are now handled inside display_paginated_dataframe
             display_df = result['dataframe'].copy()
-            if st.session_state.get(search_state_key, False):
-                from utils.helpers import search_dataframe
-                search_input_key = f"search_input_{search_key}"
-                search_term = st.text_input(
-                    "🔍 Search in results:",
-                    key=search_input_key,
-                    placeholder="Type to search across all columns..."
-                )
-                if search_term:
-                    display_df = search_dataframe(display_df, search_term)
-                    if len(display_df) < len(result['dataframe']):
-                        st.info(f"Showing {len(display_df):,} of {len(result['dataframe']):,} rows matching '{search_term}'")
-            
-            # Display visualization if active (BEFORE dataframe)
-            if st.session_state.get(viz_state_key, False):
-                from utils.helpers import visualize_dataframe
-                visualize_dataframe(display_df, unique_suffix=f"query_result_{len(st.session_state.query_history)}")
-            
             st.session_state.current_page = 1
             display_paginated_dataframe(display_df, unique_suffix=f"query_result_{len(st.session_state.query_history)}")
             st.session_state.last_result_df = result['dataframe']
@@ -730,24 +712,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 key=download_key
             )
         
-        # Display search box if active (BEFORE dataframe)
+        # Search and visualization are now handled inside display_paginated_dataframe
         display_df = last_select_result.copy()
-        search_active = st.session_state.get(search_state_key, False)
-        if search_active:
-            from utils.helpers import search_dataframe
-            search_input_key = f"search_input_{search_key}"
-            search_term = st.text_input(
-                "🔍 Search in results:",
-                key=search_input_key,
-                placeholder="Type to search across all columns..."
-            )
-            if search_term:
-                display_df = search_dataframe(display_df, search_term)
-                if len(display_df) < len(last_select_result):
-                    st.info(f"Showing {len(display_df):,} of {len(last_select_result):,} rows matching '{search_term}'")
-        
         st.session_state.current_page = 1
-        # Visualization is now handled inside display_paginated_dataframe
         display_paginated_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")
 
 def execute_generated_query(query: str):
