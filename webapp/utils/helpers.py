@@ -147,6 +147,16 @@ def display_paginated_dataframe(df, unique_suffix=None):
     if viz_state_key not in st.session_state:
         st.session_state[viz_state_key] = False
     
+    # DEBUG: Add debug info for visualization icon
+    debug_key = f"viz_debug_{unique_suffix}"
+    if debug_key not in st.session_state:
+        st.session_state[debug_key] = {
+            'button_clicked': False,
+            'state_before': False,
+            'state_after': False,
+            'click_count': 0
+        }
+    
     # Create a container with relative positioning to overlay the icon
     st.markdown("""
     <style>
@@ -195,12 +205,45 @@ def display_paginated_dataframe(df, unique_suffix=None):
             # Position icon at the top, aligned with dataframe top
             st.markdown("<div style='height: 0px;'></div>", unsafe_allow_html=True)
             # Small button styled like Streamlit's hover icons
-            if st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=True):
-                st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+            button_clicked = st.button("📊", help="Data Visualization", key=viz_icon_key, use_container_width=True)
+            
+            # DEBUG: Track button clicks
+            if button_clicked:
+                debug_info = st.session_state[debug_key]
+                debug_info['button_clicked'] = True
+                debug_info['state_before'] = st.session_state.get(viz_state_key, False)
+                debug_info['click_count'] = debug_info.get('click_count', 0) + 1
+                st.session_state[viz_state_key] = not st.session_state.get(viz_state_key, False)
+                debug_info['state_after'] = st.session_state.get(viz_state_key, False)
+                st.session_state[debug_key] = debug_info
+                print(f"DEBUG: Visualization button clicked - key: {viz_icon_key}, state: {debug_info['state_before']} -> {debug_info['state_after']}")
+    
+    # DEBUG: Show debug info in expander
+    with st.expander("🔍 Visualization Debug Info", expanded=False):
+        debug_info = st.session_state.get(debug_key, {})
+        st.write(f"**Button Key:** `{viz_icon_key}`")
+        st.write(f"**State Key:** `{viz_state_key}`")
+        st.write(f"**Current State:** `{st.session_state.get(viz_state_key, False)}`")
+        st.write(f"**Button Clicked:** `{debug_info.get('button_clicked', False)}`")
+        st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
+        st.write(f"**State After Click:** `{debug_info.get('state_after', False)}`")
+        st.write(f"**Click Count:** `{debug_info.get('click_count', 0)}`")
+        st.write(f"**DataFrame Rows:** `{len(df)}`")
+        st.write(f"**Paginated Rows:** `{len(paginated_df)}`")
+        st.write(f"**Unique Suffix:** `{unique_suffix}`")
     
     # Display visualization if active (right after dataframe)
-    if st.session_state.get(viz_state_key, False):
-        visualize_dataframe(df, unique_suffix=f"viz_{unique_suffix}")
+    viz_active = st.session_state.get(viz_state_key, False)
+    if viz_active:
+        print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
+        try:
+            visualize_dataframe(df, unique_suffix=f"viz_{unique_suffix}")
+        except Exception as e:
+            st.error(f"Error displaying visualization: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            print(f"DEBUG: Visualization error: {e}")
+            print(traceback.format_exc())
     
     # Show info if paginated
     if total_pages > 1:
