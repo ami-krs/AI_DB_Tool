@@ -429,12 +429,12 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with action icons in same line
-            result_col1, result_col2, result_col3, result_col4 = st.columns([8, 1, 1, 1])
+            # Compact Results header with action icons in same line - tighter spacing
+            result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
-                # Search icon button
+                # Search icon button - smaller size
                 search_key = f"search_toggle_{len(st.session_state.query_history)}"
                 if unique_suffix:
                     search_key = f"search_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
@@ -450,8 +450,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 # Toggle search state
                 if search_toggle:
                     st.session_state[search_state_key] = not st.session_state[search_state_key]
+                    st.rerun()
             with result_col3:
-                # Visualization icon button
+                # Visualization icon button - smaller size
                 viz_key = f"viz_toggle_{len(st.session_state.query_history)}"
                 if unique_suffix:
                     viz_key = f"viz_toggle_{unique_suffix}_{len(st.session_state.query_history)}"
@@ -467,8 +468,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 # Toggle visualization state
                 if viz_toggle:
                     st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+                    st.rerun()
             with result_col4:
-                # Download CSV button
+                # Download CSV button - same size
                 csv = result['dataframe'].to_csv(index=False)
                 download_key = f"download_csv_{len(st.session_state.query_history)}"
                 if unique_suffix:
@@ -483,7 +485,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     key=download_key
                 )
             
-            # Display search box if active
+            # Display search box if active (BEFORE dataframe)
             display_df = result['dataframe'].copy()
             if st.session_state.get(search_state_key, False):
                 from utils.helpers import search_dataframe
@@ -498,7 +500,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     if len(display_df) < len(result['dataframe']):
                         st.info(f"Showing {len(display_df):,} of {len(result['dataframe']):,} rows matching '{search_term}'")
             
-            # Display visualization if active
+            # Display visualization if active (BEFORE dataframe)
             if st.session_state.get(viz_state_key, False):
                 from utils.helpers import visualize_dataframe
                 visualize_dataframe(display_df, unique_suffix=f"query_result_{len(st.session_state.query_history)}")
@@ -744,12 +746,12 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with action icons in same line
-        result_col1, result_col2, result_col3, result_col4 = st.columns([8, 1, 1, 1])
+        # Compact Results header with action icons in same line - tighter spacing
+        result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
-            # Search icon button
+            # Search icon button - smaller size
             search_key = f"search_toggle_last_{len(st.session_state.query_history)}"
             if unique_suffix:
                 search_key = f"search_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
@@ -765,8 +767,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Toggle search state
             if search_toggle:
                 st.session_state[search_state_key] = not st.session_state[search_state_key]
+                st.rerun()
         with result_col3:
-            # Visualization icon button
+            # Visualization icon button - smaller size
             viz_key = f"viz_toggle_last_{len(st.session_state.query_history)}"
             if unique_suffix:
                 viz_key = f"viz_toggle_last_{unique_suffix}_{len(st.session_state.query_history)}"
@@ -782,8 +785,9 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Toggle visualization state
             if viz_toggle:
                 st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+                st.rerun()
         with result_col4:
-            # Download CSV button
+            # Download CSV button - same size
             csv = last_select_result.to_csv(index=False)
             download_key = f"download_csv_last_{len(st.session_state.query_history)}"
             if unique_suffix:
@@ -798,7 +802,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 key=download_key
             )
         
-        # Display search box if active
+        # Display search box if active (BEFORE dataframe)
         display_df = last_select_result.copy()
         if st.session_state.get(search_state_key, False):
             from utils.helpers import search_dataframe
@@ -813,7 +817,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 if len(display_df) < len(last_select_result):
                     st.info(f"Showing {len(display_df):,} of {len(last_select_result):,} rows matching '{search_term}'")
         
-        # Display visualization if active
+        # Display visualization if active (BEFORE dataframe)
         if st.session_state.get(viz_state_key, False):
             from utils.helpers import visualize_dataframe
             visualize_dataframe(display_df, unique_suffix=f"last_result_{len(st.session_state.query_history)}")

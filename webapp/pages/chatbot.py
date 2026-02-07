@@ -613,13 +613,45 @@ def chatbot_tab():
                                 results_shown_for_latest = True
                             else:
                                 # Show results
-                                from utils.helpers import display_paginated_dataframe
+                                from utils.helpers import display_paginated_dataframe, search_dataframe, visualize_dataframe
                                 print(f"DEBUG: ✅ Displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
                                 st.markdown("---")
-                                result_col1, result_col2 = st.columns([10, 1])
+                                # Compact Results header with action icons - tighter spacing
+                                result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
                                 with result_col1:
                                     st.markdown("**📊 Query Results**", unsafe_allow_html=True)
                                 with result_col2:
+                                    # Search icon button
+                                    search_key = f"search_toggle_chatbot_{unique_key_base}"
+                                    search_state_key = f"search_active_{search_key}"
+                                    if search_state_key not in st.session_state:
+                                        st.session_state[search_state_key] = False
+                                    search_toggle = st.button(
+                                        "🔍",
+                                        help="Search/Filter Results",
+                                        use_container_width=True,
+                                        key=search_key
+                                    )
+                                    if search_toggle:
+                                        st.session_state[search_state_key] = not st.session_state[search_state_key]
+                                        st.rerun()
+                                with result_col3:
+                                    # Visualization icon button
+                                    viz_key = f"viz_toggle_chatbot_{unique_key_base}"
+                                    viz_state_key = f"viz_active_{viz_key}"
+                                    if viz_state_key not in st.session_state:
+                                        st.session_state[viz_state_key] = False
+                                    viz_toggle = st.button(
+                                        "📊",
+                                        help="Data Visualization",
+                                        use_container_width=True,
+                                        key=viz_key
+                                    )
+                                    if viz_toggle:
+                                        st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+                                        st.rerun()
+                                with result_col4:
+                                    # Download CSV button
                                     csv = st.session_state.last_result_df.to_csv(index=False)
                                     st.download_button(
                                         "📥",
@@ -630,9 +662,28 @@ def chatbot_tab():
                                         use_container_width=True,
                                         key=f"download_auto_{unique_key_base}"
                                     )
+                                
+                                # Display search box if active (BEFORE dataframe)
+                                display_df = st.session_state.last_result_df.copy()
+                                if st.session_state.get(search_state_key, False):
+                                    search_input_key = f"search_input_{search_key}"
+                                    search_term = st.text_input(
+                                        "🔍 Search in results:",
+                                        key=search_input_key,
+                                        placeholder="Type to search across all columns..."
+                                    )
+                                    if search_term:
+                                        display_df = search_dataframe(display_df, search_term)
+                                        if len(display_df) < len(st.session_state.last_result_df):
+                                            st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
+                                
+                                # Display visualization if active (BEFORE dataframe)
+                                if st.session_state.get(viz_state_key, False):
+                                    visualize_dataframe(display_df, unique_suffix=f"chatbot_auto_result_{unique_key_base}")
+                                
                                 st.session_state.current_page = 1
                                 display_paginated_dataframe(
-                                    st.session_state.last_result_df, 
+                                    display_df, 
                                     unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                 )
                                 results_shown_for_latest = True
@@ -655,12 +706,44 @@ def chatbot_tab():
     
     if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
-        from utils.helpers import display_paginated_dataframe
+        from utils.helpers import display_paginated_dataframe, search_dataframe, visualize_dataframe
         st.markdown("---")
-        result_col1, result_col2 = st.columns([10, 1])
+        # Compact Results header with action icons - tighter spacing
+        result_col1, result_col2, result_col3, result_col4 = st.columns([9, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📊 Query Results**", unsafe_allow_html=True)
         with result_col2:
+            # Search icon button
+            search_key = "search_toggle_chatbot_fallback"
+            search_state_key = f"search_active_{search_key}"
+            if search_state_key not in st.session_state:
+                st.session_state[search_state_key] = False
+            search_toggle = st.button(
+                "🔍",
+                help="Search/Filter Results",
+                use_container_width=True,
+                key=search_key
+            )
+            if search_toggle:
+                st.session_state[search_state_key] = not st.session_state[search_state_key]
+                st.rerun()
+        with result_col3:
+            # Visualization icon button
+            viz_key = "viz_toggle_chatbot_fallback"
+            viz_state_key = f"viz_active_{viz_key}"
+            if viz_state_key not in st.session_state:
+                st.session_state[viz_state_key] = False
+            viz_toggle = st.button(
+                "📊",
+                help="Data Visualization",
+                use_container_width=True,
+                key=viz_key
+            )
+            if viz_toggle:
+                st.session_state[viz_state_key] = not st.session_state[viz_state_key]
+                st.rerun()
+        with result_col4:
+            # Download CSV button
             csv = st.session_state.last_result_df.to_csv(index=False)
             st.download_button(
                 "📥",
@@ -671,9 +754,28 @@ def chatbot_tab():
                 use_container_width=True,
                 key="download_auto_fallback"
             )
+        
+        # Display search box if active (BEFORE dataframe)
+        display_df = st.session_state.last_result_df.copy()
+        if st.session_state.get(search_state_key, False):
+            search_input_key = f"search_input_{search_key}"
+            search_term = st.text_input(
+                "🔍 Search in results:",
+                key=search_input_key,
+                placeholder="Type to search across all columns..."
+            )
+            if search_term:
+                display_df = search_dataframe(display_df, search_term)
+                if len(display_df) < len(st.session_state.last_result_df):
+                    st.info(f"Showing {len(display_df):,} of {len(st.session_state.last_result_df):,} rows matching '{search_term}'")
+        
+        # Display visualization if active (BEFORE dataframe)
+        if st.session_state.get(viz_state_key, False):
+            visualize_dataframe(display_df, unique_suffix="chatbot_auto_result_fallback")
+        
         st.session_state.current_page = 1
         display_paginated_dataframe(
-            st.session_state.last_result_df, 
+            display_df, 
             unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
         )
     
