@@ -264,10 +264,12 @@ def display_paginated_dataframe(df, unique_suffix=None):
             st.session_state[viz_state_key] = not old_state
             st.rerun()
     
-    # Display visualization if active (right after dataframe)
+    # Display visualization if active (right after dataframe and toggle)
+    # Get the current state after checkbox update
     viz_active = st.session_state.get(viz_state_key, False)
     if viz_active:
         print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
+        st.markdown("---")  # Separator before visualization
         try:
             visualize_dataframe(df, unique_suffix=f"viz_{unique_suffix}")
         except Exception as e:
