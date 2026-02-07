@@ -613,7 +613,7 @@ def chatbot_tab():
                                 results_shown_for_latest = True
                             else:
                                 # Show results
-                                from utils.helpers import display_paginated_dataframe, search_dataframe, visualize_dataframe
+                                from utils.helpers import display_paginated_dataframe
                                 print(f"DEBUG: ✅ Displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
                                 st.markdown("---")
                                 # Compact Results header with download icon
@@ -660,7 +660,7 @@ def chatbot_tab():
     
     if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
-        from utils.helpers import display_paginated_dataframe, search_dataframe, visualize_dataframe
+        from utils.helpers import display_paginated_dataframe
         st.markdown("---")
         # Compact Results header with download icon
         result_col1, result_col2 = st.columns([9, 0.4], gap="small")
