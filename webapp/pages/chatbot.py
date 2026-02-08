@@ -295,12 +295,37 @@ def chatbot_tab():
         viz_keys = [k for k in st.session_state.keys() if 'viz' in k.lower() or 'visualization' in k.lower()]
         st.write(f"**All Viz-related Keys:** `{viz_keys}`")
         
-        # Show debug info for each visualization instance
+        # Group keys by instance (extract unique suffix)
+        instances = {}
         for key in viz_keys:
             if 'viz_debug' in key:
-                debug_info = st.session_state.get(key, {})
-                st.write(f"---")
-                st.write(f"**Debug Key:** `{key}`")
+                suffix = key.replace('viz_debug_', '')
+                if suffix not in instances:
+                    instances[suffix] = {}
+                instances[suffix]['debug_key'] = key
+            elif 'viz_btn' in key:
+                # Extract suffix from button key (format: viz_btn_viz_icon_<suffix>)
+                if 'viz_icon_' in key:
+                    suffix = key.split('viz_icon_', 1)[1] if 'viz_icon_' in key else key
+                    if suffix not in instances:
+                        instances[suffix] = {}
+                    instances[suffix]['button_key'] = key
+            elif 'viz_active' in key:
+                # Extract suffix from state key (format: viz_active_viz_icon_<suffix>)
+                if 'viz_icon_' in key:
+                    suffix = key.split('viz_icon_', 1)[1] if 'viz_icon_' in key else key
+                    if suffix not in instances:
+                        instances[suffix] = {}
+                    instances[suffix]['state_key'] = key
+        
+        # Display debug info grouped by instance
+        for suffix, keys in instances.items():
+            st.write(f"---")
+            st.write(f"### Instance: `{suffix}`")
+            
+            # Show debug info
+            if 'debug_key' in keys:
+                debug_info = st.session_state.get(keys['debug_key'], {})
                 if isinstance(debug_info, dict):
                     st.write(f"**Button Clicked:** `{debug_info.get('button_clicked', False)}`")
                     st.write(f"**State Before Click:** `{debug_info.get('state_before', False)}`")
@@ -308,20 +333,24 @@ def chatbot_tab():
                     st.write(f"**Click Count:** `{debug_info.get('click_count', 0)}`")
                     st.write(f"**Last Checkbox State:** `{debug_info.get('last_checkbox_state', False)}`")
             
-            elif 'viz_btn' in key:
-                checkbox_state = st.session_state.get(key, False)
-                st.write(f"---")
-                st.write(f"**Checkbox Key:** `{key}`")
+            # Show checkbox state
+            if 'button_key' in keys:
+                checkbox_state = st.session_state.get(keys['button_key'], False)
+                st.write(f"**Checkbox Key:** `{keys['button_key']}`")
                 st.write(f"**Checkbox State:** `{checkbox_state}`")
             
-            elif 'viz_active' in key:
-                state_value = st.session_state.get(key, False)
-                st.write(f"---")
-                st.write(f"**State Key:** `{key}`")
+            # Show state key
+            if 'state_key' in keys:
+                state_value = st.session_state.get(keys['state_key'], False)
+                st.write(f"**State Key:** `{keys['state_key']}`")
                 st.write(f"**State Value:** `{state_value}`")
+                # Show if states match
+                if 'button_key' in keys:
+                    checkbox_state = st.session_state.get(keys['button_key'], False)
+                    st.write(f"**States Match:** `{checkbox_state == state_value}`")
         
-        if not viz_keys:
-            st.write("**No visualization-related keys found in session state**")
+        if not instances:
+            st.write("**No visualization instances found**")
 
     # If an agent (e.g., Debug Agent) requested to run suggested SQL, execute it here
     # Check this FIRST before rendering anything else, so results appear at the top

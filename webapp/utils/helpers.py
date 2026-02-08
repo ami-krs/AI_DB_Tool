@@ -238,18 +238,24 @@ def display_paginated_dataframe(df, unique_suffix=None):
         # This is the value that Streamlit stored when checkbox was clicked
         actual_state = st.session_state.get(button_key, False)
         
+        # Always update last_checkbox_state to current state (for accurate tracking)
+        debug_info['last_checkbox_state'] = actual_state
+        
         # Always sync state key with checkbox state (they should always match)
-        if st.session_state.get(viz_state_key, False) != actual_state:
+        current_state_key_value = st.session_state.get(viz_state_key, False)
+        if current_state_key_value != actual_state:
             # State is out of sync - sync it now
-            old_state = st.session_state.get(viz_state_key, False)
+            old_state = current_state_key_value
             st.session_state[viz_state_key] = actual_state
-            # If state changed, update debug info
+            # Update debug info to reflect the sync
             if actual_state != previous_checkbox_state:
                 debug_info['button_clicked'] = True
                 debug_info['state_before'] = old_state
                 debug_info['click_count'] = debug_info.get('click_count', 0) + 1
                 debug_info['state_after'] = actual_state
-                print(f"DEBUG: Visualization state synced - key: {button_key}, state: {old_state} -> {actual_state}")
+                print(f"DEBUG: Visualization state synced and changed - key: {button_key}, state: {old_state} -> {actual_state}")
+            else:
+                print(f"DEBUG: Visualization state synced (no change) - key: {button_key}, state: {old_state} -> {actual_state}")
         
         # Detect state change by comparing with previous state
         if actual_state != previous_checkbox_state:
@@ -260,13 +266,9 @@ def display_paginated_dataframe(df, unique_suffix=None):
                 debug_info['click_count'] = debug_info.get('click_count', 0) + 1
             st.session_state[viz_state_key] = actual_state
             debug_info['state_after'] = actual_state
-            debug_info['last_checkbox_state'] = actual_state
             print(f"DEBUG: Visualization toggle changed - key: {button_key}, state: {old_state} -> {actual_state}")
-        else:
-            # Update last checkbox state even if no change detected
-            debug_info['last_checkbox_state'] = actual_state
         
-        # Always store updated debug info
+        # Always store updated debug info with current checkbox state
         st.session_state[debug_key] = debug_info
     
     # Debug info is now shown at the top of the page (in chatbot.py) to persist after checkbox clicks
