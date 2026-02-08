@@ -228,13 +228,19 @@ def display_paginated_dataframe(df, unique_suffix=None):
         # Small icon button - toggle visualization on click
         current_viz_state = st.session_state.get(button_key, False)
         
+        # Use a separate key for the button click detection
+        button_click_key = f"{button_key}_click"
+        
         # Button click toggles the state
-        if st.button(
+        button_clicked = st.button(
             "📊",
-            key=button_key,
+            key=button_click_key,
             help="Toggle Data Visualization",
             use_container_width=True
-        ):
+        )
+        
+        # If button was clicked, toggle the state
+        if button_clicked:
             # Toggle state when button is clicked
             new_state = not current_viz_state
             st.session_state[button_key] = new_state
