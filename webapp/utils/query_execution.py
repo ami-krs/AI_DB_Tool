@@ -697,8 +697,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with download and visualization icons
-        result_col1, result_col2, result_col3 = st.columns([8.5, 0.4, 0.4], gap="small")
+        # Compact Results header with download and visualization icons - tighter spacing
+        result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
