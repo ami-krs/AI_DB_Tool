@@ -306,14 +306,14 @@ def chatbot_tab():
             elif 'viz_btn' in key:
                 # Extract suffix from button key (format: viz_btn_viz_icon_<suffix>)
                 if 'viz_icon_' in key:
-                    suffix = key.split('viz_icon_', 1)[1] if 'viz_icon_' in key else key
+                    suffix = key.split('viz_icon_', 1)[1]
                     if suffix not in instances:
                         instances[suffix] = {}
                     instances[suffix]['button_key'] = key
             elif 'viz_active' in key:
                 # Extract suffix from state key (format: viz_active_viz_icon_<suffix>)
                 if 'viz_icon_' in key:
-                    suffix = key.split('viz_icon_', 1)[1] if 'viz_icon_' in key else key
+                    suffix = key.split('viz_icon_', 1)[1]
                     if suffix not in instances:
                         instances[suffix] = {}
                     instances[suffix]['state_key'] = key
