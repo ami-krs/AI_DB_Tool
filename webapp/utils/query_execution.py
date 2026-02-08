@@ -429,8 +429,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with download icon (visualization icon is now in display_paginated_dataframe)
-            result_col1, result_col2 = st.columns([9, 0.4], gap="small")
+            # Compact Results header with download and visualization icons
+            result_col1, result_col2, result_col3 = st.columns([8.5, 0.4, 0.4], gap="small")
             with result_col1:
                 st.markdown("**📊 Results**", unsafe_allow_html=True)
             with result_col2:
@@ -448,6 +448,11 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     use_container_width=True,
                     key=download_key
                 )
+            with result_col3:
+                # Visualization icon button - positioned next to download CSV
+                from utils.helpers import _render_viz_icon_button
+                viz_suffix = f"query_result_{len(st.session_state.query_history)}"
+                _render_viz_icon_button(viz_suffix, result['dataframe'])
             
             # Search and visualization are now handled inside display_paginated_dataframe
             display_df = result['dataframe'].copy()
@@ -692,8 +697,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with action icons in same line - tighter spacing
-        result_col1, result_col2 = st.columns([9, 0.4], gap="small")
+        # Compact Results header with download and visualization icons
+        result_col1, result_col2, result_col3 = st.columns([8.5, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
@@ -711,6 +716,11 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 use_container_width=True,
                 key=download_key
             )
+        with result_col3:
+            # Visualization icon button - positioned next to download CSV
+            from utils.helpers import _render_viz_icon_button
+            viz_suffix = f"query_result_last_{len(st.session_state.query_history)}"
+            _render_viz_icon_button(viz_suffix, last_select_result)
         
         # Search and visualization are now handled inside display_paginated_dataframe
         display_df = last_select_result.copy()

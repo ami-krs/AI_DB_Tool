@@ -219,77 +219,13 @@ def display_paginated_dataframe(df, unique_suffix=None):
     previous_checkbox_state = st.session_state.get(button_key, False)
     debug_info['last_checkbox_state'] = previous_checkbox_state
     
-    # Use a small icon button instead of checkbox
-    # Position it in a small column on the right side, similar to Streamlit's built-in icons
-    toggle_col1, toggle_col2 = st.columns([0.97, 0.03])
-    with toggle_col1:
-        st.empty()  # Spacer to align with dataframe
-    with toggle_col2:
-        # Small icon button - toggle visualization on click
-        current_viz_state = st.session_state.get(button_key, False)
-        
-        # Use a separate key for the button click detection
-        button_click_key = f"{button_key}_click"
-        
-        # Button click toggles the state
-        button_clicked = st.button(
-            "📊",
-            key=button_click_key,
-            help="Toggle Data Visualization",
-            use_container_width=True
-        )
-        
-        # If button was clicked, toggle the state
-        if button_clicked:
-            # Toggle state when button is clicked
-            new_state = not current_viz_state
-            st.session_state[button_key] = new_state
-            st.session_state[viz_state_key] = new_state
-            actual_state = new_state
-            
-            # Update debug info
-            debug_info['button_clicked'] = True
-            debug_info['state_before'] = current_viz_state
-            debug_info['state_after'] = new_state
-            debug_info['click_count'] = debug_info.get('click_count', 0) + 1
-            debug_info['last_checkbox_state'] = new_state
-            print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {current_viz_state} -> {new_state}")
-        else:
-            # No click, use current state
-            actual_state = current_viz_state
-            debug_info['last_checkbox_state'] = actual_state
-        
-        # Always sync state key with button state
-        current_state_key_value = st.session_state.get(viz_state_key, False)
-        if current_state_key_value != actual_state:
-            st.session_state[viz_state_key] = actual_state
-        
-        # Always store updated debug info
-        st.session_state[debug_key] = debug_info
-    
-    # Add CSS to make the button small and unobtrusive
-    st.markdown("""
-    <style>
-        button[data-testid*="viz_btn"] {
-            min-height: 24px !important;
-            height: 24px !important;
-            padding: 2px 4px !important;
-            font-size: 14px !important;
-            border-radius: 4px !important;
-            border: 1px solid #e0e0e0 !important;
-            background-color: rgba(255, 255, 255, 0.9) !important;
-        }
-        button[data-testid*="viz_btn"]:hover {
-            background-color: rgba(240, 240, 240, 0.95) !important;
-            border-color: #14a085 !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # Visualization icon is now rendered in the header next to download CSV
+    # No need to render it here anymore
     
     # Debug info is now shown at the top of the page (in chatbot.py) to persist after button clicks
     # No need to show it here as it disappears when button is clicked
     
-    # Display visualization if active (right after dataframe and toggle)
+    # Display visualization if active (right after dataframe)
     # Read state directly from button key (this is the source of truth)
     button_key = f"viz_btn_{viz_icon_key}"
     viz_active = st.session_state.get(button_key, False)
