@@ -570,15 +570,15 @@ def chatbot_tab():
     #     st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
     #     st.write(f"- `chatbot_show_results_for_query` exists: {has_show_results_flag}")
     #     st.write(f"- `chatbot_auto_execution_error` exists: {has_auto_error}")
-        if has_last_result:
-            st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
-            st.write(f"- Result columns: {list(st.session_state.last_result_df.columns)[:5]}...")
-        if has_auto_query:
-            st.write(f"- Last auto-executed query: {st.session_state.chatbot_last_auto_executed_query[:100]}...")
-        if has_auto_error:
-            st.write(f"- Auto-execution error: {st.session_state.chatbot_auto_execution_error[:200]}...")
-        st.write(f"- Query history length: {len(st.session_state.get('query_history', []))}")
-        st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
+    #     if has_last_result:
+    #         st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
+    #         st.write(f"- Result columns: {list(st.session_state.last_result_df.columns)[:5]}...")
+    #     if has_auto_query:
+    #         st.write(f"- Last auto-executed query: {st.session_state.chatbot_last_auto_executed_query[:100]}...")
+    #     if has_auto_error:
+    #         st.write(f"- Auto-execution error: {st.session_state.chatbot_auto_execution_error[:200]}...")
+    #     st.write(f"- Query history length: {len(st.session_state.get('query_history', []))}")
+    #     st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
     
     # Display chat history
     print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
