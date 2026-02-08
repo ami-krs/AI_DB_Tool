@@ -5,7 +5,7 @@ python-dotenv>=1.0.1
 psycopg2-binary>=2.9.9        # PostgreSQL
 mysql-connector-python>=8.3.0  # MySQL
 pymssql>=2.2.11               # Microsoft SQL Server
-cx_Oracle>=8.3.0               # Oracle (optional, requires Oracle Instant Client)
+# cx_Oracle>=8.3.0               # Oracle (optional, requires Oracle Instant Client and setuptools)
 sqlalchemy>=2.0.23             # Universal database toolkit
 
 # AI/ML
