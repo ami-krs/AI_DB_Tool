@@ -99,21 +99,35 @@ def _render_viz_icon_button(unique_suffix, df):
     # Store dataframe reference for visualization
     st.session_state[f"viz_df_{unique_suffix}"] = df
     
-    # Add CSS to make the button small and match download button style
+    # Add CSS to make the button match download button size and style exactly
     st.markdown("""
     <style>
+        /* Match download button styling exactly */
         button[data-testid*="viz_btn"] {
-            min-height: 24px !important;
-            height: 24px !important;
-            padding: 2px 4px !important;
-            font-size: 14px !important;
-            border-radius: 4px !important;
-            border: 1px solid #e0e0e0 !important;
-            background-color: rgba(255, 255, 255, 0.9) !important;
+            height: 38.4px !important;
+            min-height: 38.4px !important;
+            max-height: 38.4px !important;
+            padding: 0.25rem 0.75rem !important;
+            font-size: 0.875rem !important;
+            line-height: 1.5 !important;
+            border-radius: 0.25rem !important;
+            border: 1px solid rgba(49, 51, 63, 0.2) !important;
+            background-color: rgb(255, 255, 255) !important;
+            color: rgb(38, 39, 48) !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
         }
         button[data-testid*="viz_btn"]:hover {
-            background-color: rgba(240, 240, 240, 0.95) !important;
-            border-color: #14a085 !important;
+            border-color: rgb(255, 75, 75) !important;
+            color: rgb(255, 75, 75) !important;
+        }
+        button[data-testid*="viz_btn"]:active {
+            background-color: rgba(49, 51, 63, 0.1) !important;
+        }
+        /* Ensure buttons are aligned in the same row */
+        div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
+            display: flex !important;
+            align-items: stretch !important;
         }
     </style>
     """, unsafe_allow_html=True)
