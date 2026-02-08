@@ -23,8 +23,8 @@ streamlit>=1.32.0              # Alternative: FastAPI for web UI
 
 # Data handling
 pandas>=2.2.0
-numpy>=2.1.0
-pyarrow>=16.0.0                # For Parquet export
+numpy>=1.24.0,<2.0.0
+pyarrow>=14.0.0                # For Parquet export
 
 # Visualization
 plotly>=5.18.0
