@@ -12,11 +12,16 @@ from pathlib import Path
 
 # Load environment variables (optional - Streamlit Cloud uses secrets.toml instead)
 # Note: python-dotenv is optional - Streamlit Cloud uses .streamlit/secrets.toml
+# Check if dotenv module is available before importing
+_dotenv_available = False
 try:
-    import dotenv
-    from dotenv import load_dotenv
-    load_dotenv()
-except (ImportError, ModuleNotFoundError):
+    import importlib.util
+    spec = importlib.util.find_spec("dotenv")
+    if spec is not None:
+        from dotenv import load_dotenv
+        load_dotenv()
+        _dotenv_available = True
+except (ImportError, ModuleNotFoundError, AttributeError):
     # python-dotenv not available (e.g., on Streamlit Cloud)
     # Streamlit Cloud uses .streamlit/secrets.toml instead
     pass
