@@ -9,10 +9,15 @@ import streamlit as st
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (optional - Streamlit Cloud uses secrets.toml instead)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not available (e.g., on Streamlit Cloud)
+    # Streamlit Cloud uses .streamlit/secrets.toml instead
+    pass
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
