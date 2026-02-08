@@ -38,6 +38,86 @@ def get_api_key(key_name: str) -> Optional[str]:
     
     return None
 
+def _render_viz_icon_button(unique_suffix, df):
+    """Render a small visualization icon button that toggles visualization display.
+    
+    Args:
+        unique_suffix: Unique suffix for this visualization instance
+        df: DataFrame to visualize when button is clicked
+    """
+    # Generate keys
+    viz_icon_key = f"viz_icon_{unique_suffix}"
+    button_key = f"viz_btn_{viz_icon_key}"
+    viz_state_key = f"viz_active_{viz_icon_key}"
+    button_click_key = f"{button_key}_click"
+    debug_key = f"viz_debug_{unique_suffix}"
+    
+    # Initialize state if needed
+    if button_key not in st.session_state:
+        st.session_state[button_key] = False
+    if viz_state_key not in st.session_state:
+        st.session_state[viz_state_key] = False
+    if debug_key not in st.session_state:
+        st.session_state[debug_key] = {
+            'button_clicked': False,
+            'state_before': False,
+            'state_after': False,
+            'click_count': 0,
+            'last_checkbox_state': False
+        }
+    
+    current_viz_state = st.session_state.get(button_key, False)
+    debug_info = st.session_state[debug_key]
+    
+    # Button click toggles the state
+    button_clicked = st.button(
+        "📊",
+        key=button_click_key,
+        help="Toggle Data Visualization",
+        use_container_width=True
+    )
+    
+    # If button was clicked, toggle the state
+    if button_clicked:
+        new_state = not current_viz_state
+        st.session_state[button_key] = new_state
+        st.session_state[viz_state_key] = new_state
+        
+        # Update debug info
+        debug_info['button_clicked'] = True
+        debug_info['state_before'] = current_viz_state
+        debug_info['state_after'] = new_state
+        debug_info['click_count'] = debug_info.get('click_count', 0) + 1
+        debug_info['last_checkbox_state'] = new_state
+        print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {current_viz_state} -> {new_state}")
+    else:
+        debug_info['last_checkbox_state'] = current_viz_state
+    
+    # Store updated debug info
+    st.session_state[debug_key] = debug_info
+    
+    # Store dataframe reference for visualization
+    st.session_state[f"viz_df_{unique_suffix}"] = df
+    
+    # Add CSS to make the button small and match download button style
+    st.markdown("""
+    <style>
+        button[data-testid*="viz_btn"] {
+            min-height: 24px !important;
+            height: 24px !important;
+            padding: 2px 4px !important;
+            font-size: 14px !important;
+            border-radius: 4px !important;
+            border: 1px solid #e0e0e0 !important;
+            background-color: rgba(255, 255, 255, 0.9) !important;
+        }
+        button[data-testid*="viz_btn"]:hover {
+            background-color: rgba(240, 240, 240, 0.95) !important;
+            border-color: #14a085 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 def display_paginated_dataframe(df, unique_suffix=None):
     """Display dataframe with pagination controls
     
