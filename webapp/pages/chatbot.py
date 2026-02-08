@@ -730,8 +730,8 @@ def chatbot_tab():
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
         from utils.helpers import display_paginated_dataframe
         st.markdown("---")
-        # Compact Results header with download icon
-        result_col1, result_col2 = st.columns([9, 0.4], gap="small")
+        # Compact Results header with download and visualization icons
+        result_col1, result_col2, result_col3 = st.columns([8.5, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📊 Query Results**", unsafe_allow_html=True)
         with result_col2:
@@ -746,6 +746,11 @@ def chatbot_tab():
                 use_container_width=True,
                 key="download_auto_fallback"
             )
+        with result_col3:
+            # Visualization icon button - positioned next to download CSV
+            from utils.helpers import _render_viz_icon_button
+            viz_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+            _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
         
         # Search and visualization are now handled inside display_paginated_dataframe
         display_df = st.session_state.last_result_df.copy()
