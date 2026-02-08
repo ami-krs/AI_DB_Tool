@@ -274,23 +274,23 @@ def chatbot_tab():
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
-    # Debug section for agent SQL execution (visible on page)
-    with st.expander("🔍 Agent SQL Execution Debug", expanded=False):
-        agent_sql_debug = st.session_state.get("agent_sql_to_run")
-        agent_result_debug = st.session_state.get("agent_sql_execution_result")
-        st.write(f"**agent_sql_to_run exists:** {agent_sql_debug is not None}")
-        if agent_sql_debug:
-            st.write(f"**agent_sql value:** {agent_sql_debug[:200]}...")
-        st.write(f"**agent_sql_execution_result exists:** {agent_result_debug is not None}")
-        if agent_result_debug:
-            st.write(f"**Result status:** {agent_result_debug.get('status', 'unknown')}")
-        st.write(f"**agent_sql_source:** {st.session_state.get('agent_sql_source', 'None')}")
-        # Show all agent-related keys
-        agent_keys = [k for k in st.session_state.keys() if 'agent' in k.lower()]
-        st.write(f"**All agent-related keys:** {agent_keys}")
+    # Debug section for agent SQL execution (DISABLED for performance)
+    # with st.expander("🔍 Agent SQL Execution Debug", expanded=False):
+    #     agent_sql_debug = st.session_state.get("agent_sql_to_run")
+    #     agent_result_debug = st.session_state.get("agent_sql_execution_result")
+    #     st.write(f"**agent_sql_to_run exists:** {agent_sql_debug is not None}")
+    #     if agent_sql_debug:
+    #         st.write(f"**agent_sql value:** {agent_sql_debug[:200]}...")
+    #     st.write(f"**agent_sql_execution_result exists:** {agent_result_debug is not None}")
+    #     if agent_result_debug:
+    #         st.write(f"**Result status:** {agent_result_debug.get('status', 'unknown')}")
+    #     st.write(f"**agent_sql_source:** {st.session_state.get('agent_sql_source', 'None')}")
+    #     # Show all agent-related keys
+    #     agent_keys = [k for k in st.session_state.keys() if 'agent' in k.lower()]
+    #     st.write(f"**All agent-related keys:** {agent_keys}")
     
-    # Visualization Debug Info - moved to top to persist after checkbox clicks
-    with st.expander("🔍 Visualization Debug Info", expanded=True):
+    # Visualization Debug Info (DISABLED for performance)
+    # with st.expander("🔍 Visualization Debug Info", expanded=True):
         # Find all visualization-related keys
         viz_keys = [k for k in st.session_state.keys() if 'viz' in k.lower() or 'visualization' in k.lower()]
         st.write(f"**All Viz-related Keys:** `{viz_keys}`")
@@ -560,14 +560,16 @@ def chatbot_tab():
     has_auto_query = st.session_state.get('chatbot_last_auto_executed_query') is not None
     has_auto_error = st.session_state.get('chatbot_auto_execution_error') is not None
     has_show_results_flag = st.session_state.get('chatbot_show_results_for_query') is not None
-    print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}, has_show_flag={has_show_results_flag}")
+    # Debug logging disabled for performance (can be enabled if needed)
+    # print(f"DEBUG: Checking for results - has_last_result={has_last_result}, has_auto_query={has_auto_query}, has_auto_error={has_auto_error}, has_show_flag={has_show_results_flag}")
     
-    with st.expander("🔍 Debug Info (Click to see)", expanded=False):
-        st.write("**Session State Check:**")
-        st.write(f"- `last_result_df` exists: {has_last_result}")
-        st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
-        st.write(f"- `chatbot_show_results_for_query` exists: {has_show_results_flag}")
-        st.write(f"- `chatbot_auto_execution_error` exists: {has_auto_error}")
+    # Debug Info section (DISABLED for performance)
+    # with st.expander("🔍 Debug Info (Click to see)", expanded=False):
+    #     st.write("**Session State Check:**")
+    #     st.write(f"- `last_result_df` exists: {has_last_result}")
+    #     st.write(f"- `chatbot_last_auto_executed_query` exists: {has_auto_query}")
+    #     st.write(f"- `chatbot_show_results_for_query` exists: {has_show_results_flag}")
+    #     st.write(f"- `chatbot_auto_execution_error` exists: {has_auto_error}")
         if has_last_result:
             st.write(f"- Result rows: {len(st.session_state.last_result_df)}")
             st.write(f"- Result columns: {list(st.session_state.last_result_df.columns)[:5]}...")
