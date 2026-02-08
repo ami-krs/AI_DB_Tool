@@ -356,7 +356,8 @@ def chatbot_tab():
     # Check this FIRST before rendering anything else, so results appear at the top
     # Check if we need to execute agent SQL (persist across reruns)
     
-    print(f"DEBUG: chatbot_tab - agent_sql exists: {agent_sql is not None}, agent_execution_result exists: {agent_execution_result is not None}")
+    # Debug logging disabled for performance
+    # print(f"DEBUG: chatbot_tab - agent_sql exists: {agent_sql is not None}, agent_execution_result exists: {agent_execution_result is not None}")
     if agent_sql:
         print(f"DEBUG: agent_sql value: {agent_sql[:100] if agent_sql else 'None'}...")
     
@@ -581,7 +582,8 @@ def chatbot_tab():
     #     st.write(f"- Chat history length: {len(st.session_state.get('chat_history', []))}")
     
     # Display chat history
-    print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
+    # Debug logging disabled for performance
+    # print(f"DEBUG: Displaying chat history - total messages: {len(st.session_state.chat_history) if st.session_state.chat_history else 0}")
     
     # Track if we've shown results for the latest message
     results_shown_for_latest = False
