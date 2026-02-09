@@ -147,6 +147,16 @@ def _render_viz_icon_button(unique_suffix, df):
                 /* Match vertical alignment */
                 vertical-align: middle !important;
             }
+            /* Control emoji size to match download button emoji size */
+            button[data-testid*="viz_btn"]::before,
+            button[data-testid*="viz_btn"] {
+                font-size: 0.875rem !important;
+            }
+            /* Ensure emoji doesn't scale differently */
+            button[data-testid*="viz_btn"] * {
+                font-size: inherit !important;
+                line-height: inherit !important;
+            }
             button[data-testid*="viz_btn"]:hover {
                 border-color: rgb(255, 75, 75) !important;
                 color: rgb(255, 75, 75) !important;
