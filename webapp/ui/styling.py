@@ -414,8 +414,8 @@ def inject_base_css():
     }
     
     /* Compact Results header */
-    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📊 Results")) p,
-    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📊 Last Query Results")) p {
+    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📋 Results")) p,
+    div[data-testid="stVerticalBlock"]:has(> div > div > p:has-text("📋 Last Query Results")) p {
         font-size: 1rem !important;
         margin-bottom: 0.25rem !important;
         margin-top: 0.25rem !important;

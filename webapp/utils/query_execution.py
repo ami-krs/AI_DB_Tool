@@ -432,7 +432,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Compact Results header with download and visualization icons - tighter spacing
             result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
             with result_col1:
-                st.markdown("**📊 Results**", unsafe_allow_html=True)
+                st.markdown("**📋 Results**", unsafe_allow_html=True)
             with result_col2:
                 # Download CSV button
                 csv = result['dataframe'].to_csv(index=False)
@@ -700,7 +700,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         # Compact Results header with download and visualization icons - tighter spacing
         result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
         with result_col1:
-            st.markdown("**📊 Last Query Results**", unsafe_allow_html=True)
+            st.markdown("**📋 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
             # Download CSV button - same size
             csv = last_select_result.to_csv(index=False)

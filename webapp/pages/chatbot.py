@@ -686,7 +686,7 @@ def chatbot_tab():
                                 # Compact Results header with download and visualization icons - tighter spacing
                                 result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
                                 with result_col1:
-                                    st.markdown("**📊 Query Results**", unsafe_allow_html=True)
+                                    st.markdown("**📋 Query Results**", unsafe_allow_html=True)
                                 with result_col2:
                                     # Download CSV button
                                     csv = st.session_state.last_result_df.to_csv(index=False)
@@ -737,7 +737,7 @@ def chatbot_tab():
         # Compact Results header with download and visualization icons - tighter spacing
         result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
         with result_col1:
-            st.markdown("**📊 Query Results**", unsafe_allow_html=True)
+            st.markdown("**📋 Query Results**", unsafe_allow_html=True)
         with result_col2:
             # Download CSV button
             csv = st.session_state.last_result_df.to_csv(index=False)

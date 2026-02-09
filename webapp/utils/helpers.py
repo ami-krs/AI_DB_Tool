@@ -72,8 +72,9 @@ def _render_viz_icon_button(unique_suffix, df):
     
     # Button click toggles the state
     # Use width='stretch' to match download button behavior (new Streamlit API)
+    # Using 📈 (chart increasing) icon to differentiate from 📋 (Query Results)
     button_clicked = st.button(
-        "📊",
+        "📈",
         key=button_click_key,
         help="Toggle Data Visualization",
         width="stretch"  # New Streamlit API - replaces use_container_width=True
