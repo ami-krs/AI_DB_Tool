@@ -238,6 +238,29 @@ class SQLChatbot:
                         print(f"DEBUG: Table '{table.get('table_name', 'unknown')}' has {len(cols)} columns")
                         if cols:
                             print(f"DEBUG: First column: {cols[0] if isinstance(cols[0], dict) else cols[0]}")
+                
+                # Check if the requested table exists and has columns
+                user_upper = user_message.upper()
+                requested_table = None
+                for keyword in ['INSERT INTO', 'UPDATE', 'DELETE FROM', 'IN', 'TABLE']:
+                    if keyword in user_upper:
+                        # Try to extract table name (simple heuristic)
+                        parts = user_message.upper().split()
+                        for i, part in enumerate(parts):
+                            if part in ['INTO', 'FROM', 'TABLE'] and i + 1 < len(parts):
+                                potential_table = parts[i + 1].strip('.,;')
+                                # Check if this table exists in schema
+                                for table in tables:
+                                    if isinstance(table, dict):
+                                        table_name = table.get('table_name', '').upper()
+                                        if table_name == potential_table.upper():
+                                            requested_table = table
+                                            cols = table.get('columns', [])
+                                            print(f"DEBUG: Found requested table '{table.get('table_name')}' with {len(cols)} columns")
+                                            if not cols:
+                                                print(f"DEBUG: WARNING - Requested table '{table.get('table_name')}' has NO column details!")
+                                            break
+                        break
             elif tables:
                 print(f"DEBUG: First 5 table names: {tables[:5]}")
         else:
