@@ -103,29 +103,22 @@ def _render_viz_icon_button(unique_suffix, df):
     # Storing large dataframes in session state can significantly slow down app performance
     # The dataframe is passed directly to visualize_dataframe when needed
     
-    # Inject CSS only once per session to avoid repeated injection (performance optimization)
+    # Inject CSS and JavaScript only once per session to avoid repeated injection (performance optimization)
     css_key = "viz_button_css_injected"
     if css_key not in st.session_state:
         st.markdown("""
         <style>
             /* Match Streamlit download button styling EXACTLY */
-            /* Streamlit download buttons are actually smaller than regular buttons */
-            /* They use specific dimensions that we need to match precisely */
+            /* Use JavaScript to dynamically match download button size */
             button[data-testid*="viz_btn"] {
-                /* CRITICAL: Match Streamlit download button exact height */
+                /* Start with base styling - will be overridden by JavaScript */
                 height: 38.4px !important;
                 min-height: 38.4px !important;
                 max-height: 38.4px !important;
-                /* Match width to fill container like download button */
                 width: 100% !important;
-                min-width: 0 !important;
-                max-width: 100% !important;
-                /* CRITICAL: Download buttons use minimal padding */
                 padding: 0.25rem 0.375rem !important;
-                /* CRITICAL: Match download button font size exactly */
                 font-size: 0.875rem !important;
                 line-height: 1.4 !important;
-                /* Match border and styling */
                 border-radius: 0.25rem !important;
                 border: 1px solid rgba(49, 51, 63, 0.2) !important;
                 background-color: rgb(255, 255, 255) !important;
@@ -135,27 +128,12 @@ def _render_viz_icon_button(unique_suffix, df):
                 align-items: center !important;
                 justify-content: center !important;
                 margin: 0 !important;
-                /* Remove any transforms or scaling */
                 transform: none !important;
                 scale: 1 !important;
-                /* Match font weight */
                 font-weight: 400 !important;
-                /* Ensure no extra spacing */
                 letter-spacing: normal !important;
-                /* Remove any text decoration */
                 text-decoration: none !important;
-                /* Match vertical alignment */
                 vertical-align: middle !important;
-            }
-            /* Control emoji size to match download button emoji size */
-            button[data-testid*="viz_btn"]::before,
-            button[data-testid*="viz_btn"] {
-                font-size: 0.875rem !important;
-            }
-            /* Ensure emoji doesn't scale differently */
-            button[data-testid*="viz_btn"] * {
-                font-size: inherit !important;
-                line-height: inherit !important;
             }
             button[data-testid*="viz_btn"]:hover {
                 border-color: rgb(255, 75, 75) !important;
@@ -165,35 +143,75 @@ def _render_viz_icon_button(unique_suffix, df):
             button[data-testid*="viz_btn"]:active {
                 background-color: rgba(49, 51, 63, 0.1) !important;
             }
-            /* Ensure the button container matches download button container */
-            div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 0 !important;
-                width: 100% !important;
-            }
-            /* Also target the direct parent to ensure proper sizing */
-            div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) > div {
-                width: 100% !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-            /* Match download button container exactly */
-            div[data-testid*="column"]:has(button[data-testid*="baseButton-download"]) {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 0 !important;
-                width: 100% !important;
-            }
-            /* Ensure both buttons have the same container treatment */
-            div[data-testid*="column"]:has(button[data-testid*="viz_btn"]),
-            div[data-testid*="column"]:has(button[data-testid*="baseButton-download"]) {
-                flex: 0 0 auto !important;
-            }
         </style>
+        <script>
+        (function() {
+            function matchDownloadButtonSize() {
+                // Find the download button in the same row
+                const vizButtons = document.querySelectorAll('button[data-testid*="viz_btn"]');
+                vizButtons.forEach(function(vizBtn) {
+                    // Find the download button in the same parent container
+                    const parentColumn = vizBtn.closest('[data-testid*="column"]');
+                    if (!parentColumn) return;
+                    
+                    // Find the previous sibling column that contains the download button
+                    const allColumns = Array.from(parentColumn.parentElement.querySelectorAll('[data-testid*="column"]'));
+                    const currentIndex = allColumns.indexOf(parentColumn);
+                    const downloadColumn = allColumns[currentIndex - 1];
+                    
+                    if (downloadColumn) {
+                        const downloadBtn = downloadColumn.querySelector('button[data-testid*="baseButton-download"]');
+                        if (downloadBtn) {
+                            // Get computed styles from download button
+                            const downloadStyles = window.getComputedStyle(downloadBtn);
+                            const downloadHeight = downloadStyles.height;
+                            const downloadWidth = downloadStyles.width;
+                            const downloadPadding = downloadStyles.padding;
+                            const downloadFontSize = downloadStyles.fontSize;
+                            
+                            // Apply exact same dimensions to visualization button
+                            vizBtn.style.height = downloadHeight;
+                            vizBtn.style.minHeight = downloadHeight;
+                            vizBtn.style.maxHeight = downloadHeight;
+                            vizBtn.style.width = downloadWidth;
+                            vizBtn.style.minWidth = downloadWidth;
+                            vizBtn.style.maxWidth = downloadWidth;
+                            vizBtn.style.padding = downloadPadding;
+                            vizBtn.style.fontSize = downloadFontSize;
+                            
+                            console.log('Matched viz button to download button:', {
+                                height: downloadHeight,
+                                width: downloadWidth,
+                                padding: downloadPadding,
+                                fontSize: downloadFontSize
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Run immediately and after DOM updates
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', matchDownloadButtonSize);
+            } else {
+                matchDownloadButtonSize();
+            }
+            
+            // Also run after a short delay to catch dynamically added buttons
+            setTimeout(matchDownloadButtonSize, 100);
+            setTimeout(matchDownloadButtonSize, 500);
+            setTimeout(matchDownloadButtonSize, 1000);
+            
+            // Watch for new buttons being added
+            const observer = new MutationObserver(function(mutations) {
+                matchDownloadButtonSize();
+            });
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        })();
+        </script>
         """, unsafe_allow_html=True)
         st.session_state[css_key] = True
 
