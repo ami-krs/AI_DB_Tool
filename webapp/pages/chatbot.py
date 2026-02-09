@@ -683,8 +683,8 @@ def chatbot_tab():
                                 from utils.helpers import display_paginated_dataframe
                                 print(f"DEBUG: ✅ Displaying results after latest message - rows: {len(st.session_state.last_result_df)}")
                                 st.markdown("---")
-                                # Compact Results header with download and visualization icons - tighter spacing
-                                result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
+                                # Compact Results header with download, visualization, and data explorer icons
+                                result_col1, result_col2, result_col3, result_col4 = st.columns([7.5, 0.4, 0.4, 0.4], gap="small")
                                 with result_col1:
                                     st.markdown("**📋 Query Results**", unsafe_allow_html=True)
                                 with result_col2:
@@ -704,6 +704,48 @@ def chatbot_tab():
                                     from utils.helpers import _render_viz_icon_button
                                     viz_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                     _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
+                                with result_col4:
+                                    # Data Explorer icon button - positioned next to visualization button
+                                    from utils.helpers import _render_data_explorer_button
+                                    explorer_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                    explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
+                                
+                                # Display Data Explorer if active
+                                if explorer_active:
+                                    st.markdown("---")
+                                    st.markdown("### 🔍 Data Explorer")
+                                    try:
+                                        # Show basic statistics
+                                        st.markdown("**Data Overview:**")
+                                        col1, col2, col3 = st.columns(3)
+                                        with col1:
+                                            st.metric("Rows", f"{len(st.session_state.last_result_df):,}")
+                                        with col2:
+                                            st.metric("Columns", len(st.session_state.last_result_df.columns))
+                                        with col3:
+                                            numeric_cols = st.session_state.last_result_df.select_dtypes(include=['number']).columns
+                                            st.metric("Numeric Columns", len(numeric_cols))
+                                        
+                                        # Show column info
+                                        st.markdown("**Column Information:**")
+                                        col_info = pd.DataFrame({
+                                            'Column': st.session_state.last_result_df.columns,
+                                            'Data Type': [str(dtype) for dtype in st.session_state.last_result_df.dtypes],
+                                            'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
+                                            'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
+                                        })
+                                        st.dataframe(col_info, use_container_width=True, hide_index=True)
+                                        
+                                        # Show basic statistics for numeric columns
+                                        if len(numeric_cols) > 0:
+                                            st.markdown("**Numeric Column Statistics:**")
+                                            st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
+                                        
+                                        # Show sample data
+                                        st.markdown("**Sample Data:**")
+                                        st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
+                                    except Exception as e:
+                                        st.error(f"Error displaying data explorer: {str(e)}")
                                 
                                 # Search and visualization are now handled inside display_paginated_dataframe
                                 display_df = st.session_state.last_result_df.copy()
@@ -755,6 +797,43 @@ def chatbot_tab():
             from utils.helpers import _render_viz_icon_button
             viz_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
             _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
+        
+        # Display Data Explorer if active
+        if explorer_active:
+            st.markdown("---")
+            st.markdown("### 🔍 Data Explorer")
+            try:
+                # Show basic statistics
+                st.markdown("**Data Overview:**")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Rows", f"{len(st.session_state.last_result_df):,}")
+                with col2:
+                    st.metric("Columns", len(st.session_state.last_result_df.columns))
+                with col3:
+                    numeric_cols = st.session_state.last_result_df.select_dtypes(include=['number']).columns
+                    st.metric("Numeric Columns", len(numeric_cols))
+                
+                # Show column info
+                st.markdown("**Column Information:**")
+                col_info = pd.DataFrame({
+                    'Column': st.session_state.last_result_df.columns,
+                    'Data Type': [str(dtype) for dtype in st.session_state.last_result_df.dtypes],
+                    'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
+                    'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
+                })
+                st.dataframe(col_info, use_container_width=True, hide_index=True)
+                
+                # Show basic statistics for numeric columns
+                if len(numeric_cols) > 0:
+                    st.markdown("**Numeric Column Statistics:**")
+                    st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
+                
+                # Show sample data
+                st.markdown("**Sample Data:**")
+                st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
+            except Exception as e:
+                st.error(f"Error displaying data explorer: {str(e)}")
         
         # Search and visualization are now handled inside display_paginated_dataframe
         display_df = st.session_state.last_result_df.copy()

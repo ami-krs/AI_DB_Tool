@@ -232,6 +232,149 @@ def _render_viz_icon_button(unique_suffix, df):
         """, unsafe_allow_html=True)
         st.session_state[css_key] = True
 
+def _render_data_explorer_button(unique_suffix, df):
+    """Render a Data Explorer icon button that toggles data explorer display.
+    
+    Args:
+        unique_suffix: Unique suffix for this data explorer instance
+        df: DataFrame to explore when button is clicked
+    """
+    # Generate keys
+    explorer_icon_key = f"explorer_icon_{unique_suffix}"
+    button_key = f"explorer_btn_{explorer_icon_key}"
+    explorer_state_key = f"explorer_active_{explorer_icon_key}"
+    button_click_key = f"{button_key}_click"
+    
+    # Initialize state if needed
+    if button_key not in st.session_state:
+        st.session_state[button_key] = False
+    if explorer_state_key not in st.session_state:
+        st.session_state[explorer_state_key] = False
+    
+    current_explorer_state = st.session_state.get(button_key, False)
+    
+    # Button click toggles the state
+    # Use width='stretch' to match download button behavior (new Streamlit API)
+    # Using 🔍 (magnifying glass) icon for Data Explorer
+    button_clicked = st.button(
+        "🔍",
+        key=button_click_key,
+        help="Toggle Data Explorer",
+        width="stretch"  # New Streamlit API - replaces use_container_width=True
+    )
+    
+    # If button was clicked, toggle the state
+    if button_clicked:
+        new_state = not current_explorer_state
+        st.session_state[button_key] = new_state
+        st.session_state[explorer_state_key] = new_state
+    
+    # Inject CSS only once per session (shared with viz button)
+    css_key = "explorer_button_css_injected"
+    if css_key not in st.session_state:
+        st.markdown("""
+        <style>
+            /* Match Streamlit download button styling EXACTLY */
+            button[data-testid*="explorer_btn"] {
+                height: 38.4px !important;
+                min-height: 38.4px !important;
+                max-height: 38.4px !important;
+                width: 100% !important;
+                padding: 0.25rem 0.375rem !important;
+                font-size: 0.875rem !important;
+                line-height: 1.4 !important;
+                border-radius: 0.25rem !important;
+                border: 1px solid rgba(49, 51, 63, 0.2) !important;
+                background-color: rgb(255, 255, 255) !important;
+                color: rgb(38, 39, 48) !important;
+                box-sizing: border-box !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                transform: none !important;
+                scale: 1 !important;
+                font-weight: 400 !important;
+                letter-spacing: normal !important;
+                text-decoration: none !important;
+                vertical-align: middle !important;
+            }
+            button[data-testid*="explorer_btn"]:hover {
+                border-color: rgb(255, 75, 75) !important;
+                color: rgb(255, 75, 75) !important;
+                background-color: rgba(255, 75, 75, 0.05) !important;
+            }
+            button[data-testid*="explorer_btn"]:active {
+                background-color: rgba(49, 51, 63, 0.1) !important;
+            }
+        </style>
+        <script>
+        (function() {
+            function matchDownloadButtonSizeForExplorer() {
+                const explorerButtons = document.querySelectorAll('button[data-testid*="explorer_btn"]');
+                explorerButtons.forEach(function(explorerBtn) {
+                    const parentColumn = explorerBtn.closest('[data-testid*="column"]');
+                    if (!parentColumn) return;
+                    
+                    const allColumns = Array.from(parentColumn.parentElement.querySelectorAll('[data-testid*="column"]'));
+                    const currentIndex = allColumns.indexOf(parentColumn);
+                    const downloadColumn = allColumns[0]; // First column should have download button
+                    
+                    if (downloadColumn) {
+                        const downloadBtn = downloadColumn.querySelector('button[data-testid*="baseButton-download"]');
+                        if (downloadBtn) {
+                            const downloadStyles = window.getComputedStyle(downloadBtn);
+                            explorerBtn.style.height = downloadStyles.height;
+                            explorerBtn.style.minHeight = downloadStyles.height;
+                            explorerBtn.style.maxHeight = downloadStyles.height;
+                            explorerBtn.style.width = downloadStyles.width;
+                            explorerBtn.style.minWidth = downloadStyles.width;
+                            explorerBtn.style.maxWidth = downloadStyles.width;
+                            explorerBtn.style.padding = downloadStyles.padding;
+                            explorerBtn.style.fontSize = downloadStyles.fontSize;
+                        }
+                    }
+                });
+            }
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', matchDownloadButtonSizeForExplorer);
+            } else {
+                matchDownloadButtonSizeForExplorer();
+            }
+            
+            setTimeout(matchDownloadButtonSizeForExplorer, 100);
+            setTimeout(matchDownloadButtonSizeForExplorer, 500);
+            setTimeout(matchDownloadButtonSizeForExplorer, 1000);
+            
+            let timeoutId = null;
+            const observer = new MutationObserver(function(mutations) {
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(matchDownloadButtonSizeForExplorer, 200);
+            });
+            if (document.body) {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } else {
+                setTimeout(function() {
+                    if (document.body) {
+                        observer.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+                    }
+                }, 100);
+            }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state[css_key] = True
+    
+    # Return the state key for checking if explorer should be displayed
+    return button_key, current_explorer_state
+
 def display_paginated_dataframe(df, unique_suffix=None):
     """Display dataframe with pagination controls
     
