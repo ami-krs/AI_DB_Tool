@@ -747,7 +747,7 @@ def chatbot_tab():
                 "results.csv",
                 "text/csv",
                 help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
-                use_container_width=True,
+                width="stretch",  # New Streamlit API - replaces use_container_width=True
                 key="download_auto_fallback"
             )
         with result_col3:

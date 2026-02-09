@@ -71,12 +71,12 @@ def _render_viz_icon_button(unique_suffix, df):
     debug_info = st.session_state[debug_key]
     
     # Button click toggles the state
-    # Use use_container_width=True to match download button behavior
+    # Use width='stretch' to match download button behavior (new Streamlit API)
     button_clicked = st.button(
         "📊",
         key=button_click_key,
         help="Toggle Data Visualization",
-        use_container_width=True
+        width="stretch"  # New Streamlit API - replaces use_container_width=True
     )
     
     # If button was clicked, toggle the state
