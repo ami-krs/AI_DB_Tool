@@ -366,7 +366,22 @@ REQUIRED:
 2. Provide a CORRECTED SQL query in a ```sql code block using ONLY actual column names from the schema above
 3. Replace any generic column names (like 'id') with actual column names from the schema
 4. For JOIN queries: Use actual foreign key columns from the schema (e.g., 'department_id', 'employee_id')
-5. For MULTIPLE UPDATE statements with foreign key relationships:
+5. For INSERT statements with foreign key violations:
+   - If error mentions "foreign key constraint" or "Key (column_name)=(value) is not present in table":
+     * The foreign key value does not exist in the referenced table
+     * Solution 1 (RECOMMENDED): First query existing values from the parent table, then use those values
+       Example: If inserting into 'employee' with 'department_id', first run:
+       SELECT department_id FROM department;
+       Then use only those existing department_id values in your INSERT statements
+     * Solution 2: Generate INSERT statements for the parent table first (if it's empty)
+       Example: If 'department' table is empty, first insert departments:
+       INSERT INTO department (department_id, department_name) VALUES (101, 'Sales');
+       INSERT INTO department (department_id, department_name) VALUES (102, 'Marketing');
+       Then insert employees using those department_id values
+     * Solution 3: Use NULL if the foreign key column allows NULL values
+       Example: INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (1, 'John', NULL, 50000);
+     * NEVER suggest using non-existent foreign key values
+6. For MULTIPLE UPDATE statements with foreign key relationships:
    - If error mentions "foreign key constraint" or "referential integrity":
      * Identify which table is the PARENT (referenced) and which is the CHILD (referencing)
      * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
