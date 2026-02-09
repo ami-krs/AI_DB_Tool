@@ -108,16 +108,25 @@ def _render_viz_icon_button(unique_suffix, df):
     if css_key not in st.session_state:
         st.markdown("""
         <style>
-            /* Match Streamlit download button styling exactly */
-            /* Streamlit download buttons with use_container_width=True fill the container */
+            /* Match Streamlit download button styling EXACTLY */
+            /* Streamlit download buttons use specific classes and have fixed dimensions */
+            /* Target the button by its key attribute to override Streamlit defaults */
+            /* First, let's inspect and match the actual download button styles */
             button[data-testid*="viz_btn"] {
+                /* Match Streamlit's download button exact dimensions - these are the actual values */
                 height: 38.4px !important;
                 min-height: 38.4px !important;
                 max-height: 38.4px !important;
+                /* Critical: Match the exact width behavior of download button */
                 width: 100% !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                /* Match Streamlit's button padding exactly - download buttons use less padding */
                 padding: 0.25rem 0.5rem !important;
-                font-size: 1rem !important;
+                /* Match font size - download buttons use smaller font */
+                font-size: 0.875rem !important;
                 line-height: 1.5 !important;
+                /* Match border and styling */
                 border-radius: 0.25rem !important;
                 border: 1px solid rgba(49, 51, 63, 0.2) !important;
                 background-color: rgb(255, 255, 255) !important;
@@ -127,6 +136,13 @@ def _render_viz_icon_button(unique_suffix, df):
                 align-items: center !important;
                 justify-content: center !important;
                 margin: 0 !important;
+                /* Remove any transforms or scaling that might make it appear larger */
+                transform: none !important;
+                scale: 1 !important;
+                /* Match font weight */
+                font-weight: 400 !important;
+                /* Ensure no extra spacing */
+                letter-spacing: normal !important;
             }
             button[data-testid*="viz_btn"]:hover {
                 border-color: rgb(255, 75, 75) !important;
@@ -136,17 +152,23 @@ def _render_viz_icon_button(unique_suffix, df):
             button[data-testid*="viz_btn"]:active {
                 background-color: rgba(49, 51, 63, 0.1) !important;
             }
-            /* Ensure buttons are aligned in the same row and match download button container */
+            /* Ensure the button container matches download button container */
             div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
+                padding: 0 !important;
             }
-            /* Match the download button container styling */
+            /* Also target the direct parent to ensure proper sizing */
+            div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) > div {
+                width: 100% !important;
+            }
+            /* Match download button container exactly */
             div[data-testid*="column"]:has(button[data-testid*="baseButton-download"]) {
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
+                padding: 0 !important;
             }
         </style>
         """, unsafe_allow_html=True)
