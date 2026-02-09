@@ -1019,7 +1019,6 @@ def chatbot_tab():
                     schema_data_queries = schema_data_response.suggestions
                     
                     # Execute the SELECT queries suggested by SchemaDataAgent
-                    existing_data_summary = {}
                     if schema_data_queries:
                         print(f"DEBUG: SchemaDataAgent suggested {len(schema_data_queries)} queries to check existing data")
                         for query in schema_data_queries:
@@ -1117,18 +1116,18 @@ def chatbot_tab():
                     if existing_data_summary:
                         enhanced_schema_context += f"\n=== EXISTING VALUES (YOU MUST USE ONLY THESE VALUES) ===\n"
                         for key, values in existing_data_summary.items():
-                            # Flatten the values list
-                            flat_values = []
-                            for v in values:
-                                if isinstance(v, (list, tuple)):
-                                    flat_values.extend(v)
-                                else:
-                                    flat_values.append(v)
-                            # Remove duplicates and None values
-                            unique_values = [str(v) for v in set(flat_values) if v is not None and str(v).strip()]
-                            if unique_values:
-                                enhanced_schema_context += f"{key}: {', '.join(unique_values[:20])}\n"
-                                enhanced_schema_context += f"CRITICAL: For foreign key column {key}, you MUST use ONLY these values: {', '.join(unique_values[:20])}\n"
+                            # Values are already a list of strings from extraction
+                            if values:
+                                # Show first 20 values
+                                values_str = ', '.join(values[:20])
+                                if len(values) > 20:
+                                    values_str += f" (and {len(values) - 20} more)"
+                                enhanced_schema_context += f"{key}: {values_str}\n"
+                                column_name = key.split('.')[1] if '.' in key else key
+                                table_name = key.split('.')[0] if '.' in key else 'unknown'
+                                enhanced_schema_context += f"🚨 CRITICAL: For foreign key column '{column_name}' in table '{table_name}', you MUST use ONLY these values: {', '.join(values[:20])}\n"
+                                enhanced_schema_context += f"   - NEVER use values like 1, 2, 3 unless they appear in the list above\n"
+                                enhanced_schema_context += f"   - If the list above shows [10, 20, 30], use ONLY 10, 20, or 30 - nothing else\n"
                         enhanced_schema_context += "\n=== END EXISTING VALUES ===\n"
                     
                     enhanced_schema_context += "\n=== END EXISTING DATA ANALYSIS ===\n"
