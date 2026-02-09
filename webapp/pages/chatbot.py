@@ -1064,6 +1064,38 @@ def chatbot_tab():
                             enhanced_schema_context += f"- {q}\n"
                     enhanced_schema_context += "\n=== END EXISTING DATA ANALYSIS ===\n"
                 
+                # Ensure schema context is up-to-date before generating SQL
+                if st.session_state.chatbot and st.session_state.connected and st.session_state.db_manager:
+                    try:
+                        # Refresh schema context to ensure it has latest table and column information
+                        if not st.session_state.chatbot.schema_context or not st.session_state.chatbot.schema_context.get('tables'):
+                            print(f"DEBUG: Schema context missing, refreshing...")
+                            # Rebuild schema_info
+                            tables = st.session_state.db_manager.get_tables()
+                            full_table_schemas = []
+                            for table_name in (tables or []):
+                                try:
+                                    table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                    if table_schema:
+                                        full_table_schemas.append(table_schema)
+                                except Exception as e:
+                                    print(f"DEBUG: Could not get schema for {table_name}: {e}")
+                                    full_table_schemas.append({'table_name': table_name, 'columns': []})
+                            
+                            schema_info = {
+                                'tables': full_table_schemas,
+                                'db_type': st.session_state.get('db_type', 'postgresql'),
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                            }
+                            st.session_state.schema_info = schema_info
+                            st.session_state.chatbot.set_schema_context(schema_info)
+                            print(f"DEBUG: Refreshed schema context - {len(full_table_schemas)} tables")
+                    except Exception as e:
+                        print(f"DEBUG: Could not refresh schema context: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
                 with st.spinner("🤔 Thinking..."):
                     # Temporarily enhance chatbot's schema context if we have data analysis
                     original_context = None
