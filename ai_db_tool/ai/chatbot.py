@@ -369,6 +369,11 @@ class SQLChatbot:
         if db_type != 'unknown':
             prompt += f"Database Type: {db_type}\n\n"
         
+        # Add existing data analysis if available
+        if self.schema_context and self.schema_context.get('data_analysis'):
+            prompt += self.schema_context.get('data_analysis', '')
+            prompt += "\n"
+        
         if self.schema_context:
             prompt += "=== DATABASE SCHEMA (YOU MUST USE ONLY THESE TABLES AND COLUMNS - NO PLACEHOLDERS) ===\n"
             tables = self.schema_context.get('tables', [])
@@ -570,19 +575,21 @@ class SQLChatbot:
                 prompt += "      - For BOOLEAN columns: Use TRUE/FALSE or 1/0\n"
                 prompt += "      - For foreign key columns: CRITICAL - Foreign key values MUST exist in the referenced table\n"
                 prompt += "        * If the schema shows foreign key relationships (e.g., 'department_id' references 'department' table):\n"
-                prompt += "          - OPTION 1 (RECOMMENDED): Generate INSERT statements for the parent table FIRST\n"
+                prompt += "          - CHECK THE 'EXISTING VALUES' SECTION ABOVE - it shows the actual values that exist\n"
+                prompt += "          - You MUST use ONLY the values listed in the 'EXISTING VALUES' section\n"
+                prompt += "          - If 'EXISTING VALUES' shows 'department.department_id: 10, 20, 30', use ONLY 10, 20, or 30\n"
+                prompt += "          - NEVER guess or invent foreign key values (like 1, 2, 3, 101, 102, 103) unless they appear in EXISTING VALUES\n"
+                prompt += "          - OPTION 1: If EXISTING VALUES section shows values, use ONLY those values\n"
+                prompt += "          - OPTION 2: If EXISTING VALUES section is empty, generate INSERT statements for the parent table FIRST\n"
                 prompt += "            Example: If inserting into 'employee' with 'department_id', first insert departments:\n"
                 prompt += "            ```sql\n"
                 prompt += "            INSERT INTO department (department_id, department_name) VALUES (1, 'Sales');\n"
                 prompt += "            INSERT INTO department (department_id, department_name) VALUES (2, 'Marketing');\n"
                 prompt += "            ```\n"
                 prompt += "            Then use those department_id values (1, 2) in employee INSERT statements\n"
-                prompt += "          - OPTION 2: If parent table already has data, you cannot know the values without querying\n"
-                prompt += "            In this case, generate a SELECT query first: SELECT department_id FROM department;\n"
-                prompt += "            Then use only those existing values in your INSERT statements\n"
                 prompt += "          - OPTION 3: Use NULL if the foreign key column allows NULL values\n"
-                prompt += "        * NEVER guess or invent foreign key values (like 101, 102, 103) - they must exist or be created first\n"
-                prompt += "        * If inserting into a child table, ALWAYS generate parent table INSERTs first, then use those values\n"
+                prompt += "        * CRITICAL: If 'EXISTING VALUES' section exists above, you MUST use ONLY those values - no exceptions\n"
+                prompt += "        * If inserting into a child table, ALWAYS check EXISTING VALUES first, then generate parent table INSERTs if needed\n"
                 prompt += "   d) Generate the requested number of INSERT statements (e.g., 10 records = 10 INSERT statements)\n"
                 prompt += "3. Example format (using ACTUAL columns from schema):\n"
                 prompt += "   ```sql\n"

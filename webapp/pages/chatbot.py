@@ -1018,6 +1018,7 @@ def chatbot_tab():
                     schema_data_queries = schema_data_response.suggestions
                     
                     # Execute the SELECT queries suggested by SchemaDataAgent
+                    existing_data_summary = {}
                     if schema_data_queries:
                         print(f"DEBUG: SchemaDataAgent suggested {len(schema_data_queries)} queries to check existing data")
                         for query in schema_data_queries:
@@ -1028,9 +1029,24 @@ def chatbot_tab():
                                     # Store the results to be used by chatbot
                                     query_key = f"schema_data_{hash(query) % 10000}"
                                     st.session_state[query_key] = result
-                                    print(f"DEBUG: Executed schema data query, got {len(result)} rows")
+                                    
+                                    # Extract table and column from query for summary
+                                    query_upper = query.upper()
+                                    if 'FROM' in query_upper:
+                                        parts = query_upper.split('FROM')
+                                        if len(parts) > 1:
+                                            table_part = parts[1].strip().split()[0].strip(';')
+                                            # Get column name
+                                            if 'SELECT' in query_upper:
+                                                col_part = query_upper.split('SELECT')[1].split('FROM')[0].strip()
+                                                existing_data_summary[f"{table_part}.{col_part}"] = result.values.tolist() if hasattr(result, 'values') else list(result)
+                                    
+                                    print(f"DEBUG: Executed schema data query, got {len(result)} rows: {list(result.columns) if hasattr(result, 'columns') else 'N/A'}")
+                                    print(f"DEBUG: Sample values: {result.head(5).values.tolist() if hasattr(result, 'head') else 'N/A'}")
                             except Exception as e:
                                 print(f"DEBUG: Could not execute schema data query: {e}")
+                                import traceback
+                                traceback.print_exc()
                 except Exception as e:
                     print(f"DEBUG: SchemaDataAgent error: {e}")
                     import traceback
@@ -1062,6 +1078,25 @@ def chatbot_tab():
                         enhanced_schema_context += f"\nQueries executed to check existing data:\n"
                         for q in schema_data_queries:
                             enhanced_schema_context += f"- {q}\n"
+                    
+                    # Add actual existing values to context
+                    if existing_data_summary:
+                        enhanced_schema_context += f"\n=== EXISTING VALUES (YOU MUST USE ONLY THESE VALUES) ===\n"
+                        for key, values in existing_data_summary.items():
+                            # Flatten the values list
+                            flat_values = []
+                            for v in values:
+                                if isinstance(v, (list, tuple)):
+                                    flat_values.extend(v)
+                                else:
+                                    flat_values.append(v)
+                            # Remove duplicates and None values
+                            unique_values = [str(v) for v in set(flat_values) if v is not None and str(v).strip()]
+                            if unique_values:
+                                enhanced_schema_context += f"{key}: {', '.join(unique_values[:20])}\n"
+                                enhanced_schema_context += f"CRITICAL: For foreign key column {key}, you MUST use ONLY these values: {', '.join(unique_values[:20])}\n"
+                        enhanced_schema_context += "\n=== END EXISTING VALUES ===\n"
+                    
                     enhanced_schema_context += "\n=== END EXISTING DATA ANALYSIS ===\n"
                 
                 # Ensure schema context is up-to-date before generating SQL
