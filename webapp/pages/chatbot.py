@@ -1021,6 +1021,48 @@ def chatbot_tab():
                     print(f"DEBUG: SchemaDataAgent analysis: {schema_data_analysis[:200] if schema_data_analysis else 'None'}...")
                     print(f"DEBUG: SchemaDataAgent suggested queries: {schema_data_queries}")
                     
+                    # Fallback: If SchemaDataAgent didn't generate queries, try to generate them directly from schema
+                    if not schema_data_queries and 'insert' in user_upper:
+                        print(f"DEBUG: SchemaDataAgent didn't generate queries, trying fallback detection...")
+                        schema_info = st.session_state.get('schema_info', {})
+                        tables = schema_info.get('tables', [])
+                        
+                        # Find the target table (employee in this case)
+                        target_table_name = None
+                        for keyword in ['employee', 'table']:
+                            if keyword in user_upper:
+                                # Try to find the table
+                                for table in tables:
+                                    if isinstance(table, dict):
+                                        table_name = table.get('table_name', '').lower()
+                                        if keyword in table_name or table_name in user_lower:
+                                            target_table_name = table.get('table_name')
+                                            break
+                                    elif isinstance(table, str) and keyword in table.lower():
+                                        target_table_name = table
+                                        break
+                                if target_table_name:
+                                    break
+                        
+                        if target_table_name:
+                            # Find foreign keys for this table
+                            for table in tables:
+                                if isinstance(table, dict) and table.get('table_name') == target_table_name:
+                                    foreign_keys = table.get('foreign_keys', [])
+                                    if foreign_keys:
+                                        for fk in foreign_keys:
+                                            if isinstance(fk, dict):
+                                                referred_table = fk.get('referred_table', '')
+                                                referred_columns = fk.get('referred_columns', [])
+                                                if referred_table and referred_columns:
+                                                    # Generate SELECT query
+                                                    pk_col = referred_columns[0] if referred_columns else 'id'
+                                                    fallback_query = f"SELECT {pk_col} FROM {referred_table};"
+                                                    if fallback_query not in schema_data_queries:
+                                                        schema_data_queries.append(fallback_query)
+                                                        print(f"DEBUG: Generated fallback query: {fallback_query}")
+                                    break
+                    
                     # Execute the SELECT queries suggested by SchemaDataAgent
                     if schema_data_queries:
                         print(f"DEBUG: SchemaDataAgent suggested {len(schema_data_queries)} queries to check existing data")
