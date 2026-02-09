@@ -713,7 +713,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 "results.csv",
                 "text/csv",
                 help=f"Download CSV - {len(last_select_result):,} rows",
-                use_container_width=True,
+                width="stretch",  # New Streamlit API - replaces use_container_width=True
                 key=download_key
             )
         with result_col3:
