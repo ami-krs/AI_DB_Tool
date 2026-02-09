@@ -996,6 +996,7 @@ def chatbot_tab():
             
             schema_data_queries = []
             schema_data_analysis = None
+            existing_data_summary = {}  # Initialize here to ensure it's always defined
             if is_dml_request and st.session_state.get('schema_info') and st.session_state.get('connected'):
                 try:
                     from ai_db_tool.ai import AgentOrchestrator
