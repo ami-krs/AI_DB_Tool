@@ -71,11 +71,12 @@ def _render_viz_icon_button(unique_suffix, df):
     debug_info = st.session_state[debug_key]
     
     # Button click toggles the state
+    # Don't use use_container_width to match download button size exactly
     button_clicked = st.button(
         "📊",
         key=button_click_key,
         help="Toggle Data Visualization",
-        use_container_width=True
+        use_container_width=False
     )
     
     # If button was clicked, toggle the state
@@ -107,32 +108,47 @@ def _render_viz_icon_button(unique_suffix, df):
     if css_key not in st.session_state:
         st.markdown("""
         <style>
-            /* Match download button styling exactly */
+            /* Match Streamlit download button styling exactly */
+            /* Streamlit download buttons have specific dimensions - match them precisely */
             button[data-testid*="viz_btn"] {
                 height: 38.4px !important;
                 min-height: 38.4px !important;
                 max-height: 38.4px !important;
-                padding: 0.25rem 0.75rem !important;
-                font-size: 0.875rem !important;
+                width: auto !important;
+                min-width: 38.4px !important;
+                padding: 0.25rem 0.5rem !important;
+                font-size: 1rem !important;
                 line-height: 1.5 !important;
                 border-radius: 0.25rem !important;
                 border: 1px solid rgba(49, 51, 63, 0.2) !important;
                 background-color: rgb(255, 255, 255) !important;
                 color: rgb(38, 39, 48) !important;
-                width: 100% !important;
                 box-sizing: border-box !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                flex-shrink: 0 !important;
             }
             button[data-testid*="viz_btn"]:hover {
                 border-color: rgb(255, 75, 75) !important;
                 color: rgb(255, 75, 75) !important;
+                background-color: rgba(255, 75, 75, 0.05) !important;
             }
             button[data-testid*="viz_btn"]:active {
                 background-color: rgba(49, 51, 63, 0.1) !important;
             }
-            /* Ensure buttons are aligned in the same row */
+            /* Ensure buttons are aligned in the same row and match download button container */
             div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
                 display: flex !important;
-                align-items: stretch !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            /* Match the download button container styling */
+            div[data-testid*="column"]:has(button[data-testid*="baseButton-download"]) {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
             }
         </style>
         """, unsafe_allow_html=True)
