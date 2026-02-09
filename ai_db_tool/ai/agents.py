@@ -353,10 +353,59 @@ Be very concise. Provide corrected SQL using actual schema column names."""
             schema_context += "\n=== END SCHEMA ===\n"
             schema_context += "\nCRITICAL: Use ONLY the column names listed above. NEVER use generic names like 'id' unless that exact column exists in the table's column list.\n"
         
+        # For UniqueViolation errors, try to query existing primary key values
+        existing_pk_values = None
+        pk_column = None
+        table_name = None
+        
+        if 'UniqueViolation' in str(error) or 'duplicate key' in str(error_message).lower() or 'already exists' in str(error_message).lower():
+            # Try to extract table and column from error message
+            import re
+            # Pattern: Key (column_name)=(value) already exists
+            pk_match = re.search(r'Key\s*\(([^)]+)\)\s*=\s*\(([^)]+)\)', str(error_message), re.IGNORECASE)
+            if pk_match:
+                pk_column = pk_match.group(1).strip()
+                existing_value = pk_match.group(2).strip()
+            
+            # Try to extract table name from query
+            query_upper = query.upper()
+            if 'INSERT INTO' in query_upper:
+                table_match = re.search(r'INSERT\s+INTO\s+([^\s(]+)', query_upper, re.IGNORECASE)
+                if table_match:
+                    table_name = table_match.group(1).strip()
+                    # Remove schema prefix if present
+                    if '.' in table_name:
+                        table_name = table_name.split('.')[-1]
+            
+            # Query existing primary key values if we have table and column
+            if table_name and pk_column and db_manager:
+                try:
+                    pk_query = f"SELECT {pk_column} FROM {table_name} ORDER BY {pk_column};"
+                    pk_result = db_manager.execute_query(pk_query)
+                    if pk_result is not None and len(pk_result) > 0:
+                        existing_pk_values = pk_result[pk_column].tolist() if pk_column in pk_result.columns else None
+                        print(f"DEBUG: Found existing {pk_column} values: {existing_pk_values[:10] if existing_pk_values else 'None'}")
+                except Exception as e:
+                    print(f"DEBUG: Could not query existing PK values: {e}")
+        
+        # Add existing PK values to context if available
+        pk_context = ""
+        if existing_pk_values:
+            pk_context = f"\n\n=== EXISTING PRIMARY KEY VALUES ===\n"
+            pk_context += f"Table: {table_name}\n"
+            pk_context += f"Primary Key Column: {pk_column}\n"
+            pk_context += f"Existing Values: {', '.join([str(v) for v in existing_pk_values[:20]])}\n"
+            if len(existing_pk_values) > 20:
+                pk_context += f"(and {len(existing_pk_values) - 20} more)\n"
+            pk_context += f"Next Available ID: {max(existing_pk_values) + 1 if existing_pk_values else 'N/A'}\n"
+            pk_context += f"CRITICAL: You MUST use a value that is NOT in the list above, or use the next available ID.\n"
+            pk_context += f"=== END EXISTING PRIMARY KEY VALUES ===\n"
+        
         user_prompt = f"""Debug this SQL error and provide a corrected query:
 
 Database: {db_type} ({schema_info.get('total_tables', 0)} tables)
 {schema_context}
+{pk_context}
 Query: ```sql
 {query}
 ```
