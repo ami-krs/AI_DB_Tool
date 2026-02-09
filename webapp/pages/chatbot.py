@@ -9,6 +9,7 @@ from utils.query_execution import (
     show_common_queries, generate_sql_query, optimize_query, 
     debug_query, save_query_to_history
 )
+from utils.helpers import get_api_key
 from ui.components import render_sql_editor
 from shared import CODEMIRROR_AVAILABLE, MONACO_EDITOR_AVAILABLE, codemirror_editor, monaco_editor
 
