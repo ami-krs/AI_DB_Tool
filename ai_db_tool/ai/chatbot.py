@@ -95,12 +95,14 @@ CRITICAL - MULTIPLE OPERATIONS:
 
 Examples:
 - CORRECT: SELECT * FROM employees WHERE salary > 50000
-- CORRECT: INSERT INTO employees (name, salary) VALUES ('John', 60000)
+- CORRECT: INSERT INTO employees (employee_name, salary, department_id) VALUES ('John Smith', 60000, 10)
+- CORRECT: INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (1, 'John Doe', 10, 50000); INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (2, 'Jane Smith', 10, 55000);
 - CORRECT: CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT)
 - CORRECT (multiple tables): INSERT INTO table1 (name) VALUES ('A'); INSERT INTO table2 (name) VALUES ('B'); INSERT INTO table3 (name) VALUES ('C');
 - WRONG: sqlite3 database.db "SELECT * FROM employees" or .tables
 - WRONG: Only generating SQL for the first table when multiple tables are requested
-- WRONG: INSERT INTO example_table (column1, column2) ...  (placeholders that don't exist)
+- WRONG: INSERT INTO example_table (column1, column2) VALUES ('value1', 'value2')  (placeholders that don't exist)
+- WRONG: INSERT INTO employee (column1, column2, column3) VALUES ('value1', 'value2', 'value3')  (NEVER use placeholder column names or values)
 
 Guidelines:
 - Be helpful, accurate, and concise
@@ -453,6 +455,9 @@ class SQLChatbot:
                 prompt += "     * DO NOT guess - use what's actually in the schema\n"
                 prompt += "4. When user asks to insert records in 'all tables', generate INSERT statements for EACH table in the list above.\n"
                 prompt += "5. NEVER use placeholder names like 'example_table', 'test_table', 'table1', 'table2', 'table_name', 'column1', 'column2', 'column3' - these DO NOT EXIST in this database.\n"
+                prompt += "   - For INSERT operations: You MUST read the actual column names from the 'Columns:' line in the schema above\n"
+                prompt += "   - NEVER generate INSERT INTO table (column1, column2, column3) - use the ACTUAL column names from the schema\n"
+                prompt += "   - NEVER use placeholder values like 'value1', 'value2', 'value3' - generate realistic data based on column types\n"
                 prompt += "6. NEVER use 'table_name' as a literal string in SQL (e.g., 'FROM dfu.table_name') - replace it with actual table names from the list.\n"
                 prompt += "7. If user asks for 'records from DFU table' or 'records from schema X', they likely mean tables IN that schema. Generate SELECT statements for each table in that schema, or ask which specific table they want.\n"
                 prompt += "8. NEVER generate 'SELECT * FROM schema_name' - you cannot SELECT from a schema directly. Use 'SELECT * FROM schema_name.table_name' instead.\n"
@@ -499,16 +504,50 @@ class SQLChatbot:
                 prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
             
             if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
-                prompt += "\n\n=== CRITICAL INSTRUCTIONS ===\n"
-                prompt += "The user wants ACTUAL SQL INSERT statements for their specific database tables.\n"
-                prompt += "1. Start your response IMMEDIATELY with ```sql\n"
-                prompt += "2. Generate INSERT statements for EACH table listed in the schema above\n"
-                prompt += "3. Use the EXACT table names and column names from the schema\n"
-                prompt += "4. Generate 5 INSERT statements per table (as requested)\n"
-                prompt += "5. DO NOT write explanations before the SQL - the SQL code block must be the FIRST thing in your response\n"
-                prompt += "6. DO NOT use placeholder names like 'table_name', 'example_table', 'column1', 'column2'\n"
-                prompt += "7. DO NOT say 'you'll need to' or 'first ensure' - just generate the SQL\n"
-                prompt += "8. If you cannot generate SQL, return an error message explaining why\n"
+                prompt += "\n\n=== CRITICAL INSTRUCTIONS FOR INSERT OPERATIONS ===\n"
+                prompt += "🚨 ABSOLUTE REQUIREMENTS - READ THE SCHEMA ABOVE CAREFULLY:\n"
+                prompt += "\n"
+                prompt += "STEP 1: Identify the target table from the user's request (e.g., 'employee' table)\n"
+                prompt += "STEP 2: Find that table in the schema above - look for 'Table: employee' or similar\n"
+                prompt += "STEP 3: Read the 'Columns:' line for that table - it shows the EXACT column names\n"
+                prompt += "STEP 4: Extract ONLY the actual column names from the schema (e.g., 'employee_id', 'employee_name', 'department_id', 'salary')\n"
+                prompt += "STEP 5: Generate INSERT statements using ONLY those exact column names - NEVER use 'column1', 'column2', 'column3'\n"
+                prompt += "\n"
+                prompt += "🚫 ABSOLUTE PROHIBITIONS:\n"
+                prompt += "- NEVER use placeholder column names: 'column1', 'column2', 'column3', 'col1', 'col2', etc.\n"
+                prompt += "- NEVER use placeholder values: 'value1', 'value2', 'value3', 'test1', 'test2', etc.\n"
+                prompt += "- NEVER say 'Please replace column1, column2, column3' - you MUST use actual column names from the schema\n"
+                prompt += "- NEVER generate generic INSERT statements with placeholders\n"
+                prompt += "\n"
+                prompt += "✅ YOU MUST:\n"
+                prompt += "1. Start your response IMMEDIATELY with ```sql - NO explanations before the SQL\n"
+                prompt += "2. For each INSERT statement:\n"
+                prompt += "   a) Use the EXACT table name from the schema (e.g., 'employee', 'department')\n"
+                prompt += "   b) List the ACTUAL column names from that table's 'Columns:' line in the schema\n"
+                prompt += "   c) Generate REALISTIC data values based on column types:\n"
+                prompt += "      - For VARCHAR/TEXT columns: Use realistic names/descriptions (e.g., 'John Doe', 'Sales Department')\n"
+                prompt += "      - For INTEGER columns: Use actual numbers (e.g., 100, 5000, 12345)\n"
+                prompt += "      - For DATE columns: Use date format (e.g., '2024-01-15', CURRENT_DATE)\n"
+                prompt += "      - For BOOLEAN columns: Use TRUE/FALSE or 1/0\n"
+                prompt += "      - For foreign key columns: Use values that would exist in the referenced table\n"
+                prompt += "   d) Generate the requested number of INSERT statements (e.g., 10 records = 10 INSERT statements)\n"
+                prompt += "3. Example format (using ACTUAL columns from schema):\n"
+                prompt += "   ```sql\n"
+                prompt += "   INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (1, 'John Smith', 10, 50000);\n"
+                prompt += "   INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (2, 'Jane Doe', 10, 55000);\n"
+                prompt += "   ```\n"
+                prompt += "   (Where 'employee_id', 'employee_name', 'department_id', 'salary' are the ACTUAL column names from the schema)\n"
+                prompt += "\n"
+                prompt += "4. If the schema shows column details like:\n"
+                prompt += "   Table: employee\n"
+                prompt += "     Columns: employee_id (INTEGER) NOT NULL PRIMARY KEY, employee_name (VARCHAR) NOT NULL, department_id (INTEGER), salary (DECIMAL)\n"
+                prompt += "   Then your INSERT must use: employee_id, employee_name, department_id, salary (NOT column1, column2, column3)\n"
+                prompt += "\n"
+                prompt += "5. Generate realistic, varied data - each INSERT should have different values\n"
+                prompt += "6. DO NOT write explanations before the SQL - the SQL code block must be the FIRST thing in your response\n"
+                prompt += "7. DO NOT say 'Please replace column1, column2, column3' - you MUST use actual column names\n"
+                prompt += "8. If you cannot see the table or columns in the schema above, return an error explaining which table/columns are missing\n"
+                prompt += "\n"
                 prompt += "=== END CRITICAL INSTRUCTIONS ===\n"
             elif any(keyword in user_upper for keyword in ['CREATE VIEW', 'VIEW', 'CREATE.*VIEW']):
                 prompt += "\n\n=== CRITICAL INSTRUCTIONS FOR CREATE VIEW ===\n"
