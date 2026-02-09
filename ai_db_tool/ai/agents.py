@@ -505,25 +505,49 @@ Be very concise. Provide SELECT queries that will help generate correct INSERT/U
             schema_context += f"Total Tables: {schema_info.get('total_tables', len(tables))}\n\n"
             
             # Add table and column information with foreign key hints
+            # First, identify foreign key relationships
+            fk_relationships = {}  # {child_table: [(fk_column, parent_table, parent_pk_column)]}
             for table in tables[:15]:  # Show more tables for better context
                 if isinstance(table, dict):
                     table_name = table.get('table_name', 'unknown')
                     columns_list = table.get('columns', [])
+                    foreign_keys = table.get('foreign_keys', [])
+                    
+                    # Extract foreign key relationships
+                    if foreign_keys:
+                        for fk in foreign_keys:
+                            if isinstance(fk, dict):
+                                fk_col = fk.get('constrained_columns', [])
+                                referred_table = fk.get('referred_table', '')
+                                referred_columns = fk.get('referred_columns', [])
+                                if fk_col and referred_table:
+                                    if table_name not in fk_relationships:
+                                        fk_relationships[table_name] = []
+                                    fk_relationships[table_name].append((
+                                        fk_col[0] if fk_col else 'unknown',
+                                        referred_table,
+                                        referred_columns[0] if referred_columns else 'unknown'
+                                    ))
+                    
                     if columns_list:
                         if isinstance(columns_list[0], dict):
                             col_details = []
                             for col in columns_list:
                                 col_name = col.get('name', str(col))
                                 col_type = col.get('type', '')
-                                is_fk = col.get('foreign_key', False)
                                 is_pk = col.get('primary_key', False)
-                                fk_ref = col.get('references', '')
                                 
                                 col_str = f"{col_name} ({col_type})"
                                 if is_pk:
                                     col_str += " PRIMARY KEY"
-                                if is_fk and fk_ref:
-                                    col_str += f" -> REFERENCES {fk_ref}"
+                                
+                                # Check if this column is a foreign key
+                                if table_name in fk_relationships:
+                                    for fk_col, parent_table, parent_pk in fk_relationships[table_name]:
+                                        if col_name == fk_col:
+                                            col_str += f" -> REFERENCES {parent_table}({parent_pk})"
+                                            break
+                                
                                 col_details.append(col_str)
                             schema_context += f"Table: {table_name}\n  Columns: {', '.join(col_details[:15])}\n"
                         else:
@@ -533,6 +557,14 @@ Be very concise. Provide SELECT queries that will help generate correct INSERT/U
                 elif isinstance(table, str):
                     schema_context += f"Table: {table}\n"
             
+            # Add foreign key relationship summary
+            if fk_relationships:
+                schema_context += "\n=== FOREIGN KEY RELATIONSHIPS ===\n"
+                for child_table, fks in fk_relationships.items():
+                    for fk_col, parent_table, parent_pk in fks:
+                        schema_context += f"{child_table}.{fk_col} -> {parent_table}.{parent_pk}\n"
+                schema_context += "=== END FOREIGN KEY RELATIONSHIPS ===\n"
+            
             schema_context += "\n=== END SCHEMA ===\n"
         
         user_prompt = f"""Analyze this user request and determine what data needs to be queried from the database:
@@ -541,16 +573,30 @@ User Request: {user_query}
 
 {schema_context}
 
-REQUIRED:
-1. Identify what data needs to be checked (foreign key values, primary key values, etc.)
-2. Generate SELECT queries to retrieve that data
-3. Provide queries in a ```sql code block
-4. Explain briefly (2-3 sentences) why this data is needed
+CRITICAL REQUIREMENTS:
+1. If the user wants to INSERT into a table, identify ALL foreign key columns in that table
+2. For EACH foreign key column, generate a SELECT query to get existing values from the referenced parent table
+3. Example: If inserting into 'employee' table and 'employee' has 'department_id' -> REFERENCES 'department.department_id':
+   - Generate: SELECT department_id FROM department;
+4. Generate queries in a ```sql code block - ONE query per foreign key relationship
+5. Explain briefly (1-2 sentences) why these queries are needed
+
+STEP-BY-STEP PROCESS:
+1. Identify the target table from user request (e.g., 'employee')
+2. Find that table in the schema above
+3. Look for foreign key relationships (columns with -> REFERENCES)
+4. For EACH foreign key, generate: SELECT [parent_pk_column] FROM [parent_table];
+5. If no foreign keys found, you may not need to generate queries (but still check)
 
 Focus on:
-- For INSERT: Query parent tables for existing foreign key values
+- For INSERT: ALWAYS query parent tables for existing foreign key values - this is CRITICAL
 - For UPDATE/DELETE: Query tables for existing primary key values
-- Any data dependencies that must exist before the operation can succeed"""
+- Generate at least ONE SELECT query if foreign keys exist
+
+Example output format:
+```sql
+SELECT department_id FROM department;
+```"""
         
         analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         

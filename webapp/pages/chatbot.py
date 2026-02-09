@@ -1018,6 +1018,9 @@ def chatbot_tab():
                     schema_data_analysis = schema_data_response.analysis
                     schema_data_queries = schema_data_response.suggestions
                     
+                    print(f"DEBUG: SchemaDataAgent analysis: {schema_data_analysis[:200] if schema_data_analysis else 'None'}...")
+                    print(f"DEBUG: SchemaDataAgent suggested queries: {schema_data_queries}")
+                    
                     # Execute the SELECT queries suggested by SchemaDataAgent
                     if schema_data_queries:
                         print(f"DEBUG: SchemaDataAgent suggested {len(schema_data_queries)} queries to check existing data")
