@@ -3,8 +3,9 @@ import streamlit as st
 import os
 import pandas as pd
 from typing import Optional, Dict, Any
-import plotly.express as px
-import plotly.graph_objects as go
+# Lazy import plotly - only import when visualization is actually needed
+# import plotly.express as px
+# import plotly.graph_objects as go
 
 def get_api_key(key_name: str) -> Optional[str]:
     """
@@ -89,7 +90,8 @@ def _render_viz_icon_button(unique_suffix, df):
         debug_info['state_after'] = new_state
         debug_info['click_count'] = debug_info.get('click_count', 0) + 1
         debug_info['last_checkbox_state'] = new_state
-        print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {current_viz_state} -> {new_state}")
+        # Debug logging disabled for performance
+        # print(f"DEBUG: Visualization button clicked - key: {button_key}, state: {current_viz_state} -> {new_state}")
     else:
         debug_info['last_checkbox_state'] = current_viz_state
     
@@ -327,12 +329,14 @@ def display_paginated_dataframe(df, unique_suffix=None):
     # Always sync state key with button state (button is authoritative)
     current_state_key_value = st.session_state.get(viz_state_key, False)
     if current_state_key_value != viz_active:
-        print(f"DEBUG: Syncing state key {viz_state_key} from {current_state_key_value} to {viz_active} (button state)")
+        # Debug logging disabled for performance
+        # print(f"DEBUG: Syncing state key {viz_state_key} from {current_state_key_value} to {viz_active} (button state)")
         st.session_state[viz_state_key] = viz_active
     
     # Display visualization based on button state (not state key)
     if viz_active:
-        print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
+        # Debug logging disabled for performance
+        # print(f"DEBUG: Visualization is active, calling visualize_dataframe with suffix: viz_{unique_suffix}")
         st.markdown("---")  # Separator before visualization
         try:
             visualize_dataframe(df, unique_suffix=f"viz_{unique_suffix}")
@@ -340,8 +344,9 @@ def display_paginated_dataframe(df, unique_suffix=None):
             st.error(f"Error displaying visualization: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
-            print(f"DEBUG: Visualization error: {e}")
-            print(traceback.format_exc())
+            # Debug logging disabled for performance
+            # print(f"DEBUG: Visualization error: {e}")
+            # print(traceback.format_exc())
     
     # Show info if paginated
     if total_pages > 1:
@@ -383,6 +388,14 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
         df: DataFrame to visualize
         unique_suffix: Optional unique suffix for session state keys
     """
+    # Lazy import plotly - only import when visualization is actually needed
+    try:
+        import plotly.express as px
+        import plotly.graph_objects as go
+    except ImportError:
+        st.error("Plotly is not installed. Please install it with: pip install plotly")
+        return
+    
     if df is None or len(df) == 0:
         st.warning("No data to visualize")
         return
