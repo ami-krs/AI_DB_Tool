@@ -71,12 +71,12 @@ def _render_viz_icon_button(unique_suffix, df):
     debug_info = st.session_state[debug_key]
     
     # Button click toggles the state
-    # Don't use use_container_width to match download button size exactly
+    # Use use_container_width=True to match download button behavior
     button_clicked = st.button(
         "📊",
         key=button_click_key,
         help="Toggle Data Visualization",
-        use_container_width=False
+        use_container_width=True
     )
     
     # If button was clicked, toggle the state
@@ -109,13 +109,12 @@ def _render_viz_icon_button(unique_suffix, df):
         st.markdown("""
         <style>
             /* Match Streamlit download button styling exactly */
-            /* Streamlit download buttons have specific dimensions - match them precisely */
+            /* Streamlit download buttons with use_container_width=True fill the container */
             button[data-testid*="viz_btn"] {
                 height: 38.4px !important;
                 min-height: 38.4px !important;
                 max-height: 38.4px !important;
-                width: auto !important;
-                min-width: 38.4px !important;
+                width: 100% !important;
                 padding: 0.25rem 0.5rem !important;
                 font-size: 1rem !important;
                 line-height: 1.5 !important;
@@ -124,11 +123,10 @@ def _render_viz_icon_button(unique_suffix, df):
                 background-color: rgb(255, 255, 255) !important;
                 color: rgb(38, 39, 48) !important;
                 box-sizing: border-box !important;
-                display: inline-flex !important;
+                display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
                 margin: 0 !important;
-                flex-shrink: 0 !important;
             }
             button[data-testid*="viz_btn"]:hover {
                 border-color: rgb(255, 75, 75) !important;
