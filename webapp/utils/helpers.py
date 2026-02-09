@@ -98,41 +98,45 @@ def _render_viz_icon_button(unique_suffix, df):
     # Store updated debug info
     st.session_state[debug_key] = debug_info
     
-    # Store dataframe reference for visualization
-    st.session_state[f"viz_df_{unique_suffix}"] = df
+    # Don't store full dataframe in session state - it's already available via display_paginated_dataframe
+    # Storing large dataframes in session state can significantly slow down app performance
+    # The dataframe is passed directly to visualize_dataframe when needed
     
-    # Add CSS to make the button match download button size and style exactly
-    st.markdown("""
-    <style>
-        /* Match download button styling exactly */
-        button[data-testid*="viz_btn"] {
-            height: 38.4px !important;
-            min-height: 38.4px !important;
-            max-height: 38.4px !important;
-            padding: 0.25rem 0.75rem !important;
-            font-size: 0.875rem !important;
-            line-height: 1.5 !important;
-            border-radius: 0.25rem !important;
-            border: 1px solid rgba(49, 51, 63, 0.2) !important;
-            background-color: rgb(255, 255, 255) !important;
-            color: rgb(38, 39, 48) !important;
-            width: 100% !important;
-            box-sizing: border-box !important;
-        }
-        button[data-testid*="viz_btn"]:hover {
-            border-color: rgb(255, 75, 75) !important;
-            color: rgb(255, 75, 75) !important;
-        }
-        button[data-testid*="viz_btn"]:active {
-            background-color: rgba(49, 51, 63, 0.1) !important;
-        }
-        /* Ensure buttons are aligned in the same row */
-        div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
-            display: flex !important;
-            align-items: stretch !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # Inject CSS only once per session to avoid repeated injection (performance optimization)
+    css_key = "viz_button_css_injected"
+    if css_key not in st.session_state:
+        st.markdown("""
+        <style>
+            /* Match download button styling exactly */
+            button[data-testid*="viz_btn"] {
+                height: 38.4px !important;
+                min-height: 38.4px !important;
+                max-height: 38.4px !important;
+                padding: 0.25rem 0.75rem !important;
+                font-size: 0.875rem !important;
+                line-height: 1.5 !important;
+                border-radius: 0.25rem !important;
+                border: 1px solid rgba(49, 51, 63, 0.2) !important;
+                background-color: rgb(255, 255, 255) !important;
+                color: rgb(38, 39, 48) !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            button[data-testid*="viz_btn"]:hover {
+                border-color: rgb(255, 75, 75) !important;
+                color: rgb(255, 75, 75) !important;
+            }
+            button[data-testid*="viz_btn"]:active {
+                background-color: rgba(49, 51, 63, 0.1) !important;
+            }
+            /* Ensure buttons are aligned in the same row */
+            div[data-testid*="column"]:has(button[data-testid*="viz_btn"]) {
+                display: flex !important;
+                align-items: stretch !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        st.session_state[css_key] = True
 
 def display_paginated_dataframe(df, unique_suffix=None):
     """Display dataframe with pagination controls
