@@ -781,14 +781,15 @@ class AgentOrchestrator:
         return response
     
     def debug_error(self, query: str, error: str, error_message: str, 
-                   schema_info: Dict[str, Any], db_type: str) -> AgentResponse:
+                   schema_info: Dict[str, Any], db_type: str, db_manager=None) -> AgentResponse:
         """Debug a query error"""
         context = {
             'query': query,
             'error': error,
             'error_message': error_message,
             'schema_info': schema_info,
-            'db_type': db_type
+            'db_type': db_type,
+            'db_manager': db_manager  # Pass db_manager so DebugAgent can query existing data
         }
         response = self.debug_agent.analyze(context)
         self.agent_responses.append(response)
