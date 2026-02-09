@@ -1032,18 +1032,51 @@ def chatbot_tab():
                                     st.session_state[query_key] = result
                                     
                                     # Extract table and column from query for summary
-                                    query_upper = query.upper()
-                                    if 'FROM' in query_upper:
-                                        parts = query_upper.split('FROM')
-                                        if len(parts) > 1:
-                                            table_part = parts[1].strip().split()[0].strip(';')
-                                            # Get column name
-                                            if 'SELECT' in query_upper:
-                                                col_part = query_upper.split('SELECT')[1].split('FROM')[0].strip()
-                                                existing_data_summary[f"{table_part}.{col_part}"] = result.values.tolist() if hasattr(result, 'values') else list(result)
+                                    query_upper = query.upper().strip()
+                                    table_name = None
+                                    column_name = None
+                                    
+                                    # Parse SELECT column FROM table
+                                    if 'SELECT' in query_upper and 'FROM' in query_upper:
+                                        # Get column name
+                                        select_part = query_upper.split('SELECT')[1].split('FROM')[0].strip()
+                                        # Remove DISTINCT, etc.
+                                        select_part = select_part.replace('DISTINCT', '').strip()
+                                        column_name = select_part.split(',')[0].strip() if ',' in select_part else select_part.strip()
+                                        
+                                        # Get table name
+                                        from_part = query_upper.split('FROM')[1].strip()
+                                        # Handle schema.table format and WHERE clauses
+                                        table_name = from_part.split()[0].strip(';').strip()
+                                        # Remove schema prefix if present (e.g., "dfu.department" -> "department")
+                                        if '.' in table_name:
+                                            table_name = table_name.split('.')[-1]
+                                    
+                                    # Extract values from DataFrame
+                                    if table_name and column_name and hasattr(result, 'columns'):
+                                        # Get the actual column name from DataFrame (might be different due to case sensitivity)
+                                        df_columns = list(result.columns)
+                                        actual_col = column_name
+                                        # Try to find matching column (case-insensitive)
+                                        for col in df_columns:
+                                            if col.upper() == column_name.upper():
+                                                actual_col = col
+                                                break
+                                        
+                                        if actual_col in df_columns:
+                                            # Get unique values from the column
+                                            values = result[actual_col].dropna().unique().tolist()
+                                            # Convert to strings and filter out empty values
+                                            values = [str(v) for v in values if v is not None and str(v).strip()]
+                                            
+                                            if values:
+                                                key = f"{table_name}.{column_name}"
+                                                existing_data_summary[key] = values
+                                                print(f"DEBUG: Extracted {len(values)} unique values for {key}: {values[:10]}")
                                     
                                     print(f"DEBUG: Executed schema data query, got {len(result)} rows: {list(result.columns) if hasattr(result, 'columns') else 'N/A'}")
-                                    print(f"DEBUG: Sample values: {result.head(5).values.tolist() if hasattr(result, 'head') else 'N/A'}")
+                                    if hasattr(result, 'head'):
+                                        print(f"DEBUG: Sample values: {result.head(5).to_dict('records')}")
                             except Exception as e:
                                 print(f"DEBUG: Could not execute schema data query: {e}")
                                 import traceback
