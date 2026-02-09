@@ -777,7 +777,7 @@ def chatbot_tab():
         from utils.helpers import display_paginated_dataframe
         st.markdown("---")
         # Compact Results header with download and visualization icons - tighter spacing
-        result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
+        result_col1, result_col2, result_col3, result_col4 = st.columns([7.5, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📋 Query Results**", unsafe_allow_html=True)
         with result_col2:
@@ -797,6 +797,11 @@ def chatbot_tab():
             from utils.helpers import _render_viz_icon_button
             viz_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
             _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
+        with result_col4:
+            # Data Explorer icon button - positioned next to visualization button
+            from utils.helpers import _render_data_explorer_button
+            explorer_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+            explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
         
         # Display Data Explorer if active
         if explorer_active:
