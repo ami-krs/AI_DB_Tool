@@ -598,7 +598,8 @@ Example output format:
 SELECT department_id FROM department;
 ```"""
         
-        analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
+        # Use higher max_tokens for SchemaDataAgent to ensure it generates complete queries
+        analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt, max_tokens=800)
         
         # Extract SELECT queries from the response
         suggestions = self._extract_select_queries(analysis_text)
