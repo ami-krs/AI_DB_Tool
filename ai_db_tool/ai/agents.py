@@ -324,6 +324,7 @@ Be very concise. Provide corrected SQL using actual schema column names."""
         error_message = context.get('error_message', '')
         schema_info = context.get('schema_info', {})
         db_type = context.get('db_type', 'unknown')
+        db_manager = context.get('db_manager')  # Optional: for querying existing data
         
         # Build schema context for the prompt
         schema_context = ""
@@ -366,7 +367,24 @@ REQUIRED:
 2. Provide a CORRECTED SQL query in a ```sql code block using ONLY actual column names from the schema above
 3. Replace any generic column names (like 'id') with actual column names from the schema
 4. For JOIN queries: Use actual foreign key columns from the schema (e.g., 'department_id', 'employee_id')
-5. For INSERT statements with foreign key violations:
+5. For INSERT statements with PRIMARY KEY violations (UniqueViolation/duplicate key):
+   - If error mentions "duplicate key value violates unique constraint" or "UniqueViolation" or "Key (column_name)=(value) already exists":
+     * The primary key value already exists in the table
+     * Solution 1 (RECOMMENDED): Query existing primary key values first, then use a value that doesn't exist
+       Example: If inserting into 'employee' with 'employee_id', first run:
+       SELECT employee_id FROM employee ORDER BY employee_id;
+       Then use the next available ID (e.g., if max is 10, use 11, 12, etc.)
+     * Solution 2: If the primary key is SERIAL/AUTO_INCREMENT, omit it from INSERT and let the database generate it
+       Example: INSERT INTO employee (employee_name, department_id, salary) VALUES ('John', 1, 50000);
+       (Omit employee_id if it's SERIAL)
+     * Solution 3: Use a subquery to find the next available ID
+       Example: INSERT INTO employee (employee_id, employee_name, department_id, salary) 
+                VALUES ((SELECT COALESCE(MAX(employee_id), 0) + 1 FROM employee), 'John', 1, 50000);
+     * Solution 4: If you need specific IDs, first check which ones are available:
+       SELECT employee_id FROM employee WHERE employee_id IN (1, 2, 3, 4, 5);
+       Then use IDs that are NOT in the result
+     * NEVER suggest using a primary key value that already exists
+6. For INSERT statements with foreign key violations:
    - If error mentions "foreign key constraint" or "Key (column_name)=(value) is not present in table":
      * The foreign key value does not exist in the referenced table
      * Solution 1 (RECOMMENDED): First query existing values from the parent table, then use those values

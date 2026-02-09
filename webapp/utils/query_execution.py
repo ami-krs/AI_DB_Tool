@@ -345,7 +345,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                             result.get('error', 'Unknown error'),
                             str(result.get('error', '')),
                             schema_info,
-                            db_type
+                            db_type,
+                            db_manager=st.session_state.get('db_manager')  # Pass db_manager for querying existing data
                         )
                         if debug_response:
                             display_agent_response(debug_response, expanded=True)
