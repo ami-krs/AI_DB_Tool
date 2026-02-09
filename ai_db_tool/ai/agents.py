@@ -79,7 +79,7 @@ class BaseAgent(ABC):
         """Perform analysis and return response"""
         pass
     
-    def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
+    def _call_llm(self, system_prompt: str, user_prompt: str, max_tokens: int = 500) -> str:
         """Call the LLM with given prompts"""
         try:
             if self.provider == "openai":
@@ -90,7 +90,7 @@ class BaseAgent(ABC):
                         {"role": "user", "content": user_prompt}
                     ],
                     temperature=0.3,
-                    max_tokens=500
+                    max_tokens=max_tokens
                 )
                 return response.choices[0].message.content
             elif self.provider == "anthropic":
