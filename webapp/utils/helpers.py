@@ -202,14 +202,30 @@ def _render_viz_icon_button(unique_suffix, df):
             setTimeout(matchDownloadButtonSize, 500);
             setTimeout(matchDownloadButtonSize, 1000);
             
-            // Watch for new buttons being added
+            // Watch for new buttons being added (with debouncing to prevent excessive calls)
+            let timeoutId = null;
             const observer = new MutationObserver(function(mutations) {
-                matchDownloadButtonSize();
+                // Debounce to prevent excessive calls
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(matchDownloadButtonSize, 200);
             });
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            // Only observe if document.body exists
+            if (document.body) {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } else {
+                // Wait for body to be available
+                setTimeout(function() {
+                    if (document.body) {
+                        observer.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+                    }
+                }, 100);
+            }
         })();
         </script>
         """, unsafe_allow_html=True)
