@@ -468,6 +468,139 @@ Be brief but provide the corrected SQL query with proper UPDATE ordering."""
         return 0.85
 
 
+class SchemaDataAgent(BaseAgent):
+    """Agent specialized in reading schema data and existing records before generating INSERT/UPDATE/DELETE statements"""
+    
+    SYSTEM_PROMPT = """You are an expert database schema and data analyzer. Your role is to analyze user requests for INSERT/UPDATE/DELETE operations and determine what data needs to be queried from the database before generating SQL statements.
+
+CRITICAL REQUIREMENTS:
+1. For INSERT operations with foreign keys: Identify which parent tables need to be queried to get existing foreign key values
+2. For UPDATE/DELETE operations: Identify which tables need to be queried to check existing primary key values
+3. Generate SELECT queries to retrieve necessary data (foreign key values, primary key values, etc.)
+4. Provide brief analysis (2-3 sentences max) explaining what data needs to be checked
+5. Always provide the SELECT queries in a ```sql code block
+
+Focus on:
+- Foreign key relationships: If inserting into a child table, query parent table for existing foreign key values
+- Primary key constraints: If updating/deleting, check what primary key values exist
+- Data dependencies: Identify any data that must exist before the operation can succeed
+
+Be very concise. Provide SELECT queries that will help generate correct INSERT/UPDATE/DELETE statements."""
+    
+    def __init__(self, api_key: Optional[str] = None, provider: str = "openai", model: str = "gpt-4o"):
+        super().__init__("Schema Data Agent", api_key, provider, model)
+    
+    def analyze(self, context: Dict[str, Any]) -> AgentResponse:
+        """Analyze user request and determine what data needs to be queried"""
+        user_query = context.get('user_query', '')
+        schema_info = context.get('schema_info', {})
+        db_type = context.get('db_type', 'unknown')
+        
+        # Build schema context for the prompt
+        schema_context = ""
+        if schema_info and schema_info.get('tables'):
+            tables = schema_info.get('tables', [])
+            schema_context = f"\n\n=== DATABASE SCHEMA ===\n"
+            schema_context += f"Database Type: {db_type}\n"
+            schema_context += f"Total Tables: {schema_info.get('total_tables', len(tables))}\n\n"
+            
+            # Add table and column information with foreign key hints
+            for table in tables[:15]:  # Show more tables for better context
+                if isinstance(table, dict):
+                    table_name = table.get('table_name', 'unknown')
+                    columns_list = table.get('columns', [])
+                    if columns_list:
+                        if isinstance(columns_list[0], dict):
+                            col_details = []
+                            for col in columns_list:
+                                col_name = col.get('name', str(col))
+                                col_type = col.get('type', '')
+                                is_fk = col.get('foreign_key', False)
+                                is_pk = col.get('primary_key', False)
+                                fk_ref = col.get('references', '')
+                                
+                                col_str = f"{col_name} ({col_type})"
+                                if is_pk:
+                                    col_str += " PRIMARY KEY"
+                                if is_fk and fk_ref:
+                                    col_str += f" -> REFERENCES {fk_ref}"
+                                col_details.append(col_str)
+                            schema_context += f"Table: {table_name}\n  Columns: {', '.join(col_details[:15])}\n"
+                        else:
+                            schema_context += f"Table: {table_name}\n  Columns: {', '.join([str(col) for col in columns_list[:15]])}\n"
+                    else:
+                        schema_context += f"Table: {table_name} (no column info)\n"
+                elif isinstance(table, str):
+                    schema_context += f"Table: {table}\n"
+            
+            schema_context += "\n=== END SCHEMA ===\n"
+        
+        user_prompt = f"""Analyze this user request and determine what data needs to be queried from the database:
+
+User Request: {user_query}
+
+{schema_context}
+
+REQUIRED:
+1. Identify what data needs to be checked (foreign key values, primary key values, etc.)
+2. Generate SELECT queries to retrieve that data
+3. Provide queries in a ```sql code block
+4. Explain briefly (2-3 sentences) why this data is needed
+
+Focus on:
+- For INSERT: Query parent tables for existing foreign key values
+- For UPDATE/DELETE: Query tables for existing primary key values
+- Any data dependencies that must exist before the operation can succeed"""
+        
+        analysis_text = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
+        
+        # Extract SELECT queries from the response
+        suggestions = self._extract_select_queries(analysis_text)
+        confidence = self._extract_confidence(analysis_text)
+        
+        return AgentResponse(
+            agent_name=self.name,
+            analysis=analysis_text,
+            suggestions=suggestions,
+            confidence=confidence,
+            metadata={'user_query': user_query, 'db_type': db_type},
+            timestamp=datetime.now()
+        )
+    
+    def _extract_select_queries(self, text: str) -> List[str]:
+        """Extract SELECT queries from analysis text"""
+        import re
+        queries = []
+        
+        # Look for SQL code blocks
+        sql_block_pattern = r'```sql\s*(.*?)\s*```'
+        matches = re.findall(sql_block_pattern, text, re.DOTALL | re.IGNORECASE)
+        for match in matches:
+            # Extract individual SELECT statements
+            select_pattern = r'(SELECT\s+[^;]+(?:;[^;]+)*)'
+            select_matches = re.findall(select_pattern, match, re.IGNORECASE | re.DOTALL)
+            queries.extend(select_matches)
+        
+        # Also look for SELECT statements outside code blocks
+        if not queries:
+            select_pattern = r'(SELECT\s+[^;]+(?:;[^;]+)*)'
+            select_matches = re.findall(select_pattern, text, re.IGNORECASE | re.DOTALL)
+            queries.extend(select_matches)
+        
+        return queries[:5]  # Limit to 5 queries
+    
+    def _extract_confidence(self, text: str) -> float:
+        """Extract confidence level"""
+        import re
+        confidence_match = re.search(r'confidence[:\s]+([0-9.]+)', text.lower())
+        if confidence_match:
+            try:
+                return float(confidence_match.group(1))
+            except:
+                pass
+        return 0.85
+
+
 class ReviewAgent(BaseAgent):
     """Agent that reviews results and suggests optimizations and improvements"""
     
@@ -607,6 +740,17 @@ class AgentOrchestrator:
             'dataframe': dataframe
         }
         response = self.review_agent.analyze(context)
+        self.agent_responses.append(response)
+        return response
+    
+    def analyze_schema_data(self, user_query: str, schema_info: Dict[str, Any], db_type: str) -> AgentResponse:
+        """Analyze what schema data needs to be queried before generating INSERT/UPDATE/DELETE statements"""
+        context = {
+            'user_query': user_query,
+            'schema_info': schema_info,
+            'db_type': db_type
+        }
+        response = self.schema_data_agent.analyze(context)
         self.agent_responses.append(response)
         return response
     

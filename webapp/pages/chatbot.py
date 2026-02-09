@@ -986,6 +986,55 @@ def chatbot_tab():
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
             
+            # Check if this is an INSERT/UPDATE/DELETE request - if so, use SchemaDataAgent first
+            user_upper = user_input.upper()
+            is_dml_request = any(keyword in user_upper for keyword in [
+                'INSERT', 'UPDATE', 'DELETE', 'POPULATE', 'ADD RECORDS', 
+                'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS', 'MODIFY', 'CHANGE', 'REMOVE'
+            ])
+            
+            schema_data_queries = []
+            schema_data_analysis = None
+            if is_dml_request and st.session_state.get('schema_info') and st.session_state.get('connected'):
+                try:
+                    from ai_db_tool.ai import AgentOrchestrator
+                    # Initialize orchestrator if not exists
+                    if 'agent_orchestrator' not in st.session_state or st.session_state.get('agent_orchestrator') is None:
+                        api_key = get_api_key()
+                        provider = "openai"  # Default provider
+                        orchestrator = AgentOrchestrator(api_key=api_key, provider=provider)
+                        st.session_state['agent_orchestrator'] = orchestrator
+                    else:
+                        orchestrator = st.session_state.get('agent_orchestrator')
+                    
+                    # Call SchemaDataAgent to determine what data needs to be queried
+                    schema_data_response = orchestrator.analyze_schema_data(
+                        user_query=user_input,
+                        schema_info=st.session_state.get('schema_info', {}),
+                        db_type=st.session_state.get('db_type', 'postgresql')
+                    )
+                    schema_data_analysis = schema_data_response.analysis
+                    schema_data_queries = schema_data_response.suggestions
+                    
+                    # Execute the SELECT queries suggested by SchemaDataAgent
+                    if schema_data_queries:
+                        print(f"DEBUG: SchemaDataAgent suggested {len(schema_data_queries)} queries to check existing data")
+                        for query in schema_data_queries:
+                            try:
+                                # Execute query to get existing data
+                                result = st.session_state.db_manager.execute_query(query)
+                                if result is not None and len(result) > 0:
+                                    # Store the results to be used by chatbot
+                                    query_key = f"schema_data_{hash(query) % 10000}"
+                                    st.session_state[query_key] = result
+                                    print(f"DEBUG: Executed schema data query, got {len(result)} rows")
+                            except Exception as e:
+                                print(f"DEBUG: Could not execute schema data query: {e}")
+                except Exception as e:
+                    print(f"DEBUG: SchemaDataAgent error: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             # Get AI response
             try:
                 print(f"DEBUG: Calling chatbot.chat() (chatbot_tab) with query: {user_input}")
@@ -1002,8 +1051,35 @@ def chatbot_tab():
                 else:
                     print(f"DEBUG: WARNING - No schema context in chatbot!")
                 print(f"DEBUG: Schema tables count: {len(st.session_state.get('schema_info', {}).get('tables', [])) if st.session_state.get('schema_info') else 0}")
+                
+                # Enhance schema context with existing data if available
+                enhanced_schema_context = None
+                if schema_data_queries and schema_data_analysis:
+                    # Add schema data analysis to context
+                    enhanced_schema_context = f"\n\n=== EXISTING DATA ANALYSIS ===\n{schema_data_analysis}\n"
+                    if schema_data_queries:
+                        enhanced_schema_context += f"\nQueries executed to check existing data:\n"
+                        for q in schema_data_queries:
+                            enhanced_schema_context += f"- {q}\n"
+                    enhanced_schema_context += "\n=== END EXISTING DATA ANALYSIS ===\n"
+                
                 with st.spinner("🤔 Thinking..."):
+                    # Temporarily enhance chatbot's schema context if we have data analysis
+                    original_context = None
+                    if enhanced_schema_context and st.session_state.chatbot:
+                        # Store original context
+                        original_context = st.session_state.chatbot.schema_context
+                        # Add data analysis to context
+                        if original_context:
+                            enhanced_context = original_context.copy()
+                            enhanced_context['data_analysis'] = enhanced_schema_context
+                            st.session_state.chatbot.set_schema_context(enhanced_context)
+                    
                     response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                    
+                    # Restore original context
+                    if original_context and st.session_state.chatbot:
+                        st.session_state.chatbot.set_schema_context(original_context)
                 print(f"DEBUG: Chatbot response received (chatbot_tab): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
                 print(f"DEBUG: Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
                 if 'error' not in response:

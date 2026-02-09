@@ -8,6 +8,7 @@ from .agents import (
     ResultsAnalyzerAgent,
     DebugAgent,
     ReviewAgent,
+    SchemaDataAgent,
     AgentOrchestrator,
     AgentResponse
 )
@@ -20,6 +21,7 @@ __all__ = [
     "ResultsAnalyzerAgent",
     "DebugAgent",
     "ReviewAgent",
+    "SchemaDataAgent",
     "AgentOrchestrator",
     "AgentResponse"
 ]
