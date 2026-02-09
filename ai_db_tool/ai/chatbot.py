@@ -231,6 +231,13 @@ class SQLChatbot:
             if tables and isinstance(tables[0], dict):
                 table_names = [t.get('table_name', 'unknown') for t in tables[:5]]
                 print(f"DEBUG: First 5 tables: {table_names}")
+                # Check if tables have column details
+                for table in tables[:3]:
+                    if isinstance(table, dict):
+                        cols = table.get('columns', [])
+                        print(f"DEBUG: Table '{table.get('table_name', 'unknown')}' has {len(cols)} columns")
+                        if cols:
+                            print(f"DEBUG: First column: {cols[0] if isinstance(cols[0], dict) else cols[0]}")
             elif tables:
                 print(f"DEBUG: First 5 table names: {tables[:5]}")
         else:

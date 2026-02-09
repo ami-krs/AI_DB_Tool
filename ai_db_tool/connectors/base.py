@@ -270,12 +270,16 @@ class DatabaseManager:
         # Get foreign keys
         foreign_keys = inspector.get_foreign_keys(table_name)
         
-        return {
+        # Build schema dict with table_name as key for compatibility
+        schema_dict = {
             'table_name': table_name,
             'columns': columns,
             'primary_keys': primary_keys,
             'foreign_keys': foreign_keys,
         }
+        
+        # Also add table_name at top level for easier access
+        return schema_dict
     
     def get_database_info(self, connection_id: str = "default") -> Dict[str, Any]:
         """Get comprehensive database information"""
