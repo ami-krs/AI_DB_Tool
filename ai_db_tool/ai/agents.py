@@ -96,7 +96,7 @@ class BaseAgent(ABC):
             elif self.provider == "anthropic":
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=500,
+                    max_tokens=max_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )
