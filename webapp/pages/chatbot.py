@@ -710,6 +710,26 @@ def chatbot_tab():
                                     from utils.helpers import _render_data_explorer_button
                                     explorer_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                     explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
+                                with result_col5:
+                                    # SQL Editor icon button
+                                    from utils.helpers import _render_sql_editor_button
+                                    sql_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                    sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+                                
+                                # Display SQL Editor if active
+                                if sql_active:
+                                    st.markdown("---")
+                                    st.markdown("### 📝 SQL Editor")
+                                    from ui.components import render_sql_editor
+                                    sql_query = render_sql_editor(
+                                        key=f"sql_editor_chatbot_auto_{sql_suffix}",
+                                        height=200,
+                                        placeholder="Enter SQL query here..."
+                                    )
+                                    if sql_query and sql_query.strip():
+                                        if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
+                                            from utils.query_execution import execute_query
+                                            execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
                                 
                                 # Display Data Explorer if active
                                 if explorer_active:
@@ -777,8 +797,8 @@ def chatbot_tab():
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
         from utils.helpers import display_paginated_dataframe
         st.markdown("---")
-        # Compact Results header with download and visualization icons - tighter spacing
-        result_col1, result_col2, result_col3, result_col4 = st.columns([7.5, 0.4, 0.4, 0.4], gap="small")
+        # Compact Results header with download, visualization, data explorer, and SQL editor icons
+        result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📋 Query Results**", unsafe_allow_html=True)
         with result_col2:
@@ -803,6 +823,26 @@ def chatbot_tab():
             from utils.helpers import _render_data_explorer_button
             explorer_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
             explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
+        with result_col5:
+            # SQL Editor icon button
+            from utils.helpers import _render_sql_editor_button
+            sql_suffix = f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+            sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+        
+        # Display SQL Editor if active
+        if sql_active:
+            st.markdown("---")
+            st.markdown("### 📝 SQL Editor")
+            from ui.components import render_sql_editor
+            sql_query = render_sql_editor(
+                key=f"sql_editor_chatbot_fallback_{sql_suffix}",
+                height=200,
+                placeholder="Enter SQL query here..."
+            )
+            if sql_query and sql_query.strip():
+                if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}"):
+                    from utils.query_execution import execute_query
+                    execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_{sql_suffix}")
         
         # Display Data Explorer if active
         if explorer_active:
