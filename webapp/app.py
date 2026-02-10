@@ -18,8 +18,8 @@ try:
     import importlib.util
     spec = importlib.util.find_spec("dotenv")
     if spec is not None:
-        from dotenv import load_dotenv
-        load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
         _dotenv_available = True
 except (ImportError, ModuleNotFoundError, AttributeError):
     # python-dotenv not available (e.g., on Streamlit Cloud)
@@ -67,8 +67,22 @@ st.set_page_config(
 # Inject base CSS (must be called early, before any content)
 inject_base_css()
 
-# Initialize session state
-initialize_session_state()
+# Initialize session state (with error handling)
+try:
+    initialize_session_state()
+        except Exception as e:
+    # If initialization fails, set minimal defaults to prevent server crash
+    if 'active_section' not in st.session_state:
+        st.session_state.active_section = 'home'
+    if 'connected' not in st.session_state:
+        st.session_state.connected = False
+    if 'db_manager' not in st.session_state:
+        from ai_db_tool.connectors import DatabaseManager
+        st.session_state.db_manager = DatabaseManager()
+    # Log error but don't crash
+        import traceback
+    print(f"ERROR in initialize_session_state: {e}")
+        traceback.print_exc()
 
 
 def main():
