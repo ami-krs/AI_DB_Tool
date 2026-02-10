@@ -977,17 +977,17 @@ def chatbot_tab():
             # Also clear last_result_df to prevent duplicate display
             st.session_state.pop('last_result_df', None)
             st.session_state.pop('last_result', None)
-        else:
-            # Show single result (original fallback behavior)
+        elif has_last_result_fallback and st.session_state.get('last_result_df') is not None:
+            # Show single result (original fallback behavior) - only if last_result_df still exists
             from utils.helpers import display_paginated_dataframe
             st.markdown("---")
             # Compact Results header with download, visualization, data explorer, and SQL editor icons
             result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
-        with result_col1:
-            st.markdown("**📋 Query Results**", unsafe_allow_html=True)
-        with result_col2:
-            # Download CSV button
-            csv = st.session_state.last_result_df.to_csv(index=False)
+            with result_col1:
+                st.markdown("**📋 Query Results**", unsafe_allow_html=True)
+            with result_col2:
+                # Download CSV button
+                csv = st.session_state.last_result_df.to_csv(index=False)
             st.download_button(
                 "📥",
                 csv,
