@@ -7,10 +7,6 @@ from utils.helpers import get_api_key
 import importlib.util
 
 
-DB_SECTIONS = {"chatbot", "sql_editor", "data_explorer", "visualizations"}
-AI_SECTIONS = {"chatbot", "sql_editor"}
-
-
 def _anthropic_pkg_available() -> bool:
     """Return True if the optional `anthropic` package is installed."""
     try:
@@ -50,8 +46,7 @@ def _get_active_section() -> str:
 
 def initialize_session_state():
     """Initialize all session state variables"""
-    # Determine active section EARLY so we can defer heavy work on Home.
-    # (This runs on every rerun; keep it lightweight.)
+    # Determine active section (used by navigation and home/dashboard logic)
     if "active_section" not in st.session_state:
         st.session_state.active_section = _get_active_section()
 
@@ -67,17 +62,9 @@ def initialize_session_state():
     if 'db_type' not in st.session_state:
         st.session_state.db_type = None
 
-    # Defer auto-connecting + schema fetching until user opens DB-relevant sections.
-    # This makes Home load much faster after boot.
-    active_section = st.session_state.get("active_section", "home")
-    should_autoconnect_now = active_section in DB_SECTIONS
-
-    if "auto_connect_attempted" not in st.session_state:
-        st.session_state.auto_connect_attempted = False
-
-    # Auto-load saved database connection (DEFERRED)
-    if should_autoconnect_now and (not st.session_state.connected) and (not st.session_state.auto_connect_attempted):
-        st.session_state.auto_connect_attempted = True
+    # --- Eager DB auto-connect & schema fetch (original behaviour) ---
+    # Auto-load saved database connection on startup (if not already connected)
+    if not st.session_state.connected:
         saved_config = load_db_config()
         if saved_config:
             try:
@@ -85,8 +72,43 @@ def initialize_session_state():
                     st.session_state.connected = True
                     st.session_state.db_type = saved_config.db_type
                     st.session_state.auto_connected = True
-                    # Do NOT fetch schema here. Schema can be heavy; pages will fetch on-demand.
-                    if "schema_info" not in st.session_state:
+
+                    # Fetch full schema information eagerly so chatbot and UI
+                    # have an accurate view of tables/columns from first load.
+                    try:
+                        tables = st.session_state.db_manager.get_tables()
+                        try:
+                            schema_info = st.session_state.db_manager.get_database_info()
+                            if schema_info:
+                                # Ensure tables list is present and normalized
+                                if schema_info.get("tables") and isinstance(schema_info["tables"][0] if schema_info["tables"] else None, dict):
+                                    # Already detailed table schema
+                                    pass
+                                else:
+                                    # Fallback: just use table names
+                                    schema_info["tables"] = tables or []
+                                schema_info["db_type"] = saved_config.db_type
+                                schema_info["total_tables"] = len(tables) if tables else 0
+                                schema_info["database_name"] = saved_config.database
+                                st.session_state.schema_info = schema_info
+                            else:
+                                # Fallback minimal schema_info
+                                st.session_state.schema_info = {
+                                    "tables": tables or [],
+                                    "db_type": saved_config.db_type,
+                                    "total_tables": len(tables) if tables else 0,
+                                    "database_name": saved_config.database,
+                                }
+                        except Exception:
+                            # If get_database_info fails, still keep minimal info
+                            st.session_state.schema_info = {
+                                "tables": tables or [],
+                                "db_type": saved_config.db_type,
+                                "total_tables": len(tables) if tables else 0,
+                                "database_name": saved_config.database,
+                            }
+                    except Exception:
+                        # If even get_tables fails, create an empty schema_info
                         st.session_state.schema_info = {
                             "tables": [],
                             "db_type": saved_config.db_type,
@@ -97,17 +119,42 @@ def initialize_session_state():
                 # Silent failure; user can still manually connect via UI
                 pass
 
-    # Ensure schema_info exists if connected (lightweight placeholder only)
+    # Ensure schema_info exists if connected (and may have been created manually)
     if st.session_state.connected and "schema_info" not in st.session_state:
-        st.session_state.schema_info = {
-            "tables": [],
-            "db_type": st.session_state.db_type,
-            "total_tables": 0,
-        }
+        try:
+            tables = st.session_state.db_manager.get_tables()
+            try:
+                schema_info = st.session_state.db_manager.get_database_info()
+                if schema_info:
+                    if schema_info.get("tables") and isinstance(schema_info["tables"][0] if schema_info["tables"] else None, dict):
+                        # Detailed table schema already present
+                        pass
+                    else:
+                        schema_info["tables"] = tables or []
+                    schema_info["db_type"] = st.session_state.db_type
+                    schema_info["total_tables"] = len(tables) if tables else 0
+                    st.session_state.schema_info = schema_info
+                else:
+                    st.session_state.schema_info = {
+                        "tables": tables or [],
+                        "db_type": st.session_state.db_type,
+                        "total_tables": len(tables) if tables else 0,
+                    }
+            except Exception:
+                st.session_state.schema_info = {
+                    "tables": tables or [],
+                    "db_type": st.session_state.db_type,
+                    "total_tables": len(tables) if tables else 0,
+                }
+        except Exception:
+            st.session_state.schema_info = {
+                "tables": [],
+                "db_type": st.session_state.db_type,
+                "total_tables": 0,
+            }
 
-    # Defer AI client initialization until user opens AI-relevant sections.
-    should_init_ai_now = active_section in AI_SECTIONS
-    if should_init_ai_now and st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
+    # Initialize chatbot and AI query builder eagerly once DB is connected
+    if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
         try:
             openai_key = get_api_key("OPENAI_API_KEY")
             anthropic_key = get_api_key("ANTHROPIC_API_KEY")
@@ -127,7 +174,7 @@ def initialize_session_state():
                 if st.session_state.query_builder is None:
                     st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
 
-                # Schema context will be built/expanded on-demand in the pages (Chatbot does this already).
+                # Attach schema context if available so chatbot knows the DB shape
                 if st.session_state.chatbot and st.session_state.get("schema_info"):
                     try:
                         st.session_state.chatbot.set_schema_context(st.session_state.schema_info)
