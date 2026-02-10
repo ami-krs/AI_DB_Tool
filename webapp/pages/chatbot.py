@@ -1486,26 +1486,33 @@ def chatbot_tab():
                                 schema_info = st.session_state.get('schema_info', {})
                                 tables = schema_info.get('tables', [])
                                 
+                                # Find the matching table
+                                matching_table = None
                                 for table in tables:
                                     if isinstance(table, dict):
                                         table_name_from_schema = table.get('table_name', '').lower()
                                         if table_name_from_schema == table_name.lower():
-                                            # Found matching table, check if column_name is a primary key
-                                            primary_keys = table.get('primary_keys', [])
-                                            if not primary_keys:
-                                                # Try to find from columns
-                                                columns = table.get('columns', [])
-                                                for col in columns:
-                                                    if isinstance(col, dict) and col.get('primary_key', False):
-                                                        primary_keys.append(col.get('name', ''))
-                                            
-                                            # Check if column_name matches any primary key
-                                            if any(pk_col.lower() == column_name.lower() for pk_col in primary_keys):
-                                                is_primary_key = True
-                                                print(f"DEBUG: Detected primary key: {table_name}.{column_name}")
-                                                break
-                                    if is_primary_key:
-                                        break
+                                            matching_table = table
+                                            break
+                                
+                                if matching_table:
+                                    # Get primary keys from the table
+                                    primary_keys = matching_table.get('primary_keys', [])
+                                    if not primary_keys:
+                                        # Try to find from columns
+                                        columns = matching_table.get('columns', [])
+                                        for col in columns:
+                                            if isinstance(col, dict) and col.get('primary_key', False):
+                                                primary_keys.append(col.get('name', ''))
+                                    
+                                    # Check if column_name matches any primary key (case-insensitive)
+                                    if any(pk_col.lower() == column_name.lower() for pk_col in primary_keys):
+                                        is_primary_key = True
+                                        print(f"DEBUG: Detected primary key: {table_name}.{column_name} (PKs: {primary_keys})")
+                                    else:
+                                        print(f"DEBUG: Column {table_name}.{column_name} is NOT a primary key (PKs: {primary_keys})")
+                                else:
+                                    print(f"DEBUG: Could not find table '{table_name}' in schema_info for primary key check")
                                 
                                 if is_primary_key:
                                     # Primary key values - must use NEXT available ID
