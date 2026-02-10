@@ -70,7 +70,7 @@ inject_base_css()
 # Initialize session state (with error handling)
 try:
     initialize_session_state()
-        except Exception as e:
+except Exception as e:
     # If initialization fails, set minimal defaults to prevent server crash
     if 'active_section' not in st.session_state:
         st.session_state.active_section = 'home'
