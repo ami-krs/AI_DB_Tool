@@ -1458,16 +1458,23 @@ def chatbot_tab():
                 
                 # Enhance schema context with existing data if available
                 enhanced_schema_context = None
-                if schema_data_queries and schema_data_analysis:
-                    # Add schema data analysis to context
-                    enhanced_schema_context = f"\n\n=== EXISTING DATA ANALYSIS ===\n{schema_data_analysis}\n"
+                # Build enhanced context if we have queries executed OR existing data summary
+                # This ensures primary key values are always included even if SchemaDataAgent didn't return analysis
+                if schema_data_queries or existing_data_summary:
+                    enhanced_schema_context = f"\n\n=== EXISTING DATA ANALYSIS ===\n"
+                    if schema_data_analysis:
+                        enhanced_schema_context += f"{schema_data_analysis}\n"
+                    else:
+                        enhanced_schema_context += f"Queries were executed to check existing data in the database.\n"
+                    
                     if schema_data_queries:
                         enhanced_schema_context += f"\nQueries executed to check existing data:\n"
                         for q in schema_data_queries:
                             enhanced_schema_context += f"- {q}\n"
                     
-                    # Add actual existing values to context
+                    # Add actual existing values to context (CRITICAL - this contains primary key values)
                     if existing_data_summary:
+                        print(f"DEBUG: Building enhanced_schema_context with {len(existing_data_summary)} data summaries")
                         enhanced_schema_context += f"\n=== EXISTING VALUES (YOU MUST USE ONLY THESE VALUES) ===\n"
                         for key, values in existing_data_summary.items():
                             # Values are already a list of strings from extraction
