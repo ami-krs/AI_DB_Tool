@@ -11,7 +11,7 @@ sqlalchemy>=2.0.23             # Universal database toolkit
 
 # AI/ML
 openai>=1.40.0                 # GPT for natural language to SQL
-anthropic>=0.21.0              # Claude as alternative
+# anthropic>=0.21.0            # Optional (Claude). Uncomment only if you plan to use Anthropic models.
 
 # Frontend/UI
 streamlit>=1.32.0              # Main web framework
@@ -19,7 +19,7 @@ streamlit>=1.32.0              # Main web framework
 # Data handling
 pandas>=2.2.0
 numpy>=1.24.0,<2.0.0
-pyarrow>=14.0.0                # For Parquet export
+# pyarrow>=14.0.0              # Optional (Parquet export). Uncomment if you need Parquet.
 
 # Visualization
 plotly>=5.18.0
