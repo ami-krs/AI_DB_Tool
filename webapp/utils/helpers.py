@@ -375,6 +375,152 @@ def _render_data_explorer_button(unique_suffix, df):
     # Return the state key for checking if explorer should be displayed
     return button_key, current_explorer_state
 
+
+def _render_sql_editor_button(unique_suffix):
+    """Render a SQL Editor icon button that toggles SQL editor display.
+    
+    Args:
+        unique_suffix: Unique suffix for this SQL editor instance
+    
+    Returns:
+        tuple: (button_key, is_active) - The button key and whether the editor is active
+    """
+    # Generate keys
+    sql_icon_key = f"sql_icon_{unique_suffix}"
+    button_key = f"sql_btn_{sql_icon_key}"
+    sql_state_key = f"sql_active_{sql_icon_key}"
+    button_click_key = f"{button_key}_click"
+    
+    # Initialize state if needed
+    if button_key not in st.session_state:
+        st.session_state[button_key] = False
+    if sql_state_key not in st.session_state:
+        st.session_state[sql_state_key] = False
+    
+    current_sql_state = st.session_state.get(button_key, False)
+    
+    # Button click toggles the state
+    # Use width='stretch' to match download button behavior (new Streamlit API)
+    # Using 📝 (memo) icon for SQL Editor
+    button_clicked = st.button(
+        "📝",
+        key=button_click_key,
+        help="Toggle SQL Editor",
+        width="stretch"  # New Streamlit API - replaces use_container_width=True
+    )
+    
+    # If button was clicked, toggle the state
+    if button_clicked:
+        new_state = not current_sql_state
+        st.session_state[button_key] = new_state
+        st.session_state[sql_state_key] = new_state
+    
+    # Inject CSS only once per session (shared with other icon buttons)
+    css_key = "sql_editor_button_css_injected"
+    if css_key not in st.session_state:
+        st.markdown("""
+        <style>
+            /* Match Streamlit download button styling EXACTLY */
+            button[data-testid*="sql_btn"] {
+                height: 38.4px !important;
+                min-height: 38.4px !important;
+                max-height: 38.4px !important;
+                width: 100% !important;
+                padding: 0.25rem 0.375rem !important;
+                font-size: 0.875rem !important;
+                line-height: 1.4 !important;
+                border-radius: 0.25rem !important;
+                border: 1px solid rgba(49, 51, 63, 0.2) !important;
+                background-color: rgb(255, 255, 255) !important;
+                color: rgb(38, 39, 48) !important;
+                box-sizing: border-box !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                transform: none !important;
+                scale: 1 !important;
+                font-weight: 400 !important;
+                letter-spacing: normal !important;
+                text-decoration: none !important;
+                vertical-align: middle !important;
+            }
+            button[data-testid*="sql_btn"]:hover {
+                border-color: rgb(255, 75, 75) !important;
+                color: rgb(255, 75, 75) !important;
+                background-color: rgba(255, 75, 75, 0.05) !important;
+            }
+            button[data-testid*="sql_btn"]:active {
+                background-color: rgba(49, 51, 63, 0.1) !important;
+            }
+        </style>
+        <script>
+        (function() {
+            function matchDownloadButtonSizeForSQLEditor() {
+                const sqlButtons = document.querySelectorAll('button[data-testid*="sql_btn"]');
+                sqlButtons.forEach(function(sqlBtn) {
+                    const parentColumn = sqlBtn.closest('[data-testid*="column"]');
+                    if (!parentColumn) return;
+                    
+                    const allColumns = Array.from(parentColumn.parentElement.querySelectorAll('[data-testid*="column"]'));
+                    const currentIndex = allColumns.indexOf(parentColumn);
+                    const downloadColumn = allColumns[0]; // First column should have download button
+                    
+                    if (downloadColumn) {
+                        const downloadBtn = downloadColumn.querySelector('button[data-testid*="baseButton-download"]');
+                        if (downloadBtn) {
+                            const downloadStyles = window.getComputedStyle(downloadBtn);
+                            sqlBtn.style.height = downloadStyles.height;
+                            sqlBtn.style.minHeight = downloadStyles.height;
+                            sqlBtn.style.maxHeight = downloadStyles.height;
+                            sqlBtn.style.width = downloadStyles.width;
+                            sqlBtn.style.minWidth = downloadStyles.width;
+                            sqlBtn.style.maxWidth = downloadStyles.width;
+                            sqlBtn.style.padding = downloadStyles.padding;
+                            sqlBtn.style.fontSize = downloadStyles.fontSize;
+                        }
+                    }
+                });
+            }
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', matchDownloadButtonSizeForSQLEditor);
+            } else {
+                matchDownloadButtonSizeForSQLEditor();
+            }
+            
+            setTimeout(matchDownloadButtonSizeForSQLEditor, 100);
+            setTimeout(matchDownloadButtonSizeForSQLEditor, 500);
+            setTimeout(matchDownloadButtonSizeForSQLEditor, 1000);
+            
+            let timeoutId = null;
+            const observer = new MutationObserver(function(mutations) {
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(matchDownloadButtonSizeForSQLEditor, 200);
+            });
+            if (document.body) {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } else {
+                setTimeout(function() {
+                    if (document.body) {
+                        observer.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+                    }
+                }, 100);
+            }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
+        st.session_state[css_key] = True
+    
+    return button_key, st.session_state.get(sql_state_key, False)
+
+
 def display_paginated_dataframe(df, unique_suffix=None):
     """Display dataframe with pagination controls
     
