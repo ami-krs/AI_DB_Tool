@@ -430,8 +430,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         
         # Handle single statement results (original behavior)
         if result['type'] == 'SELECT':
-            # Compact Results header with download and visualization icons - tighter spacing
-            result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
+            # Compact Results header with download, visualization, data explorer, and SQL editor icons
+            result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([7.0, 0.4, 0.4, 0.4, 0.4], gap="small")
             with result_col1:
                 st.markdown("**📋 Results**", unsafe_allow_html=True)
             with result_col2:
@@ -454,6 +454,40 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 from utils.helpers import _render_viz_icon_button
                 viz_suffix = f"query_result_{len(st.session_state.query_history)}"
                 _render_viz_icon_button(viz_suffix, result['dataframe'])
+            with result_col4:
+                # Data Explorer icon button
+                from utils.helpers import _render_data_explorer_button
+                explorer_suffix = f"query_result_{len(st.session_state.query_history)}"
+                explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, result['dataframe'])
+            with result_col5:
+                # SQL Editor icon button
+                from utils.helpers import _render_sql_editor_button
+                sql_suffix = f"query_result_{len(st.session_state.query_history)}"
+                sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+            
+            # Display SQL Editor if active
+            if sql_active:
+                st.markdown("---")
+                st.markdown("### 📝 SQL Editor")
+                from ui.components import render_sql_editor
+                sql_query = render_sql_editor(
+                    key=f"sql_editor_result_{sql_suffix}",
+                    height=200,
+                    placeholder="Enter SQL query here..."
+                )
+                if sql_query and sql_query.strip():
+                    if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
+                        execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_{sql_suffix}")
+            
+            # Display Data Explorer if active
+            if explorer_active:
+                st.markdown("---")
+                st.markdown("### 🔍 Data Explorer")
+                try:
+                    from utils.helpers import display_data_explorer
+                    display_data_explorer(result['dataframe'])
+                except Exception as e:
+                    st.error(f"Error displaying data explorer: {str(e)}")
             
             # Search and visualization are now handled inside display_paginated_dataframe
             display_df = result['dataframe'].copy()
@@ -698,8 +732,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     
     if last_select_result is not None:
         st.markdown("---")
-        # Compact Results header with download and visualization icons - tighter spacing
-        result_col1, result_col2, result_col3 = st.columns([8.2, 0.5, 0.5], gap="small")
+        # Compact Results header with download, visualization, data explorer, and SQL editor icons
+        result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([7.0, 0.4, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📋 Last Query Results**", unsafe_allow_html=True)
         with result_col2:
@@ -722,6 +756,40 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             from utils.helpers import _render_viz_icon_button
             viz_suffix = f"query_result_last_{len(st.session_state.query_history)}"
             _render_viz_icon_button(viz_suffix, last_select_result)
+        with result_col4:
+            # Data Explorer icon button
+            from utils.helpers import _render_data_explorer_button
+            explorer_suffix = f"query_result_last_{len(st.session_state.query_history)}"
+            explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, last_select_result)
+        with result_col5:
+            # SQL Editor icon button
+            from utils.helpers import _render_sql_editor_button
+            sql_suffix = f"query_result_last_{len(st.session_state.query_history)}"
+            sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+        
+        # Display SQL Editor if active
+        if sql_active:
+            st.markdown("---")
+            st.markdown("### 📝 SQL Editor")
+            from ui.components import render_sql_editor
+            sql_query = render_sql_editor(
+                key=f"sql_editor_last_{sql_suffix}",
+                height=200,
+                placeholder="Enter SQL query here..."
+            )
+            if sql_query and sql_query.strip():
+                if st.button("Execute SQL", key=f"execute_sql_last_{sql_suffix}"):
+                    execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_last_{sql_suffix}")
+        
+        # Display Data Explorer if active
+        if explorer_active:
+            st.markdown("---")
+            st.markdown("### 🔍 Data Explorer")
+            try:
+                from utils.helpers import display_data_explorer
+                display_data_explorer(last_select_result)
+            except Exception as e:
+                st.error(f"Error displaying data explorer: {str(e)}")
         
         # Search and visualization are now handled inside display_paginated_dataframe
         display_df = last_select_result.copy()
