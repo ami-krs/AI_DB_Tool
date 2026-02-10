@@ -318,6 +318,8 @@ class DatabaseManager:
     @staticmethod
     def save_connection_config(config: DatabaseConfig, name: str):
         """Save connection configuration securely using keyring"""
+        if not KEYRING_AVAILABLE:
+            return False
         try:
             keyring.set_password("ai_db_tool", f"{name}_host", config.host)
             keyring.set_password("ai_db_tool", f"{name}_port", str(config.port))
