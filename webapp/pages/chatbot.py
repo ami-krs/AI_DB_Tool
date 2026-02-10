@@ -883,10 +883,12 @@ def chatbot_tab():
         st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
         results_shown_for_latest = True
     
-    # Check for multi-query results in fallback
+    # Check for multi-query results in fallback (only if results weren't already shown)
+    # Re-check has_last_result in case it was cleared in main loop
+    has_last_result_fallback = st.session_state.get('last_result_df') is not None
     has_multi_results_fallback = st.session_state.get('chatbot_multi_query_results') is not None and len(st.session_state.get('chatbot_multi_query_results', [])) > 0
     
-    if not results_shown_for_latest and (has_last_result or has_multi_results_fallback) and has_auto_query and not has_auto_error:
+    if not results_shown_for_latest and (has_last_result_fallback or has_multi_results_fallback) and has_auto_query and not has_auto_error:
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
         
         # Check if we have multiple query results
@@ -972,6 +974,9 @@ def chatbot_tab():
             
             # Clear multi-results after displaying
             st.session_state.pop('chatbot_multi_query_results', None)
+            # Also clear last_result_df to prevent duplicate display
+            st.session_state.pop('last_result_df', None)
+            st.session_state.pop('last_result', None)
         else:
             # Show single result (original fallback behavior)
             from utils.helpers import display_paginated_dataframe
