@@ -1293,8 +1293,8 @@ def chatbot_tab():
                     print(f"DEBUG: SchemaDataAgent analysis: {schema_data_analysis[:200] if schema_data_analysis else 'None'}...")
                     print(f"DEBUG: SchemaDataAgent suggested queries: {schema_data_queries}")
                     
-                    # Fallback: If SchemaDataAgent didn't generate queries, try to generate them directly from schema
-                    # Also always query primary key values for INSERT operations to avoid UniqueViolation errors
+                    # ALWAYS query primary key values for INSERT operations to avoid UniqueViolation errors
+                    # This should run regardless of what SchemaDataAgent returns
                     if 'insert' in user_upper:
                         print(f"DEBUG: INSERT operation detected, ensuring primary key and foreign key queries...")
                         schema_info = st.session_state.get('schema_info', {})
@@ -1336,13 +1336,24 @@ def chatbot_tab():
                                         if isinstance(col, dict) and col.get('primary_key', False):
                                             primary_keys.append(col.get('name', ''))
                                 
-                                # Query primary key values
+                                # Query primary key values - ALWAYS add this query for INSERT operations
                                 if primary_keys:
                                     pk_col = primary_keys[0]  # Use first primary key column
                                     pk_query = f"SELECT {pk_col} FROM {target_table_name} ORDER BY {pk_col};"
-                                    if pk_query not in schema_data_queries:
-                                        schema_data_queries.append(pk_query)
-                                        print(f"DEBUG: Added primary key query: {pk_query}")
+                                    # Check if this query already exists (case-insensitive, ignoring whitespace)
+                                    pk_query_normalized = pk_query.upper().strip().replace(' ', '')
+                                    pk_query_exists = any(
+                                        q.upper().strip().replace(' ', '') == pk_query_normalized 
+                                        for q in schema_data_queries
+                                    )
+                                    if not pk_query_exists:
+                                        # Insert at the beginning so primary key query runs first
+                                        schema_data_queries.insert(0, pk_query)
+                                        print(f"DEBUG: Added primary key query (first): {pk_query}")
+                                    else:
+                                        print(f"DEBUG: Primary key query already exists in schema_data_queries")
+                                else:
+                                    print(f"DEBUG: WARNING - No primary key found for table {target_table_name}")
                                 
                                 # 2. Find foreign keys for this table and query parent table values
                                 foreign_keys = target_table_schema.get('foreign_keys', [])
@@ -1468,16 +1479,33 @@ def chatbot_tab():
                                 column_name = key.split('.')[1] if '.' in key else key
                                 table_name = key.split('.')[0] if '.' in key else 'unknown'
                                 
-                                # Check if this is a primary key column (same table name in key)
-                                is_primary_key = table_name.lower() in user_lower and any(
-                                    pk_col.lower() == column_name.lower() 
-                                    for table in st.session_state.get('schema_info', {}).get('tables', [])
-                                    if isinstance(table, dict) and table.get('table_name', '').lower() == table_name.lower()
-                                    for pk_col in (table.get('primary_keys', []) or [
-                                        col.get('name') for col in table.get('columns', [])
-                                        if isinstance(col, dict) and col.get('primary_key', False)
-                                    ])
-                                )
+                                # Check if this is a primary key column
+                                # A primary key query is: SELECT pk_col FROM table_name
+                                # So if the table_name in the key matches a table in schema_info and the column is a primary key, it's a PK query
+                                is_primary_key = False
+                                schema_info = st.session_state.get('schema_info', {})
+                                tables = schema_info.get('tables', [])
+                                
+                                for table in tables:
+                                    if isinstance(table, dict):
+                                        table_name_from_schema = table.get('table_name', '').lower()
+                                        if table_name_from_schema == table_name.lower():
+                                            # Found matching table, check if column_name is a primary key
+                                            primary_keys = table.get('primary_keys', [])
+                                            if not primary_keys:
+                                                # Try to find from columns
+                                                columns = table.get('columns', [])
+                                                for col in columns:
+                                                    if isinstance(col, dict) and col.get('primary_key', False):
+                                                        primary_keys.append(col.get('name', ''))
+                                            
+                                            # Check if column_name matches any primary key
+                                            if any(pk_col.lower() == column_name.lower() for pk_col in primary_keys):
+                                                is_primary_key = True
+                                                print(f"DEBUG: Detected primary key: {table_name}.{column_name}")
+                                                break
+                                    if is_primary_key:
+                                        break
                                 
                                 if is_primary_key:
                                     # Primary key values - must use NEXT available ID

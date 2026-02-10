@@ -369,10 +369,19 @@ class SQLChatbot:
         if db_type != 'unknown':
             prompt += f"Database Type: {db_type}\n\n"
         
-        # Add existing data analysis if available
+        # Add existing data analysis if available (CRITICAL for INSERT operations)
         if self.schema_context and self.schema_context.get('data_analysis'):
-            prompt += self.schema_context.get('data_analysis', '')
-            prompt += "\n"
+            data_analysis = self.schema_context.get('data_analysis', '')
+            prompt += "\n" + "="*80 + "\n"
+            prompt += "🚨 CRITICAL: EXISTING DATA INFORMATION (READ THIS BEFORE GENERATING SQL)\n"
+            prompt += "="*80 + "\n"
+            prompt += data_analysis
+            prompt += "\n" + "="*80 + "\n"
+            prompt += "⚠️ ABOVE INFORMATION IS CRITICAL - YOU MUST USE IT WHEN GENERATING INSERT STATEMENTS\n"
+            prompt += "⚠️ If you see PRIMARY KEY VALUES above, you MUST use IDs that are NOT in the existing list\n"
+            prompt += "⚠️ If you see NEXT AVAILABLE ID, use that ID and higher (e.g., if next is 4, use 4, 5, 6, etc.)\n"
+            prompt += "⚠️ NEVER use primary key values that already exist - this will cause UniqueViolation errors\n"
+            prompt += "="*80 + "\n\n"
         
         if self.schema_context:
             prompt += "=== DATABASE SCHEMA (YOU MUST USE ONLY THESE TABLES AND COLUMNS - NO PLACEHOLDERS) ===\n"
