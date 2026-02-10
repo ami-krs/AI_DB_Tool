@@ -817,6 +817,21 @@ def execute_generated_query(query: str):
         if st.session_state.get("connected") and st.session_state.get("db_manager"):
             db_type = (st.session_state.get("db_type") or "").lower()
 
+            # Guardrail: fix SQLite-specific metadata queries when using PostgreSQL/MySQL
+            # Sometimes the AI generates "SELECT name FROM sqlite_master ..." even though
+            # the active database is PostgreSQL. In that case, transparently rewrite
+            # the query to a correct information_schema-based query.
+            lowered = query.lower()
+            if "sqlite_master" in lowered and db_type == "postgresql":
+                st.info("ℹ️ Adjusted AI-generated query to use PostgreSQL information_schema instead of SQLite's sqlite_master.")
+                query = (
+                    "SELECT table_schema, table_name\n"
+                    "FROM information_schema.tables\n"
+                    "WHERE table_type = 'BASE TABLE'\n"
+                    "  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n"
+                    "ORDER BY table_schema, table_name;"
+                )
+
             def _find_insert_targets(sql: str) -> List[str]:
                 targets: List[str] = []
                 for m in re.finditer(r"INSERT\s+INTO\s+([A-Za-z_][\w]*)(?:\s*\.\s*([A-Za-z_][\w]*))?", sql, flags=re.IGNORECASE):
