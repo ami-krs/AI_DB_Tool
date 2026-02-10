@@ -728,7 +728,6 @@ def chatbot_tab():
                                     )
                                     if sql_query and sql_query.strip():
                                         if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
-                                            from utils.query_execution import execute_query
                                             execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
                                 
                                 # Display Data Explorer if active
@@ -841,7 +840,6 @@ def chatbot_tab():
             )
             if sql_query and sql_query.strip():
                 if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}"):
-                    from utils.query_execution import execute_query
                     execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_{sql_suffix}")
         
         # Display Data Explorer if active

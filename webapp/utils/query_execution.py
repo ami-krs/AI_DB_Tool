@@ -475,9 +475,10 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     height=200,
                     placeholder="Enter SQL query here..."
                 )
-                if sql_query and sql_query.strip():
-                    if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
-                        execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_{sql_suffix}")
+            if sql_query and sql_query.strip():
+                if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
+                    # execute_query is already imported at module level, no need to import again
+                    execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_{sql_suffix}")
             
             # Display Data Explorer if active
             if explorer_active:
