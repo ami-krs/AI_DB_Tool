@@ -32,11 +32,11 @@ sqlalchemy-utils>=0.41.1
 # Utilities
 pydantic>=2.6.0
 typing-extensions>=4.9.0
+# keyring>=25.0.0                # Optional - for secure credential storage (not needed on Streamlit Cloud)
 
 # Removed optional dependencies to speed up installation:
-# - fastapi, uvicorn, python-multipart (not used - app uses Streamlit)
-# - keyring (not needed on Streamlit Cloud)
-# - matplotlib (large package, only needed for specific chart types)
-# - mysql-connector-python, pymssql (optional database drivers)
+# - fastapi, uvicorn, python-multipart (not used - main app uses Streamlit, api_server.py is separate)
+# - matplotlib (large package, only needed for specific chart types - can be added back if needed)
+# - mysql-connector-python, pymssql (optional database drivers - uncomment if you need MySQL/SQL Server)
 
 
