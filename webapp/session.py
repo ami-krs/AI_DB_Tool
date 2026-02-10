@@ -29,18 +29,22 @@ def _get_active_section() -> str:
     # Otherwise, initialize from query params (if present)
     section_from_query = None
     try:
-        if hasattr(st, "query_params") and st.query_params:
+        # Safely check for query_params (available in Streamlit 1.28+)
+        if hasattr(st, "query_params"):
             query_params = st.query_params
-            if "section" in query_params:
+            if query_params and "section" in query_params:
                 section_val = query_params.get("section")
                 if isinstance(section_val, list):
                     section_val = section_val[0] if section_val else None
-                if isinstance(section_val, str):
-                    section_from_query = section_val.strip()
-    except Exception:
+                elif isinstance(section_val, str):
+                    section_val = section_val.strip()
+                if isinstance(section_val, str) and section_val:
+                    section_from_query = section_val
+    except (AttributeError, TypeError, KeyError, Exception):
+        # If query_params doesn't exist or fails, just use default
         section_from_query = None
 
-    if section_from_query in ["home", "chatbot", "sql_editor", "data_explorer", "visualizations", "smart_email_agent"]:
+    if section_from_query and section_from_query in ["home", "chatbot", "sql_editor", "data_explorer", "visualizations", "smart_email_agent"]:
         return section_from_query
     return "home"
 
