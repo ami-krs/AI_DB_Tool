@@ -640,25 +640,30 @@ User Request: {user_query}
 
 {schema_context}
 
-CRITICAL REQUIREMENTS:
-1. If the user wants to INSERT into a table, identify ALL foreign key columns in that table
-2. For EACH foreign key column, generate a SELECT query to get existing values from the referenced parent table
-3. Example: If inserting into 'employee' table and 'employee' has 'department_id' -> REFERENCES 'department.department_id':
-   - Generate: SELECT department_id FROM department;
-4. Generate queries in a ```sql code block - ONE query per foreign key relationship
-5. Explain briefly (1-2 sentences) why these queries are needed
+CRITICAL REQUIREMENTS FOR INSERT OPERATIONS:
+1. PRIMARY KEY VALUES (MANDATORY): You MUST query existing primary key values from the TARGET table itself
+   - Example: If inserting into 'employee' table with 'employee_id' as primary key, generate:
+     SELECT employee_id FROM employee ORDER BY employee_id;
+   - This is CRITICAL to prevent UniqueViolation errors - the INSERT must use IDs that don't already exist
+   - Always include this query FIRST for INSERT operations
+   
+2. FOREIGN KEY VALUES: For EACH foreign key column in the target table, generate a SELECT query to get existing values from the referenced parent table
+   - Example: If inserting into 'employee' table and 'employee' has 'department_id' -> REFERENCES 'department.department_id':
+     Generate: SELECT department_id FROM department;
+   - Generate ONE query per foreign key relationship
 
-STEP-BY-STEP PROCESS:
+STEP-BY-STEP PROCESS FOR INSERT:
 1. Identify the target table from user request (e.g., 'employee')
 2. Find that table in the schema above
-3. Look for foreign key relationships (columns with -> REFERENCES)
-4. For EACH foreign key, generate: SELECT [parent_pk_column] FROM [parent_table];
-5. If no foreign keys found, you may not need to generate queries (but still check)
+3. Find the PRIMARY KEY column(s) for that table
+4. Generate: SELECT [primary_key_column] FROM [target_table] ORDER BY [primary_key_column];
+5. Look for foreign key relationships (columns with -> REFERENCES)
+6. For EACH foreign key, generate: SELECT [parent_pk_column] FROM [parent_table];
 
 Focus on:
-- For INSERT: ALWAYS query parent tables for existing foreign key values - this is CRITICAL
+- For INSERT: ALWAYS query PRIMARY KEY values from target table FIRST, then foreign key values from parent tables
 - For UPDATE/DELETE: Query tables for existing primary key values
-- Generate at least ONE SELECT query if foreign keys exist
+- Generate at least TWO queries for INSERT: one for primary key, one or more for foreign keys
 
 Example output format:
 ```sql

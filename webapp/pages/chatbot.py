@@ -1294,46 +1294,72 @@ def chatbot_tab():
                     print(f"DEBUG: SchemaDataAgent suggested queries: {schema_data_queries}")
                     
                     # Fallback: If SchemaDataAgent didn't generate queries, try to generate them directly from schema
-                    if not schema_data_queries and 'insert' in user_upper:
-                        print(f"DEBUG: SchemaDataAgent didn't generate queries, trying fallback detection...")
+                    # Also always query primary key values for INSERT operations to avoid UniqueViolation errors
+                    if 'insert' in user_upper:
+                        print(f"DEBUG: INSERT operation detected, ensuring primary key and foreign key queries...")
                         schema_info = st.session_state.get('schema_info', {})
                         tables = schema_info.get('tables', [])
                         
-                        # Find the target table (employee in this case)
+                        # Find the target table from user input
                         target_table_name = None
-                        for keyword in ['employee', 'table']:
-                            if keyword in user_upper:
-                                # Try to find the table
-                                for table in tables:
-                                    if isinstance(table, dict):
-                                        table_name = table.get('table_name', '').lower()
-                                        if keyword in table_name or table_name in user_lower:
-                                            target_table_name = table.get('table_name')
-                                            break
-                                    elif isinstance(table, str) and keyword in table.lower():
-                                        target_table_name = table
-                                        break
-                                if target_table_name:
+                        user_lower = user_input.lower()
+                        # Try to match table names from schema
+                        for table in tables:
+                            if isinstance(table, dict):
+                                table_name = table.get('table_name', '').lower()
+                                # Check if table name appears in user input
+                                if table_name in user_lower or any(word in table_name for word in user_lower.split() if len(word) > 3):
+                                    target_table_name = table.get('table_name')
+                                    break
+                            elif isinstance(table, str):
+                                if table.lower() in user_lower:
+                                    target_table_name = table
                                     break
                         
                         if target_table_name:
-                            # Find foreign keys for this table
+                            print(f"DEBUG: Found target table: {target_table_name}")
+                            # Find the table schema
+                            target_table_schema = None
                             for table in tables:
                                 if isinstance(table, dict) and table.get('table_name') == target_table_name:
-                                    foreign_keys = table.get('foreign_keys', [])
-                                    if foreign_keys:
-                                        for fk in foreign_keys:
-                                            if isinstance(fk, dict):
-                                                referred_table = fk.get('referred_table', '')
-                                                referred_columns = fk.get('referred_columns', [])
-                                                if referred_table and referred_columns:
-                                                    # Generate SELECT query
-                                                    pk_col = referred_columns[0] if referred_columns else 'id'
-                                                    fallback_query = f"SELECT {pk_col} FROM {referred_table};"
-                                                    if fallback_query not in schema_data_queries:
-                                                        schema_data_queries.append(fallback_query)
-                                                        print(f"DEBUG: Generated fallback query: {fallback_query}")
+                                    target_table_schema = table
                                     break
+                            
+                            if target_table_schema:
+                                # 1. Query PRIMARY KEY values from target table (CRITICAL for INSERT)
+                                columns = target_table_schema.get('columns', [])
+                                primary_keys = target_table_schema.get('primary_keys', [])
+                                
+                                # If no explicit primary_keys list, find columns marked as primary_key
+                                if not primary_keys:
+                                    for col in columns:
+                                        if isinstance(col, dict) and col.get('primary_key', False):
+                                            primary_keys.append(col.get('name', ''))
+                                
+                                # Query primary key values
+                                if primary_keys:
+                                    pk_col = primary_keys[0]  # Use first primary key column
+                                    pk_query = f"SELECT {pk_col} FROM {target_table_name} ORDER BY {pk_col};"
+                                    if pk_query not in schema_data_queries:
+                                        schema_data_queries.append(pk_query)
+                                        print(f"DEBUG: Added primary key query: {pk_query}")
+                                
+                                # 2. Find foreign keys for this table and query parent table values
+                                foreign_keys = target_table_schema.get('foreign_keys', [])
+                                if foreign_keys:
+                                    for fk in foreign_keys:
+                                        if isinstance(fk, dict):
+                                            referred_table = fk.get('referred_table', '')
+                                            referred_columns = fk.get('referred_columns', [])
+                                            if referred_table and referred_columns:
+                                                # Generate SELECT query for foreign key values
+                                                fk_col = referred_columns[0] if referred_columns else 'id'
+                                                fk_query = f"SELECT {fk_col} FROM {referred_table};"
+                                                if fk_query not in schema_data_queries:
+                                                    schema_data_queries.append(fk_query)
+                                                    print(f"DEBUG: Added foreign key query: {fk_query}")
+                        else:
+                            print(f"DEBUG: Could not determine target table from user input: {user_input}")
                     
                     # Execute the SELECT queries suggested by SchemaDataAgent
                     if schema_data_queries:
@@ -1439,12 +1465,46 @@ def chatbot_tab():
                                 values_str = ', '.join(values[:20])
                                 if len(values) > 20:
                                     values_str += f" (and {len(values) - 20} more)"
-                                enhanced_schema_context += f"{key}: {values_str}\n"
                                 column_name = key.split('.')[1] if '.' in key else key
                                 table_name = key.split('.')[0] if '.' in key else 'unknown'
-                                enhanced_schema_context += f"🚨 CRITICAL: For foreign key column '{column_name}' in table '{table_name}', you MUST use ONLY these values: {', '.join(values[:20])}\n"
-                                enhanced_schema_context += f"   - NEVER use values like 1, 2, 3 unless they appear in the list above\n"
-                                enhanced_schema_context += f"   - If the list above shows [10, 20, 30], use ONLY 10, 20, or 30 - nothing else\n"
+                                
+                                # Check if this is a primary key column (same table name in key)
+                                is_primary_key = table_name.lower() in user_lower and any(
+                                    pk_col.lower() == column_name.lower() 
+                                    for table in st.session_state.get('schema_info', {}).get('tables', [])
+                                    if isinstance(table, dict) and table.get('table_name', '').lower() == table_name.lower()
+                                    for pk_col in (table.get('primary_keys', []) or [
+                                        col.get('name') for col in table.get('columns', [])
+                                        if isinstance(col, dict) and col.get('primary_key', False)
+                                    ])
+                                )
+                                
+                                if is_primary_key:
+                                    # Primary key values - must use NEXT available ID
+                                    try:
+                                        numeric_values = [int(v) for v in values if str(v).strip().isdigit()]
+                                        if numeric_values:
+                                            max_id = max(numeric_values)
+                                            next_id = max_id + 1
+                                            enhanced_schema_context += f"🚨 CRITICAL - PRIMARY KEY VALUES for {table_name}.{column_name}:\n"
+                                            enhanced_schema_context += f"   Existing IDs: {values_str}\n"
+                                            enhanced_schema_context += f"   MAX ID: {max_id}\n"
+                                            enhanced_schema_context += f"   NEXT AVAILABLE ID: {next_id}\n"
+                                            enhanced_schema_context += f"   ⚠️ YOU MUST USE IDs GREATER THAN {max_id} (e.g., {next_id}, {next_id + 1}, etc.)\n"
+                                            enhanced_schema_context += f"   ⚠️ NEVER use IDs that already exist: {', '.join(values[:10])}{'...' if len(values) > 10 else ''}\n"
+                                        else:
+                                            enhanced_schema_context += f"🚨 CRITICAL - PRIMARY KEY VALUES for {table_name}.{column_name}:\n"
+                                            enhanced_schema_context += f"   Existing values: {values_str}\n"
+                                            enhanced_schema_context += f"   ⚠️ YOU MUST USE VALUES THAT DO NOT EXIST IN THE LIST ABOVE\n"
+                                    except (ValueError, TypeError):
+                                        enhanced_schema_context += f"🚨 CRITICAL - PRIMARY KEY VALUES for {table_name}.{column_name}:\n"
+                                        enhanced_schema_context += f"   Existing values: {values_str}\n"
+                                        enhanced_schema_context += f"   ⚠️ YOU MUST USE VALUES THAT DO NOT EXIST IN THE LIST ABOVE\n"
+                                else:
+                                    # Foreign key values - must use only existing values
+                                    enhanced_schema_context += f"🚨 CRITICAL: For foreign key column '{column_name}' in table '{table_name}', you MUST use ONLY these values: {', '.join(values[:20])}\n"
+                                    enhanced_schema_context += f"   - NEVER use values like 1, 2, 3 unless they appear in the list above\n"
+                                    enhanced_schema_context += f"   - If the list above shows [10, 20, 30], use ONLY 10, 20, or 30 - nothing else\n"
                         enhanced_schema_context += "\n=== END EXISTING VALUES ===\n"
                     
                     enhanced_schema_context += "\n=== END EXISTING DATA ANALYSIS ===\n"
