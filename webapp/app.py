@@ -80,9 +80,9 @@ except Exception as e:
         from ai_db_tool.connectors import DatabaseManager
         st.session_state.db_manager = DatabaseManager()
     # Log error but don't crash
-        import traceback
+    import traceback
     print(f"ERROR in initialize_session_state: {e}")
-        traceback.print_exc()
+    traceback.print_exc()
 
 
 def main():
