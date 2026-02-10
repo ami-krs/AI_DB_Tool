@@ -18,8 +18,8 @@ try:
     import importlib.util
     spec = importlib.util.find_spec("dotenv")
     if spec is not None:
-from dotenv import load_dotenv
-load_dotenv()
+        from dotenv import load_dotenv
+        load_dotenv()
         _dotenv_available = True
 except (ImportError, ModuleNotFoundError, AttributeError):
     # python-dotenv not available (e.g., on Streamlit Cloud)
