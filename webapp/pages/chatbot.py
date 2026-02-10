@@ -766,6 +766,9 @@ def chatbot_tab():
                                     
                                     # Clear multi-results after displaying
                                     st.session_state.pop('chatbot_multi_query_results', None)
+                                    # Also clear last_result_df to prevent fallback from showing it again
+                                    st.session_state.pop('last_result_df', None)
+                                    st.session_state.pop('last_result', None)
                                     results_shown_for_latest = True
                                 elif has_last_result:
                                     # Show single result (original behavior)
