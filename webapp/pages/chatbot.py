@@ -1147,6 +1147,54 @@ def chatbot_tab():
     </script>
     """, unsafe_allow_html=True)
     
+    # Ensure schema is fetched when chatbot page loads (if connected but schema is empty)
+    if st.session_state.connected and st.session_state.db_manager:
+        schema_info = st.session_state.get('schema_info')
+        # Check if schema_info is missing or empty (just placeholder)
+        needs_schema_fetch = (
+            not schema_info or 
+            not schema_info.get('tables') or 
+            len(schema_info.get('tables', [])) == 0
+        )
+        
+        if needs_schema_fetch:
+            try:
+                with st.spinner("📊 Loading database schema..."):
+                    tables = st.session_state.db_manager.get_tables()
+                    if tables:
+                        # Fetch full schema info with column details
+                        schema_info = st.session_state.db_manager.get_database_info()
+                        if schema_info:
+                            schema_info['tables'] = schema_info.get('tables', [])
+                            schema_info['total_tables'] = len(schema_info.get('tables', []))
+                        else:
+                            # Fallback: build schema_info from individual table schemas
+                            full_table_schemas = []
+                            for table_name in tables:
+                                try:
+                                    table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                    if table_schema:
+                                        full_table_schemas.append(table_schema)
+                                except Exception as e:
+                                    full_table_schemas.append({'table_name': table_name, 'columns': []})
+                            
+                            schema_info = {
+                                'tables': full_table_schemas,
+                                'db_type': st.session_state.get('db_type', 'unknown'),
+                                'total_tables': len(tables) if tables else 0,
+                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                            }
+                        
+                        st.session_state.schema_info = schema_info
+                        # Update chatbot schema context
+                        if st.session_state.chatbot:
+                            st.session_state.chatbot.set_schema_context(schema_info)
+                        print(f"DEBUG: Fetched schema_info on chatbot page load - {len(schema_info.get('tables', []))} tables")
+            except Exception as e:
+                print(f"DEBUG: Could not fetch schema_info on chatbot page load: {e}")
+                import traceback
+                traceback.print_exc()
+    
     # Chat input (outside scrollable container, stays at bottom)
     user_input = st.chat_input("Ask me anything about your database...")
     
@@ -1161,7 +1209,7 @@ def chatbot_tab():
             # Ensure chatbot has latest schema context before generating SQL
             schema_info = st.session_state.get('schema_info')
             if st.session_state.chatbot:
-                if schema_info:
+                if schema_info and schema_info.get('tables'):
                     try:
                         st.session_state.chatbot.set_schema_context(schema_info)
                         print(f"DEBUG: Schema context set - tables: {len(schema_info.get('tables', []))}")
@@ -1179,29 +1227,30 @@ def chatbot_tab():
                         import traceback
                         traceback.print_exc()
                 else:
-                    print(f"DEBUG: WARNING - schema_info is None or not set in session state")
+                    print(f"DEBUG: WARNING - schema_info is None or empty")
                     # Try to rebuild schema_info if connected
                     if st.session_state.connected and st.session_state.db_manager:
                         try:
-                            tables = st.session_state.db_manager.get_tables()
-                            full_table_schemas = []
-                            for table_name in (tables or []):
-                                try:
-                                    table_schema = st.session_state.db_manager.get_table_schema(table_name)
-                                    if table_schema:
-                                        full_table_schemas.append(table_schema)
-                                except Exception as e:
-                                    full_table_schemas.append({'table_name': table_name, 'columns': []})
-                            
-                            schema_info = {
-                                'tables': full_table_schemas,
-                                'db_type': st.session_state.get('db_type', 'unknown'),
-                                'total_tables': len(tables) if tables else 0,
-                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
-                            }
-                            st.session_state.schema_info = schema_info
-                            st.session_state.chatbot.set_schema_context(schema_info)
-                            print(f"DEBUG: Rebuilt schema_info - {len(full_table_schemas)} tables with schemas")
+                            with st.spinner("📊 Loading database schema..."):
+                                tables = st.session_state.db_manager.get_tables()
+                                full_table_schemas = []
+                                for table_name in (tables or []):
+                                    try:
+                                        table_schema = st.session_state.db_manager.get_table_schema(table_name)
+                                        if table_schema:
+                                            full_table_schemas.append(table_schema)
+                                    except Exception as e:
+                                        full_table_schemas.append({'table_name': table_name, 'columns': []})
+                                
+                                schema_info = {
+                                    'tables': full_table_schemas,
+                                    'db_type': st.session_state.get('db_type', 'unknown'),
+                                    'total_tables': len(tables) if tables else 0,
+                                    'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
+                                }
+                                st.session_state.schema_info = schema_info
+                                st.session_state.chatbot.set_schema_context(schema_info)
+                                print(f"DEBUG: Rebuilt schema_info - {len(full_table_schemas)} tables with schemas")
                         except Exception as e:
                             print(f"DEBUG: Could not rebuild schema_info: {e}")
                             import traceback
