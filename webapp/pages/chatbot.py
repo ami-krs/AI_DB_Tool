@@ -659,17 +659,20 @@ def chatbot_tab():
                         print(f"DEBUG: sql_matches={msg_sql_matches}, should_show={msg_should_show}, auto_executed={msg_was_auto_executed}")
                         print(f"DEBUG: has_last_result={has_last_result}, has_auto_query={has_auto_query}")
                         
+                        # Check if we have multiple query results from auto-execution
+                        has_multi_results = st.session_state.get('chatbot_multi_query_results') is not None and len(st.session_state.get('chatbot_multi_query_results', [])) > 0
+                        
                         # Show results if: (1) it's the last message AND (2) has SQL AND (3) we have results available
                         # Simplified condition - if it's the last message with SQL and results exist, show them
                         should_show_results = (
                             is_last_message and 
                             msg_has_sql and 
-                            has_last_result and 
+                            (has_last_result or has_multi_results) and 
                             has_auto_query
                             # Removed strict matching - if results exist and it's the last message, show them
                         )
                         
-                        print(f"DEBUG: should_show_results={should_show_results}")
+                        print(f"DEBUG: should_show_results={should_show_results}, has_multi_results={has_multi_results}")
                         
                         if should_show_results:
                             # Check if we have results or errors to display
@@ -792,12 +795,101 @@ def chatbot_tab():
         st.info("💡 The query was generated but failed to execute. Please check the SQL syntax and table/column names.")
         results_shown_for_latest = True
     
-    if not results_shown_for_latest and has_last_result and has_auto_query and not has_auto_error:
+    # Check for multi-query results in fallback
+    has_multi_results_fallback = st.session_state.get('chatbot_multi_query_results') is not None and len(st.session_state.get('chatbot_multi_query_results', [])) > 0
+    
+    if not results_shown_for_latest and (has_last_result or has_multi_results_fallback) and has_auto_query and not has_auto_error:
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
-        from utils.helpers import display_paginated_dataframe
-        st.markdown("---")
-        # Compact Results header with download, visualization, data explorer, and SQL editor icons
-        result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
+        
+        # Check if we have multiple query results
+        multi_results = st.session_state.get('chatbot_multi_query_results', [])
+        
+        if has_multi_results_fallback and len(multi_results) > 1:
+            # Display all results from multiple SELECT queries
+            st.markdown("---")
+            st.markdown("### 📋 Query Results (Multiple Queries)")
+            
+            for result_item in multi_results:
+                query_text = result_item['query']
+                result_df = result_item['dataframe']
+                result_idx = result_item['index']
+                
+                st.markdown(f"**Query {result_idx}:**")
+                st.code(query_text, language='sql')
+                
+                # Results header with icons
+                result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
+                with result_col1:
+                    st.markdown(f"**📋 Results {result_idx}**", unsafe_allow_html=True)
+                with result_col2:
+                    # Download CSV button
+                    csv = result_df.to_csv(index=False)
+                    st.download_button(
+                        "📥",
+                        csv,
+                        f"results_{result_idx}.csv",
+                        "text/csv",
+                        help=f"Download CSV - {len(result_df):,} rows",
+                        width="stretch",
+                        key=f"download_fallback_multi_{result_idx}"
+                    )
+                with result_col3:
+                    # Visualization icon button
+                    from utils.helpers import _render_viz_icon_button
+                    viz_suffix = f"chatbot_fallback_multi_{result_idx}_{hash(query_text) % 10000}"
+                    _render_viz_icon_button(viz_suffix, result_df)
+                with result_col4:
+                    # Data Explorer icon button
+                    from utils.helpers import _render_data_explorer_button
+                    explorer_suffix = f"chatbot_fallback_multi_{result_idx}_{hash(query_text) % 10000}"
+                    explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, result_df)
+                with result_col5:
+                    # SQL Editor icon button
+                    from utils.helpers import _render_sql_editor_button
+                    sql_suffix = f"chatbot_fallback_multi_{result_idx}_{hash(query_text) % 10000}"
+                    sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+                
+                # Display SQL Editor if active
+                if sql_active:
+                    st.markdown("---")
+                    st.markdown("### 📝 SQL Editor")
+                    from ui.components import render_sql_editor
+                    sql_query_editor = render_sql_editor(
+                        key=f"sql_editor_chatbot_fallback_multi_{result_idx}_{sql_suffix}",
+                        height=200,
+                        placeholder="Enter SQL query here..."
+                    )
+                    if sql_query_editor and sql_query_editor.strip():
+                        if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_multi_{result_idx}_{sql_suffix}"):
+                            execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_multi_{result_idx}_{sql_suffix}")
+                
+                # Display Data Explorer if active
+                if explorer_active:
+                    st.markdown("---")
+                    st.markdown("### 🔍 Data Explorer")
+                    try:
+                        from utils.helpers import display_data_explorer
+                        display_data_explorer(result_df)
+                    except Exception as e:
+                        st.error(f"Error displaying data explorer: {str(e)}")
+                
+                # Display paginated dataframe
+                from utils.helpers import display_paginated_dataframe
+                display_paginated_dataframe(
+                    result_df,
+                    unique_suffix=f"chatbot_fallback_multi_{result_idx}_{hash(query_text) % 10000}"
+                )
+                
+                st.markdown("---")
+            
+            # Clear multi-results after displaying
+            st.session_state.pop('chatbot_multi_query_results', None)
+        else:
+            # Show single result (original fallback behavior)
+            from utils.helpers import display_paginated_dataframe
+            st.markdown("---")
+            # Compact Results header with download, visualization, data explorer, and SQL editor icons
+            result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
         with result_col1:
             st.markdown("**📋 Query Results**", unsafe_allow_html=True)
         with result_col2:
