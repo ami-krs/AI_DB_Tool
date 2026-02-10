@@ -315,6 +315,22 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             print(traceback.format_exc())
             orchestrator = None
     
+    # Normalize query for DB-specific guardrails
+    db_type = (st.session_state.get('db_type') or "").lower()
+    lowered_query = query.lower()
+
+    # Guardrail: fix SQLite-specific metadata queries when using PostgreSQL
+    # Example bad SQL: SELECT name FROM sqlite_master WHERE type='table';
+    if "sqlite_master" in lowered_query and db_type == "postgresql":
+        st.info("ℹ️ Adjusted query to use PostgreSQL information_schema instead of SQLite's sqlite_master.")
+        query = (
+            "SELECT table_schema, table_name\n"
+            "FROM information_schema.tables\n"
+            "WHERE table_type = 'BASE TABLE'\n"
+            "  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n"
+            "ORDER BY table_schema, table_name;"
+        )
+
     # Check if query contains a transaction block (BEGIN...COMMIT)
     # If so, execute it as a single statement to preserve transaction semantics
     query_upper = query.strip().upper()
