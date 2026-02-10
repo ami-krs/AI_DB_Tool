@@ -1298,6 +1298,8 @@ def chatbot_tab():
                                     st.session_state['chatbot_last_auto_executed_query'] = sql_query
                                     st.session_state['chatbot_auto_executed_timestamp'] = timestamp
                                     st.session_state['chatbot_auto_execution_error'] = None  # Clear any previous error
+                                    # Clear any previous multi-query results
+                                    st.session_state.pop('chatbot_multi_query_results', None)
                                     print(f"DEBUG: Flag set before execute_query")
                                     execute_query(sql_query, enable_agents=False, unique_suffix="chatbot_auto")
                                     # Verify results were stored

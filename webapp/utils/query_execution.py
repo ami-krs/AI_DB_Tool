@@ -649,11 +649,22 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     st.success(f"✅ Statement {idx} executed: Retrieved {result['rows_retrieved']:,} rows")
                     if result['dataframe'] is not None and len(result['dataframe']) > 0:
                         st.session_state.current_page = 1
+                        # Display results for each SELECT query
                         display_paginated_dataframe(result['dataframe'], unique_suffix=f"multi_stmt_{idx}_{len(statements)}")
                         
-                        # Store last result for visualization
+                        # Store last result for visualization (will be overwritten by subsequent SELECT queries)
                         st.session_state.last_result_df = result['dataframe']
                         st.session_state.last_result = result['dataframe']
+                        
+                        # For chatbot auto-execution, also store results in a list to show all
+                        if unique_suffix and "chatbot_auto" in unique_suffix:
+                            if 'chatbot_multi_query_results' not in st.session_state:
+                                st.session_state['chatbot_multi_query_results'] = []
+                            st.session_state['chatbot_multi_query_results'].append({
+                                'query': statement,
+                                'dataframe': result['dataframe'],
+                                'index': idx
+                            })
                 
                 elif result['type'] == 'DDL':
                     st.success(f"✅ Statement {idx} executed: DDL operation completed")
