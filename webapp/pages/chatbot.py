@@ -721,14 +721,14 @@ def chatbot_tab():
                                     st.markdown("---")
                                     st.markdown("### 📝 SQL Editor")
                                     from ui.components import render_sql_editor
-                                    sql_query = render_sql_editor(
+                                    sql_query_editor = render_sql_editor(
                                         key=f"sql_editor_chatbot_auto_{sql_suffix}",
                                         height=200,
                                         placeholder="Enter SQL query here..."
                                     )
-                                    if sql_query and sql_query.strip():
+                                    if sql_query_editor and sql_query_editor.strip():
                                         if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
-                                            execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
+                                            execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
                                 
                                 # Display Data Explorer if active
                                 if explorer_active:
@@ -833,14 +833,14 @@ def chatbot_tab():
             st.markdown("---")
             st.markdown("### 📝 SQL Editor")
             from ui.components import render_sql_editor
-            sql_query = render_sql_editor(
+            sql_query_editor = render_sql_editor(
                 key=f"sql_editor_chatbot_fallback_{sql_suffix}",
                 height=200,
                 placeholder="Enter SQL query here..."
             )
-            if sql_query and sql_query.strip():
+            if sql_query_editor and sql_query_editor.strip():
                 if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}"):
-                    execute_query(sql_query, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_{sql_suffix}")
+                    execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_{sql_suffix}")
         
         # Display Data Explorer if active
         if explorer_active:
