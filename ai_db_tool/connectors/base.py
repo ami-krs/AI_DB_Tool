@@ -14,7 +14,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import Engine
 import pandas as pd
 
-import keyring
+# Optional: keyring for secure credential storage (not needed on Streamlit Cloud)
+try:
+    import keyring
+    KEYRING_AVAILABLE = True
+except ImportError:
+    KEYRING_AVAILABLE = False
+    keyring = None
 
 
 @dataclass
@@ -326,6 +332,8 @@ class DatabaseManager:
     @staticmethod
     def load_connection_config(name: str) -> Optional[DatabaseConfig]:
         """Load connection configuration from keyring"""
+        if not KEYRING_AVAILABLE:
+            return None
         try:
             host = keyring.get_password("ai_db_tool", f"{name}_host")
             port = keyring.get_password("ai_db_tool", f"{name}_port")
