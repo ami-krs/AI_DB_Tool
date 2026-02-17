@@ -1066,19 +1066,19 @@ def chatbot_tab():
                             
                             # For SELECT queries, show that it was auto-executed (results appear below)
                             if is_safe_select:
-                                # Self-healing path: if latest SQL message was not auto-executed,
-                                # run it once automatically so default-question clicks never get stuck.
-                                if is_last_message and not msg.get('auto_executed', False):
+                                # Deterministic auto-run for SELECT: attempt once for any unexecuted SQL message.
+                                if not msg.get('auto_executed', False):
                                     retry_key = f"chatbot_auto_retry_{unique_key_base}"
                                     if not st.session_state.get(retry_key, False):
                                         auto_ok = _auto_execute_chatbot_select_query(
                                             sql_query,
                                             msg.get('timestamp', datetime.now().isoformat()),
-                                            unique_suffix="chatbot_auto_retry"
+                                            unique_suffix=f"chatbot_auto_retry_{unique_key_base}"
                                         )
                                         st.session_state[retry_key] = True
                                         if auto_ok:
                                             st.session_state.chat_history[idx]['auto_executed'] = True
+                                            st.session_state.chat_history[idx].update(_capture_chatbot_auto_results_snapshot())
                                         st.rerun()
                                 if msg.get('auto_executed', False):
                                     st.success("✅ Query executed automatically. Results shown below.")
