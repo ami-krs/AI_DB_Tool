@@ -388,7 +388,6 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
     if not has_snapshot:
         return False
 
-    from utils.helpers import display_paginated_dataframe
     st.markdown("---")
     if stored_multi_results and len(stored_multi_results) > 1:
         st.markdown("### 📋 Query Results (Multiple Queries)")
@@ -401,10 +400,8 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
             if query_text:
                 st.markdown(f"**Query {result_idx}:**")
                 st.code(query_text, language='sql')
-            display_paginated_dataframe(
-                result_df,
-                unique_suffix=f"chatbot_msg_snapshot_{unique_key_base}_{result_idx}"
-            )
+            st.caption(f"Rows: {len(result_df):,}")
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
             st.markdown("---")
     else:
         result_df = stored_single_result
@@ -412,10 +409,8 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
             result_df = stored_multi_results[0].get('dataframe')
         if result_df is not None:
             st.markdown("**📋 Query Results**")
-            display_paginated_dataframe(
-                result_df,
-                unique_suffix=f"chatbot_msg_snapshot_{unique_key_base}"
-            )
+            st.caption(f"Rows: {len(result_df):,}")
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
     return True
 
 
