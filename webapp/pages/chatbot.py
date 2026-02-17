@@ -380,6 +380,45 @@ def _append_assistant_message(message: Dict[str, Any]) -> None:
     st.session_state.chat_history.append(message)
 
 
+def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -> bool:
+    """Render stored snapshot results for a specific assistant message."""
+    stored_multi_results = msg.get('auto_multi_query_results', [])
+    stored_single_result = msg.get('auto_result_df')
+    has_snapshot = (stored_single_result is not None) or (len(stored_multi_results) > 0)
+    if not has_snapshot:
+        return False
+
+    from utils.helpers import display_paginated_dataframe
+    st.markdown("---")
+    if stored_multi_results and len(stored_multi_results) > 1:
+        st.markdown("### 📋 Query Results (Multiple Queries)")
+        for result_item in stored_multi_results:
+            query_text = result_item.get('query', '')
+            result_df = result_item.get('dataframe')
+            result_idx = result_item.get('index')
+            if result_df is None:
+                continue
+            if query_text:
+                st.markdown(f"**Query {result_idx}:**")
+                st.code(query_text, language='sql')
+            display_paginated_dataframe(
+                result_df,
+                unique_suffix=f"chatbot_msg_snapshot_{unique_key_base}_{result_idx}"
+            )
+            st.markdown("---")
+    else:
+        result_df = stored_single_result
+        if result_df is None and stored_multi_results:
+            result_df = stored_multi_results[0].get('dataframe')
+        if result_df is not None:
+            st.markdown("**📋 Query Results**")
+            display_paginated_dataframe(
+                result_df,
+                unique_suffix=f"chatbot_msg_snapshot_{unique_key_base}"
+            )
+    return True
+
+
 def chatbot_compact():
     """Compact chatbot for three column layout"""
     st.markdown("### 💬 AI Assistant")
@@ -1056,6 +1095,11 @@ def chatbot_tab():
                                 # For DDL/DML, always require manual execution
                                 if st.button(f"Execute Query", key=f"exec_{unique_key_base}"):
                                     execute_generated_query(sql_query)
+
+                        # Deterministic snapshot render: always show stored results inline for this message.
+                        snapshot_rendered = _render_inline_snapshot_results(msg, unique_key_base)
+                        if snapshot_rendered:
+                            results_shown_for_latest = True
                         
                         # Show auto-execution results right after the latest assistant message with SQL
                         # Check if this is the last message and matches the auto-executed query
@@ -1079,37 +1123,8 @@ def chatbot_tab():
                                 st.session_state.chat_history[idx].update(_capture_chatbot_auto_results_snapshot())
                             st.rerun()
 
-                        # Always render stored results inline to preserve chat sequence.
+                        # Mark results as already rendered so fallback section doesn't append them at end.
                         if has_stored_results:
-                            from utils.helpers import display_paginated_dataframe
-                            st.markdown("---")
-                            if stored_multi_results and len(stored_multi_results) > 1:
-                                st.markdown("### 📋 Query Results (Multiple Queries)")
-                                for result_item in stored_multi_results:
-                                    query_text = result_item.get('query', '')
-                                    result_df = result_item.get('dataframe')
-                                    result_idx = result_item.get('index')
-                                    if result_df is None:
-                                        continue
-                                    if query_text:
-                                        st.markdown(f"**Query {result_idx}:**")
-                                        st.code(query_text, language='sql')
-                                    display_paginated_dataframe(
-                                        result_df,
-                                        unique_suffix=f"chatbot_msg_{unique_key_base}_{result_idx}"
-                                    )
-                                    st.markdown("---")
-                            else:
-                                result_df = stored_single_result
-                                if result_df is None and stored_multi_results:
-                                    result_df = stored_multi_results[0].get('dataframe')
-                                if result_df is not None:
-                                    st.markdown("**📋 Query Results**")
-                                    display_paginated_dataframe(
-                                        result_df,
-                                        unique_suffix=f"chatbot_msg_{unique_key_base}"
-                                    )
-                            # Mark results as already rendered so fallback section doesn't append them at end.
                             results_shown_for_latest = True
                         
                         # More lenient SQL matching - strip and compare
