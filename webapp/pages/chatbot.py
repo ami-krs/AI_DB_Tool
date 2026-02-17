@@ -959,27 +959,49 @@ def chatbot_tab():
     
     if st.session_state.chat_history:
         total_messages = len(st.session_state.chat_history)
+        prev_assistant_sql = ""
         for idx, msg in enumerate(st.session_state.chat_history):
             print(f"DEBUG: Displaying message {idx}: role={msg.get('role')}, has_content={bool(msg.get('content'))}, has_sql={bool(msg.get('sql_query'))}")
+            if debug_enabled:
+                debug_rows.append({
+                    "idx": idx,
+                    "role": msg.get("role", "unknown"),
+                    "has_sql": bool(msg.get("sql_query")),
+                    "auto_executed": bool(msg.get("auto_executed", False)),
+                    "has_snapshot": bool(
+                        msg.get('auto_result_df') is not None or
+                        (msg.get('auto_multi_query_results') is not None and len(msg.get('auto_multi_query_results', [])) > 0)
+                    ),
+                    "bind_attempted": bool(msg.get('auto_bind_attempted', False)),
+                    "is_last": idx == total_messages - 1,
+                    "sql_preview": (_dedupe_sql_query_text(_normalize_sql_for_execution(msg.get("sql_query", "")))[:80] + "...")
+                    if msg.get("sql_query") else ""
+                })
             # Generate unique key using index and timestamp if available
             msg_timestamp = msg.get('timestamp', str(idx))
             unique_key_base = f"chatbot_tab_{idx}_{hash(str(msg_timestamp)) % 10000}"
             
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
-                if debug_enabled:
-                    debug_rows.append({
-                        "idx": idx,
-                        "role": "user",
-                        "has_sql": False,
-                        "auto_executed": False,
-                        "has_snapshot": False,
-                        "bind_attempted": False,
-                        "is_last": idx == total_messages - 1,
-                        "sql_preview": ""
-                    })
             else:
-                display_content = _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
+                # Recover SQL if assistant message missed explicit sql_query.
+                if not msg.get('sql_query'):
+                    recovered_sql = _dedupe_sql_query_text(
+                        _normalize_sql_for_execution(
+                            _extract_sql_from_response_payload({'response': msg.get('content', '')})
+                        )
+                    )
+                    if recovered_sql:
+                        st.session_state.chat_history[idx]['sql_query'] = recovered_sql
+                        st.session_state.chat_history[idx]['content'] = _clean_assistant_content_for_sql(
+                            st.session_state.chat_history[idx].get('content', ''),
+                            recovered_sql
+                        )
+                        msg = st.session_state.chat_history[idx]
+
+                # Hard guard: if message has SQL, explanation should never reprint SQL text.
+                has_sql_in_msg = bool(msg.get('sql_query'))
+                display_content = "SQL generated successfully." if has_sql_in_msg else _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
                 # Show explanation in collapsed expander by default
                 try:
                     with st.expander("💡 View Explanation", expanded=False, key=f"explanation_{unique_key_base}"):
@@ -993,6 +1015,14 @@ def chatbot_tab():
                     try:
                         raw_sql_query = msg['sql_query']
                         sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(raw_sql_query) or raw_sql_query)
+                        # Update normalized/deduped SQL back into history to avoid future duplicates.
+                        st.session_state.chat_history[idx]['sql_query'] = sql_query
+
+                        # Skip immediate duplicate assistant SQL blocks in UI.
+                        current_sql_signature = " ".join(sql_query.split()).strip().lower()
+                        if current_sql_signature and current_sql_signature == prev_assistant_sql:
+                            continue
+                        prev_assistant_sql = current_sql_signature
                         is_safe_select = _is_safe_select_query(sql_query)
                         is_last_message = (idx == total_messages - 1)
                         
@@ -1324,17 +1354,6 @@ def chatbot_tab():
                         else:
                             print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
 
-                        if debug_enabled:
-                            debug_rows.append({
-                                "idx": idx,
-                                "role": "assistant",
-                                "has_sql": bool(msg_has_sql),
-                                "auto_executed": bool(msg_was_auto_executed),
-                                "has_snapshot": bool(has_stored_results),
-                                "bind_attempted": bool(msg.get('auto_bind_attempted', False)),
-                                "is_last": bool(is_last_message),
-                                "sql_preview": (msg_sql[:80] + "...") if msg_sql and len(msg_sql) > 80 else (msg_sql or "")
-                            })
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
@@ -1564,6 +1583,7 @@ def chatbot_tab():
             st.write("**Global session flags**")
             st.write({
                 "chat_history_len": len(st.session_state.get("chat_history", [])),
+                "chat_history_roles": [m.get("role", "unknown") for m in st.session_state.get("chat_history", [])],
                 "has_last_result_df": st.session_state.get("last_result_df") is not None,
                 "has_multi_query_results": bool(st.session_state.get("chatbot_multi_query_results", [])),
                 "chatbot_last_auto_executed_query": (st.session_state.get("chatbot_last_auto_executed_query", "") or "")[:120],
