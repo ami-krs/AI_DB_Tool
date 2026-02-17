@@ -403,7 +403,11 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
                 st.markdown(f"**Query {result_idx}:**")
                 st.code(query_text, language='sql')
             st.caption(f"Rows: {len(result_df):,}")
-            st.dataframe(result_df, use_container_width=True, hide_index=True)
+            try:
+                # Keep this minimal for Streamlit Cloud compatibility.
+                st.dataframe(result_df, use_container_width=True)
+            except Exception:
+                st.write(result_df)
             rendered_any = True
             st.markdown("---")
     else:
@@ -413,7 +417,11 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
         if result_df is not None:
             st.markdown("**📋 Query Results**")
             st.caption(f"Rows: {len(result_df):,}")
-            st.dataframe(result_df, use_container_width=True, hide_index=True)
+            try:
+                # Keep this minimal for Streamlit Cloud compatibility.
+                st.dataframe(result_df, use_container_width=True)
+            except Exception:
+                st.write(result_df)
             rendered_any = True
 
     # Fallback safety: if snapshot flags exist but data object is missing, show last_result_df.
@@ -421,7 +429,10 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
         fallback_df = st.session_state.get("last_result_df")
         st.markdown("**📋 Query Results**")
         st.caption(f"Rows: {len(fallback_df):,}")
-        st.dataframe(fallback_df, use_container_width=True, hide_index=True)
+        try:
+            st.dataframe(fallback_df, use_container_width=True)
+        except Exception:
+            st.write(fallback_df)
         rendered_any = True
 
     return rendered_any
