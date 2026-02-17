@@ -1106,6 +1106,19 @@ def chatbot_tab():
 
                         # Deterministic snapshot render: always show stored results inline for this message.
                         snapshot_rendered = _render_inline_snapshot_results(msg, unique_key_base)
+                        if is_safe_select and msg.get('auto_executed', False) and not snapshot_rendered:
+                            # Hard fallback: if snapshot flags are set but nothing rendered,
+                            # execute once here and render directly so user always sees results.
+                            fallback_result = execute_single_statement(sql_query)
+                            if fallback_result.get('success') and fallback_result.get('type') == 'SELECT':
+                                fallback_df = fallback_result.get('dataframe')
+                                if fallback_df is not None:
+                                    st.markdown("---")
+                                    st.markdown("**📋 Query Results**")
+                                    st.caption(f"Rows: {len(fallback_df):,}")
+                                    st.dataframe(fallback_df, use_container_width=True, hide_index=True)
+                                    st.session_state.chat_history[idx]['auto_result_df'] = fallback_df.copy()
+                                    snapshot_rendered = True
                         if snapshot_rendered:
                             results_shown_for_latest = True
                             # Snapshot is already rendered in-order for this message.
