@@ -389,6 +389,8 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
         return False
 
     st.markdown("---")
+    rendered_any = False
+
     if stored_multi_results and len(stored_multi_results) > 1:
         st.markdown("### 📋 Query Results (Multiple Queries)")
         for result_item in stored_multi_results:
@@ -402,6 +404,7 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
                 st.code(query_text, language='sql')
             st.caption(f"Rows: {len(result_df):,}")
             st.dataframe(result_df, use_container_width=True, hide_index=True)
+            rendered_any = True
             st.markdown("---")
     else:
         result_df = stored_single_result
@@ -411,7 +414,17 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
             st.markdown("**📋 Query Results**")
             st.caption(f"Rows: {len(result_df):,}")
             st.dataframe(result_df, use_container_width=True, hide_index=True)
-    return True
+            rendered_any = True
+
+    # Fallback safety: if snapshot flags exist but data object is missing, show last_result_df.
+    if not rendered_any and st.session_state.get("last_result_df") is not None:
+        fallback_df = st.session_state.get("last_result_df")
+        st.markdown("**📋 Query Results**")
+        st.caption(f"Rows: {len(fallback_df):,}")
+        st.dataframe(fallback_df, use_container_width=True, hide_index=True)
+        rendered_any = True
+
+    return rendered_any
 
 
 def chatbot_compact():
@@ -1095,6 +1108,9 @@ def chatbot_tab():
                         snapshot_rendered = _render_inline_snapshot_results(msg, unique_key_base)
                         if snapshot_rendered:
                             results_shown_for_latest = True
+                            # Snapshot is already rendered in-order for this message.
+                            # Skip legacy global/fallback render branches.
+                            continue
                         
                         # Show auto-execution results right after the latest assistant message with SQL
                         # Check if this is the last message and matches the auto-executed query
