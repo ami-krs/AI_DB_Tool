@@ -257,6 +257,136 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
         result['error'] = str(e)
         return result
 
+
+def _split_csv_sql_items(text: str) -> List[str]:
+    """Split comma-separated SQL items while respecting quotes."""
+    items: List[str] = []
+    current: List[str] = []
+    in_single = False
+    in_double = False
+    depth = 0
+
+    i = 0
+    while i < len(text):
+        ch = text[i]
+
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            current.append(ch)
+            i += 1
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            current.append(ch)
+            i += 1
+            continue
+
+        if not in_single and not in_double:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth = max(0, depth - 1)
+            elif ch == "," and depth == 0:
+                items.append("".join(current).strip())
+                current = []
+                i += 1
+                continue
+
+        current.append(ch)
+        i += 1
+
+    if current:
+        items.append("".join(current).strip())
+    return items
+
+
+def _normalize_identifier(identifier: str) -> str:
+    """Normalize SQL identifier for matching."""
+    return identifier.strip().strip('"').strip("'").strip("`").lower()
+
+
+def _quote_identifier(identifier: str, db_type: str) -> str:
+    """Quote SQL identifier based on DB type."""
+    if db_type == "mysql":
+        return f"`{identifier.replace('`', '``')}`"
+    return f"\"{identifier.replace('\"', '\"\"')}\""
+
+
+def _try_auto_fix_duplicate_pk_insert(statement: str, error_text: str) -> Optional[Dict[str, Any]]:
+    """Retry INSERT once with next available PK when duplicate key occurs."""
+    if not statement or not statement.strip().upper().startswith("INSERT INTO"):
+        return None
+
+    err = (error_text or "").lower()
+    if "duplicate key value violates unique constraint" not in err and "already exists" not in err:
+        return None
+
+    key_match = re.search(r"Key\s+\(([^)]+)\)\s*=\s*\(([^)]+)\)\s+already exists", error_text or "", flags=re.IGNORECASE)
+    if not key_match:
+        return None
+
+    pk_column_from_error = key_match.group(1).strip()
+    duplicate_value = key_match.group(2).strip()
+    if not re.fullmatch(r"-?\d+", duplicate_value):
+        return None
+
+    insert_match = re.match(
+        r"^\s*INSERT\s+INTO\s+([^\s(]+)\s*\(([^)]+)\)\s*VALUES\s*\((.*)\)\s*;?\s*$",
+        statement,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+    if not insert_match:
+        return None
+
+    table_ref = insert_match.group(1).strip()
+    columns_text = insert_match.group(2).strip()
+    values_text = insert_match.group(3).strip()
+
+    columns = _split_csv_sql_items(columns_text)
+    values = _split_csv_sql_items(values_text)
+    if len(columns) != len(values) or not columns:
+        return None
+
+    normalized_error_pk = _normalize_identifier(pk_column_from_error)
+    pk_index = -1
+    for idx, col in enumerate(columns):
+        if _normalize_identifier(col) == normalized_error_pk:
+            pk_index = idx
+            break
+    if pk_index < 0:
+        return None
+
+    db_manager = st.session_state.get("db_manager")
+    if not db_manager:
+        return None
+
+    db_type = (st.session_state.get("db_type") or "").lower()
+    pk_select_col = _quote_identifier(pk_column_from_error, db_type)
+    max_query = f"SELECT COALESCE(MAX({pk_select_col}), 0) AS max_id FROM {table_ref}"
+
+    try:
+        max_df = db_manager.execute_query(max_query)
+        if max_df is None or len(max_df) == 0:
+            return None
+        max_id = int(max_df.iloc[0, 0] or 0)
+    except Exception:
+        return None
+
+    next_id = max(max_id + 1, int(duplicate_value) + 1)
+    values[pk_index] = str(next_id)
+
+    rewritten = f"INSERT INTO {table_ref} ({', '.join(columns)}) VALUES ({', '.join(values)});"
+    retry_result = execute_single_statement(rewritten)
+    if not retry_result.get("success"):
+        return None
+
+    return {
+        "rewritten_statement": rewritten,
+        "result": retry_result,
+        "next_id": next_id,
+        "pk_column": pk_column_from_error,
+    }
+
 def _is_simple_query(query: str) -> bool:
     """Check if query is simple enough to skip agent analysis"""
     query_upper = query.strip().upper()
@@ -419,6 +549,17 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         execution_time = time.time() - start_time
         
         if not result['success']:
+            # Automatic one-time recovery for duplicate PK on INSERT.
+            auto_fix = _try_auto_fix_duplicate_pk_insert(single_statement, str(result.get('error', '')))
+            if auto_fix:
+                result = auto_fix["result"]
+                single_statement = auto_fix["rewritten_statement"]
+                st.info(
+                    f"ℹ️ Auto-corrected duplicate primary key on `{auto_fix['pk_column']}` "
+                    f"by retrying with next available ID `{auto_fix['next_id']}`."
+                )
+
+        if not result['success']:
             st.error(f"❌ Query execution failed: {result['error']}")
             st.code(single_statement, language='sql')
             
@@ -434,7 +575,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                             result.get('error', 'Unknown error'),
                             str(result.get('error', '')),
                             schema_info,
-                            db_type
+                            db_type,
+                            db_manager=st.session_state.get('db_manager')
                         )
                         if debug_response:
                             display_agent_response(debug_response, expanded=True)
@@ -656,6 +798,15 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             st.code(statement, language='sql')
             
             result = execute_single_statement(statement)
+            if not result['success']:
+                auto_fix = _try_auto_fix_duplicate_pk_insert(statement, str(result.get('error', '')))
+                if auto_fix:
+                    result = auto_fix["result"]
+                    statement = auto_fix["rewritten_statement"]
+                    st.info(
+                        f"ℹ️ Statement {idx}: Auto-corrected duplicate primary key on "
+                        f"`{auto_fix['pk_column']}` with next ID `{auto_fix['next_id']}`."
+                    )
             results.append(result)
             
             if result['success']:
@@ -713,7 +864,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                                 error_type,
                                 error_message,
                                 schema_info,
-                                db_type
+                                db_type,
+                                db_manager=st.session_state.get('db_manager')
                             )
                             print(f"DEBUG: Debug Agent response received: {debug_response is not None}")
                             if debug_response:

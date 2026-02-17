@@ -15,6 +15,81 @@ try:
 except ImportError:
     Anthropic = None
 
+
+def _split_sql_statements_safe(sql_text: str) -> List[str]:
+    """Split SQL into statements while respecting quoted strings."""
+    if not sql_text or not sql_text.strip():
+        return []
+
+    statements: List[str] = []
+    current: List[str] = []
+    in_single = False
+    in_double = False
+    i = 0
+
+    while i < len(sql_text):
+        ch = sql_text[i]
+        nxt = sql_text[i + 1] if i + 1 < len(sql_text) else ""
+
+        # Handle escaped single quote in SQL string literals.
+        if ch == "'" and in_single and nxt == "'":
+            current.append(ch)
+            current.append(nxt)
+            i += 2
+            continue
+
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            current.append(ch)
+            i += 1
+            continue
+
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            current.append(ch)
+            i += 1
+            continue
+
+        if ch == ";" and not in_single and not in_double:
+            stmt = "".join(current).strip()
+            if stmt:
+                statements.append(stmt)
+            current = []
+            i += 1
+            continue
+
+        current.append(ch)
+        i += 1
+
+    trailing = "".join(current).strip()
+    if trailing:
+        statements.append(trailing)
+    return statements
+
+
+def _dedupe_sql_statements(sql_text: Optional[str]) -> Optional[str]:
+    """Remove exact duplicate SQL statements while preserving order."""
+    if not sql_text or not str(sql_text).strip():
+        return sql_text
+
+    statements = _split_sql_statements_safe(str(sql_text))
+    if not statements:
+        return sql_text
+
+    seen = set()
+    unique_statements: List[str] = []
+    for stmt in statements:
+        normalized = " ".join(stmt.split()).strip().lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_statements.append(stmt.strip())
+
+    if not unique_statements:
+        return None
+
+    return ";\n".join(unique_statements) + ";"
+
 # Helper to get API key from Streamlit secrets or environment variables
 def _get_api_key_from_secrets(key_name: str) -> Optional[str]:
     """Get API key from Streamlit secrets (for Streamlit Cloud) or environment variables"""
@@ -79,6 +154,9 @@ CRITICAL - USE REAL SCHEMA ONLY (NO PLACEHOLDERS):
 - NEVER invent table names like example_table/sample_table/test_table or columns like column1/column2/column3 for SELECT/INSERT/UPDATE/DELETE operations (unless those exact names exist in the schema).
 - For INSERT operations: You MUST read the actual column names from the schema and use ONLY those exact names. NEVER use placeholder names like 'column1', 'column2', 'column3'.
 - For INSERT operations: Generate realistic data values based on column types - use actual names, numbers, dates, etc. NEVER use placeholder values like 'value1', 'value2', 'value3'.
+- For INSERT operations with primary keys: NEVER reuse an existing primary key value.
+- If an INTEGER/BIGINT primary key is auto-generated (SERIAL/IDENTITY/AUTOINCREMENT/default sequence), OMIT it from INSERT columns.
+- If a primary key must be provided explicitly, use ONLY a new value greater than current max (or use the provided NEXT AVAILABLE ID when present).
 - If the user requests inserts "in all tables" and there are many tables, LIMIT to the first 10 tables and note in SQL comments which tables were included.
 - For each table, generate INSERT statements that match the real columns. Prefer inserting into a minimal set of non-null, non-generated columns.
 
@@ -307,13 +385,13 @@ class SQLChatbot:
                     sql_end = response_text.find("```", sql_start + 6)
                     if sql_end != -1:
                         sql_query = response_text[sql_start + 6:sql_end].strip()
-                        # For INSERT requests, prioritize SQL - remove explanations before SQL
-                        user_upper = user_message.upper()
-                        if any(keyword in user_upper for keyword in ['INSERT', 'POPULATE', 'ADD RECORDS', 'CREATE RECORDS', 'ADD DATA', 'TEST RECORDS']):
-                            # Keep only SQL and anything after it, remove text before SQL
-                            response_text = response_text[sql_start:]  # Keep SQL code block and anything after
-                        else:
-                            response_text = response_text[:sql_start] + response_text[sql_end + 3:].strip()
+                        # Remove SQL block from explanation text to avoid duplicate display
+                        # (UI already renders sql_query in a dedicated section).
+                        before_sql = response_text[:sql_start].strip()
+                        after_sql = response_text[sql_end + 3:].strip()
+                        response_text = "\n\n".join(part for part in [before_sql, after_sql] if part).strip()
+                        if not response_text:
+                            response_text = "SQL generated successfully."
                 else:
                     # If no SQL block found but response contains SQL-like text, try to extract it
                     if any(keyword in response_text.upper() for keyword in ['INSERT INTO', 'SELECT', 'UPDATE', 'DELETE FROM', 'CREATE TABLE']):
@@ -342,6 +420,9 @@ class SQLChatbot:
                             # Remove the SQL from response text
                             for match in matches:
                                 response_text = response_text.replace(match, '').strip()
+
+                # Final safety: remove duplicated SQL statements if model repeated them.
+                sql_query = _dedupe_sql_statements(sql_query)
             
             # Add assistant response to history
             self.conversation_history.append(
@@ -565,12 +646,17 @@ class SQLChatbot:
                 prompt += "STEP 3: Read the 'Columns:' line for that table - it shows the EXACT column names\n"
                 prompt += "STEP 4: Extract ONLY the actual column names from the schema (e.g., 'employee_id', 'employee_name', 'department_id', 'salary')\n"
                 prompt += "STEP 5: Generate INSERT statements using ONLY those exact column names - NEVER use 'column1', 'column2', 'column3'\n"
+                prompt += "STEP 6: Handle PRIMARY KEY safely before writing INSERT values:\n"
+                prompt += "   - If PK is auto-generated (SERIAL/IDENTITY/AUTOINCREMENT/default sequence), OMIT PK column from INSERT\n"
+                prompt += "   - If PK must be included, use ONLY new values not present in existing PK list\n"
+                prompt += "   - If NEXT AVAILABLE ID is provided in context, start from that ID and increment for each row\n"
                 prompt += "\n"
                 prompt += "🚫 ABSOLUTE PROHIBITIONS:\n"
                 prompt += "- NEVER use placeholder column names: 'column1', 'column2', 'column3', 'col1', 'col2', etc.\n"
                 prompt += "- NEVER use placeholder values: 'value1', 'value2', 'value3', 'test1', 'test2', etc.\n"
                 prompt += "- NEVER say 'Please replace column1, column2, column3' - you MUST use actual column names from the schema\n"
                 prompt += "- NEVER generate generic INSERT statements with placeholders\n"
+                prompt += "- NEVER reuse existing primary key values (this causes duplicate key/UniqueViolation errors)\n"
                 prompt += "\n"
                 prompt += "✅ YOU MUST:\n"
                 prompt += "1. Start your response IMMEDIATELY with ```sql - NO explanations before the SQL\n"
@@ -600,6 +686,7 @@ class SQLChatbot:
                 prompt += "        * CRITICAL: If 'EXISTING VALUES' section exists above, you MUST use ONLY those values - no exceptions\n"
                 prompt += "        * If inserting into a child table, ALWAYS check EXISTING VALUES first, then generate parent table INSERTs if needed\n"
                 prompt += "   d) Generate the requested number of INSERT statements (e.g., 10 records = 10 INSERT statements)\n"
+                prompt += "   e) For primary key columns in multiple INSERTs, all PK values MUST be unique and strictly increasing (no duplicates)\n"
                 prompt += "3. Example format (using ACTUAL columns from schema):\n"
                 prompt += "   ```sql\n"
                 prompt += "   INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES (1, 'John Smith', 10, 50000);\n"

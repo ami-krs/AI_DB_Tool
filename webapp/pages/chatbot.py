@@ -1,19 +1,383 @@
 """Page modules for different sections of the application"""
 import streamlit as st
 import pandas as pd
+import re
 from typing import Dict, List, Any
 from datetime import datetime
 
 from utils.query_execution import (
     execute_query, execute_generated_query, show_table_details, 
     show_common_queries, generate_sql_query, optimize_query, 
-    debug_query, save_query_to_history
+    debug_query, save_query_to_history, split_sql_statements, execute_single_statement
 )
 from utils.helpers import get_api_key
 from ui.components import render_sql_editor
 from shared import CODEMIRROR_AVAILABLE, MONACO_EDITOR_AVAILABLE, codemirror_editor, monaco_editor
 
 
+
+
+def _quote_identifier(identifier: str, db_type: str) -> str:
+    """Quote SQL identifier for the active database."""
+    if db_type == "mysql":
+        return f"`{identifier.replace('`', '``')}`"
+    return f"\"{identifier.replace('\"', '\"\"')}\""
+
+
+def _quote_table_reference(table_name: str, db_type: str) -> str:
+    """Quote table reference, supporting optional schema prefix."""
+    if "." in table_name:
+        schema_name, bare_table = table_name.split(".", 1)
+        return f"{_quote_identifier(schema_name, db_type)}.{_quote_identifier(bare_table, db_type)}"
+    return _quote_identifier(table_name, db_type)
+
+
+def _build_tables_with_min_records_sql(min_records: int = 10) -> str:
+    """Build SQL to list tables with more than N records."""
+    db_type = (st.session_state.get("db_type") or "").lower()
+    db_manager = st.session_state.get("db_manager")
+    tables: List[str] = []
+    if db_manager:
+        try:
+            tables = db_manager.get_tables() or []
+        except Exception:
+            tables = []
+
+    # Preferred path: exact row counts per discovered table.
+    if tables:
+        table_count_selects: List[str] = []
+        for table_name in tables:
+            table_label = str(table_name).replace("'", "''")
+            table_ref = _quote_table_reference(str(table_name), db_type)
+            table_count_selects.append(
+                f"SELECT '{table_label}' AS table_name, COUNT(*) AS record_count FROM {table_ref}"
+            )
+
+        union_query = "\nUNION ALL\n".join(table_count_selects)
+        return (
+            "WITH table_counts AS (\n"
+            f"{union_query}\n"
+            ")\n"
+            "SELECT table_name, record_count\n"
+            "FROM table_counts\n"
+            f"WHERE record_count > {int(min_records)}\n"
+            "ORDER BY record_count DESC, table_name;"
+        )
+
+    # Fallback path: still return a deterministic "records" query (never column-count logic).
+    # PostgreSQL/MySQL use catalog row-count stats (approximate but semantically correct).
+    if db_type == "postgresql":
+        return (
+            "SELECT schemaname || '.' || relname AS table_name,\n"
+            "       n_live_tup::bigint AS record_count\n"
+            "FROM pg_stat_user_tables\n"
+            f"WHERE n_live_tup > {int(min_records)}\n"
+            "ORDER BY record_count DESC, table_name;"
+        )
+
+    if db_type == "mysql":
+        return (
+            "SELECT CONCAT(table_schema, '.', table_name) AS table_name,\n"
+            "       table_rows AS record_count\n"
+            "FROM information_schema.tables\n"
+            "WHERE table_schema = DATABASE()\n"
+            "  AND table_type = 'BASE TABLE'\n"
+            f"  AND table_rows > {int(min_records)}\n"
+            "ORDER BY record_count DESC, table_name;"
+        )
+
+    if db_type == "sqlite":
+        return (
+            "SELECT name AS table_name\n"
+            "FROM sqlite_master\n"
+            "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'\n"
+            "ORDER BY name;"
+        )
+
+    return ""
+
+
+def _build_default_question_sql(question: str) -> str:
+    """Return deterministic SQL for built-in default questions."""
+    q = (question or "").strip().lower()
+    db_type = (st.session_state.get("db_type") or "").lower()
+
+    if "list of all tables" in q:
+        if db_type == "sqlite":
+            return (
+                "SELECT name AS table_name\n"
+                "FROM sqlite_master\n"
+                "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'\n"
+                "ORDER BY name;"
+            )
+        if db_type == "mysql":
+            return (
+                "SELECT table_name\n"
+                "FROM information_schema.tables\n"
+                "WHERE table_schema = DATABASE()\n"
+                "ORDER BY table_name;"
+            )
+        return (
+            "SELECT table_name\n"
+            "FROM information_schema.tables\n"
+            "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')\n"
+            "ORDER BY table_name;"
+        )
+
+    if "tables with more than 10 records" in q:
+        return _build_tables_with_min_records_sql(10)
+
+    if "column names and data types for all tables" in q:
+        if db_type == "sqlite":
+            return (
+                "SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type\n"
+                "FROM sqlite_master m\n"
+                "JOIN pragma_table_info(m.name) p\n"
+                "WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'\n"
+                "ORDER BY m.name, p.cid;"
+            )
+        if db_type == "mysql":
+            return (
+                "SELECT table_name, column_name, data_type\n"
+                "FROM information_schema.columns\n"
+                "WHERE table_schema = DATABASE()\n"
+                "ORDER BY table_name, ordinal_position;"
+            )
+        return (
+            "SELECT table_schema, table_name, column_name, data_type\n"
+            "FROM information_schema.columns\n"
+            "WHERE table_schema NOT IN ('pg_catalog', 'information_schema')\n"
+            "ORDER BY table_schema, table_name, ordinal_position;"
+        )
+
+    return ""
+
+
+def _leading_sql_keyword(sql_text: str) -> str:
+    """Return the first SQL keyword after skipping comments/whitespace."""
+    if not sql_text:
+        return ""
+
+    cleaned = sql_text.strip()
+    # Remove leading SQL line comments and block comments.
+    cleaned = re.sub(r"^\s*(?:--[^\n]*\n\s*)+", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*/\*.*?\*/\s*", "", cleaned, flags=re.DOTALL)
+
+    match = re.search(r"\b([A-Z]+)\b", cleaned.upper())
+    return match.group(1) if match else ""
+
+
+def _is_safe_select_query(sql_query: str) -> bool:
+    """Return True when the SQL can be safely auto-executed."""
+    normalized_sql = _normalize_sql_for_execution(sql_query)
+    if not normalized_sql:
+        return False
+
+    first_keyword = _leading_sql_keyword(normalized_sql)
+    is_select = first_keyword in ('SELECT', 'WITH')
+    is_not_ddl_dml = first_keyword not in [
+        'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
+        'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
+    ]
+    return is_select and is_not_ddl_dml
+
+
+def _extract_sql_from_response_payload(response: Dict[str, Any]) -> str:
+    """Extract SQL from chatbot response dict with fallbacks."""
+    sql_query = response.get('sql_query', response.get('sql', '')) if isinstance(response, dict) else ''
+    if sql_query and str(sql_query).strip():
+        return str(sql_query).strip()
+
+    response_text = response.get('response', '') if isinstance(response, dict) else ''
+    if not response_text:
+        return ''
+
+    # Prefer fenced sql blocks when present.
+    sql_block_match = re.search(r"```sql\s*(.*?)```", response_text, flags=re.IGNORECASE | re.DOTALL)
+    if sql_block_match:
+        return sql_block_match.group(1).strip()
+
+    # Fallback to any fenced block.
+    any_block_match = re.search(r"```\s*(.*?)```", response_text, flags=re.DOTALL)
+    if any_block_match:
+        return any_block_match.group(1).strip()
+
+    return response_text.strip()
+
+
+def _normalize_sql_for_execution(sql_query: str) -> str:
+    """Normalize SQL text by removing wrappers/fences/explanation prefixes."""
+    if not sql_query:
+        return ''
+
+    sql_text = str(sql_query).strip()
+
+    # Extract from SQL markdown block if present.
+    sql_block_match = re.search(r"```sql\s*(.*?)```", sql_text, flags=re.IGNORECASE | re.DOTALL)
+    if sql_block_match:
+        sql_text = sql_block_match.group(1).strip()
+    else:
+        # Extract from generic markdown block if present.
+        any_block_match = re.search(r"```\s*(.*?)```", sql_text, flags=re.DOTALL)
+        if any_block_match:
+            sql_text = any_block_match.group(1).strip()
+
+    # If explanatory text exists before SQL, trim to first SQL keyword.
+    keyword_match = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TRUNCATE)\b", sql_text, flags=re.IGNORECASE)
+    if keyword_match and keyword_match.start() > 0:
+        sql_text = sql_text[keyword_match.start():].strip()
+
+    return sql_text
+
+
+def _dedupe_sql_query_text(sql_query: str) -> str:
+    """Remove duplicate SQL statements while preserving order."""
+    normalized = _normalize_sql_for_execution(sql_query)
+    if not normalized:
+        return normalized
+    try:
+        statements = split_sql_statements(normalized)
+    except Exception:
+        statements = [normalized]
+
+    seen = set()
+    unique_statements: List[str] = []
+    for stmt in statements:
+        cleaned = (stmt or "").strip().rstrip(";")
+        if not cleaned:
+            continue
+        key = " ".join(cleaned.split()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_statements.append(cleaned)
+
+    if not unique_statements:
+        return ""
+    return ";\n".join(unique_statements) + ";"
+
+
+def _clean_assistant_content_for_sql(content: str, sql_query: str) -> str:
+    """Avoid rendering duplicate SQL in assistant explanation area."""
+    # If we already extracted SQL separately, keep explanation concise and non-SQL.
+    if sql_query and str(sql_query).strip():
+        return "SQL generated successfully."
+
+    content_text = (content or "").strip()
+    if not content_text:
+        return "SQL generated successfully."
+
+    # Remove markdown SQL code blocks from assistant content.
+    content_text = re.sub(r"```sql\s*.*?```", "", content_text, flags=re.IGNORECASE | re.DOTALL).strip()
+    content_text = re.sub(r"```\s*.*?```", "", content_text, flags=re.DOTALL).strip()
+
+    normalized_content = " ".join(content_text.split()).strip().lower()
+    normalized_sql = " ".join(_normalize_sql_for_execution(sql_query).split()).strip().lower() if sql_query else ""
+
+    if normalized_sql and (
+        normalized_content == normalized_sql or
+        normalized_sql in normalized_content
+    ):
+        return "SQL generated successfully."
+
+    return content_text or "SQL generated successfully."
+
+
+def _auto_execute_chatbot_select_query(sql_query: str, timestamp: str, unique_suffix: str = "chatbot_auto") -> bool:
+    """Auto-execute safe SELECT queries and set chatbot result state."""
+    normalized_sql = _dedupe_sql_query_text(_normalize_sql_for_execution(sql_query))
+    if not _is_safe_select_query(normalized_sql):
+        return False
+
+    try:
+        st.session_state['chatbot_last_auto_executed_query'] = normalized_sql
+        st.session_state['chatbot_auto_executed_timestamp'] = timestamp
+        st.session_state['chatbot_auto_execution_error'] = None
+        st.session_state.pop('chatbot_multi_query_results', None)
+        st.session_state.pop('last_result_df', None)
+        st.session_state.pop('last_result', None)
+
+        # Silent execution path for chatbot auto-run:
+        # Execute without rendering UI here, then render inline per message order.
+        statements = split_sql_statements(normalized_sql)
+        multi_results: List[Dict[str, Any]] = []
+        last_df = None
+
+        for stmt_idx, stmt in enumerate(statements, 1):
+            stmt_clean = (stmt or "").strip()
+            if not stmt_clean:
+                continue
+            result = execute_single_statement(stmt_clean)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'Unknown query execution error'))
+
+            if result.get('type') == 'SELECT':
+                df = result.get('dataframe')
+                if df is not None:
+                    last_df = df
+                    multi_results.append({
+                        'query': stmt_clean,
+                        'dataframe': df,
+                        'index': stmt_idx
+                    })
+
+        if last_df is not None:
+            st.session_state['last_result_df'] = last_df
+            st.session_state['last_result'] = last_df
+        if multi_results:
+            st.session_state['chatbot_multi_query_results'] = multi_results
+
+        st.session_state.pop('chatbot_auto_execution_error', None)
+        st.session_state.pop('chatbot_auto_execution_error_trace', None)
+        st.session_state['chatbot_show_results_for_query'] = normalized_sql
+        return True
+    except Exception as exec_error:
+        print(f"DEBUG: Auto-execution failed: {exec_error}")
+        import traceback
+        error_trace = traceback.format_exc()
+        traceback.print_exc()
+        st.session_state['chatbot_auto_execution_error'] = str(exec_error)
+        st.session_state['chatbot_auto_execution_error_trace'] = error_trace
+        st.error(f"❌ Auto-execution failed: {str(exec_error)}")
+        st.code(normalized_sql or sql_query, language='sql')
+        return False
+
+
+def _capture_chatbot_auto_results_snapshot() -> Dict[str, Any]:
+    """Capture current auto-execution results so they can render in message order."""
+    snapshot: Dict[str, Any] = {}
+
+    multi_results = st.session_state.get('chatbot_multi_query_results', [])
+    if multi_results:
+        copied_multi_results = []
+        for item in multi_results:
+            copied_multi_results.append({
+                'query': item.get('query', ''),
+                'dataframe': item.get('dataframe').copy() if item.get('dataframe') is not None else None,
+                'index': item.get('index')
+            })
+        snapshot['auto_multi_query_results'] = copied_multi_results
+
+    last_df = st.session_state.get('last_result_df')
+    if last_df is not None:
+        snapshot['auto_result_df'] = last_df.copy()
+
+    return snapshot
+
+
+def _append_assistant_message(message: Dict[str, Any]) -> None:
+    """Append assistant message while preventing immediate duplicate SQL entries."""
+    history = st.session_state.get('chat_history', [])
+    if history:
+        last_msg = history[-1]
+        if last_msg.get('role') == 'assistant':
+            last_sql = _normalize_sql_for_execution(last_msg.get('sql_query', ''))
+            new_sql = _normalize_sql_for_execution(message.get('sql_query', ''))
+            last_content = (last_msg.get('content', '') or '').strip()
+            new_content = (message.get('content', '') or '').strip()
+            if new_sql and last_sql == new_sql and last_content == new_content:
+                return
+    st.session_state.chat_history.append(message)
 
 
 def chatbot_compact():
@@ -36,35 +400,33 @@ def chatbot_compact():
                 if st.button(f"💬 {display_text}", key=f"compact_example_{idx}", use_container_width=True):
                     # Process the question
                     st.session_state.chat_history.append({'role': 'user', 'content': full_question})
-                    with st.spinner("🤔 Thinking..."):
-                        response = st.session_state.chatbot.chat(full_question, include_sql=True)
+                    default_sql = _build_default_question_sql(full_question)
+                    if default_sql:
+                        response = {
+                            "response": "Generated from built-in default question template.",
+                            "sql_query": default_sql,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                    else:
+                        with st.spinner("🤔 Thinking..."):
+                            response = st.session_state.chatbot.chat(full_question, include_sql=True)
                     
                     if 'error' not in response:
-                        sql_query = response.get('sql_query')
-                        auto_executed = False
+                        sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(_extract_sql_from_response_payload(response)))
+                        auto_executed = _auto_execute_chatbot_select_query(
+                            sql_query,
+                            response.get('timestamp', datetime.now().isoformat()),
+                            unique_suffix="chatbot_auto_example_compact"
+                        )
+                        auto_results_snapshot = _capture_chatbot_auto_results_snapshot() if auto_executed else {}
                         
-                        # Auto-execute SELECT queries for example questions too
-                        if sql_query:
-                            sql_upper = sql_query.strip().upper()
-                            is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
-                            is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
-                                'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
-                                'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
-                            ])
-                            
-                            if is_select and is_not_ddl_dml:
-                                try:
-                                    execute_query(sql_query, enable_agents=False)
-                                    auto_executed = True
-                                except Exception as exec_error:
-                                    print(f"DEBUG: Auto-execution failed: {exec_error}")
-                        
-                        st.session_state.chat_history.append({
+                        _append_assistant_message({
                             'role': 'assistant',
-                            'content': response['response'],
+                            'content': _clean_assistant_content_for_sql(response.get('response', ''), sql_query),
                             'sql_query': sql_query,
                             'timestamp': response['timestamp'],
-                            'auto_executed': auto_executed
+                            'auto_executed': auto_executed,
+                            **auto_results_snapshot
                         })
                     else:
                         st.session_state.chat_history.append({
@@ -87,9 +449,10 @@ def chatbot_compact():
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
             else:
+                display_content = _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
                 # Show explanation in collapsed expander by default
                 with st.expander("💡 View Explanation", expanded=False, key=f"compact_explanation_{original_idx}"):
-                    st.chat_message("assistant").write(msg['content'])
+                    st.chat_message("assistant").write(display_content)
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
@@ -198,12 +561,13 @@ def chatbot_compact():
                     # Add assistant response to history
                     try:
                         response_content = response.get('response', response.get('content', str(response)))
-                        sql_query = response.get('sql_query', response.get('sql', None))
+                        sql_query = _dedupe_sql_query_text(response.get('sql_query', response.get('sql', None)))
+                        cleaned_response_content = _clean_assistant_content_for_sql(response_content, sql_query)
                         timestamp = response.get('timestamp', datetime.now().isoformat())
                         print(f"DEBUG: Adding response to chat history - content length: {len(response_content) if response_content else 0}, has sql: {bool(sql_query)}")
                         st.session_state.chat_history.append({
                             'role': 'assistant',
-                            'content': response_content,
+                            'content': cleaned_response_content,
                             'sql_query': sql_query,
                             'timestamp': timestamp
                         })
@@ -274,6 +638,11 @@ def chatbot_tab():
     
     st.header("💬 AI SQL Assistant")
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
+    debug_enabled = st.toggle(
+        "🐞 Show chatbot debug details",
+        value=st.session_state.get("chatbot_debug_enabled", False),
+        key="chatbot_debug_enabled"
+    )
 
     # Debug section for agent SQL execution (DISABLED for performance)
     # with st.expander("🔍 Agent SQL Execution Debug", expanded=False):
@@ -504,35 +873,33 @@ def chatbot_tab():
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
                     try:
-                        with st.spinner("🤔 Thinking..."):
-                            response = st.session_state.chatbot.chat(question, include_sql=True)
+                        default_sql = _build_default_question_sql(question)
+                        if default_sql:
+                            response = {
+                                "response": "Generated from built-in default question template.",
+                                "sql_query": default_sql,
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        else:
+                            with st.spinner("🤔 Thinking..."):
+                                response = st.session_state.chatbot.chat(question, include_sql=True)
                         
                         if 'error' not in response:
-                            sql_query = response.get('sql_query')
-                            auto_executed = False
+                            sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(_extract_sql_from_response_payload(response)))
+                            auto_executed = _auto_execute_chatbot_select_query(
+                                sql_query,
+                                response.get('timestamp', datetime.now().isoformat()),
+                                unique_suffix="chatbot_auto_example"
+                            )
+                            auto_results_snapshot = _capture_chatbot_auto_results_snapshot() if auto_executed else {}
                             
-                            # Auto-execute SELECT queries for example questions
-                            if sql_query:
-                                sql_upper = sql_query.strip().upper()
-                                is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
-                                is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
-                                    'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
-                                    'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
-                                ])
-                                
-                                if is_select and is_not_ddl_dml:
-                                    try:
-                                        execute_query(sql_query, enable_agents=False)
-                                        auto_executed = True
-                                    except Exception as exec_error:
-                                        print(f"DEBUG: Auto-execution failed: {exec_error}")
-                            
-                            st.session_state.chat_history.append({
+                            _append_assistant_message({
                                 'role': 'assistant',
-                                'content': response['response'],
+                                'content': _clean_assistant_content_for_sql(response.get('response', ''), sql_query),
                                 'sql_query': sql_query,
                                 'timestamp': response['timestamp'],
-                                'auto_executed': auto_executed
+                                'auto_executed': auto_executed,
+                                **auto_results_snapshot
                             })
                         else:
                             st.session_state.chat_history.append({
@@ -588,6 +955,7 @@ def chatbot_tab():
     
     # Track if we've shown results for the latest message
     results_shown_for_latest = False
+    debug_rows: List[Dict[str, Any]] = []
     
     if st.session_state.chat_history:
         total_messages = len(st.session_state.chat_history)
@@ -599,35 +967,55 @@ def chatbot_tab():
             
             if msg['role'] == 'user':
                 st.chat_message("user").write(msg['content'])
+                if debug_enabled:
+                    debug_rows.append({
+                        "idx": idx,
+                        "role": "user",
+                        "has_sql": False,
+                        "auto_executed": False,
+                        "has_snapshot": False,
+                        "bind_attempted": False,
+                        "is_last": idx == total_messages - 1,
+                        "sql_preview": ""
+                    })
             else:
+                display_content = _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
                 # Show explanation in collapsed expander by default
                 try:
                     with st.expander("💡 View Explanation", expanded=False, key=f"explanation_{unique_key_base}"):
-                        st.chat_message("assistant").write(msg['content'])
+                        st.chat_message("assistant").write(display_content)
                 except Exception as e:
                     # Fallback if expander fails
-                    st.chat_message("assistant").write(msg['content'])
+                    st.chat_message("assistant").write(display_content)
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
                     try:
-                        sql_query = msg['sql_query']
-                        sql_upper = sql_query.strip().upper()
-                        
-                        # Check if it's a SELECT query (data retrieval)
-                        is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
-                        # Check if it's NOT DDL or DML (for safety)
-                        is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
-                            'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
-                            'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
-                        ])
+                        raw_sql_query = msg['sql_query']
+                        sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(raw_sql_query) or raw_sql_query)
+                        is_safe_select = _is_safe_select_query(sql_query)
+                        is_last_message = (idx == total_messages - 1)
                         
                         # Show SQL
                         with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{unique_key_base}"):
                             st.code(sql_query, language='sql')
                             
                             # For SELECT queries, show that it was auto-executed (results appear below)
-                            if is_select and is_not_ddl_dml:
+                            if is_safe_select:
+                                # Self-healing path: if latest SQL message was not auto-executed,
+                                # run it once automatically so default-question clicks never get stuck.
+                                if is_last_message and not msg.get('auto_executed', False):
+                                    retry_key = f"chatbot_auto_retry_{unique_key_base}"
+                                    if not st.session_state.get(retry_key, False):
+                                        auto_ok = _auto_execute_chatbot_select_query(
+                                            sql_query,
+                                            msg.get('timestamp', datetime.now().isoformat()),
+                                            unique_suffix="chatbot_auto_retry"
+                                        )
+                                        st.session_state[retry_key] = True
+                                        if auto_ok:
+                                            st.session_state.chat_history[idx]['auto_executed'] = True
+                                        st.rerun()
                                 if msg.get('auto_executed', False):
                                     st.success("✅ Query executed automatically. Results shown below.")
                                 else:
@@ -643,14 +1031,84 @@ def chatbot_tab():
                         # Check if this is the last message and matches the auto-executed query
                         is_last_message = (idx == total_messages - 1)
                         msg_has_sql = 'sql_query' in msg and msg['sql_query']
+                        stored_multi_results = msg.get('auto_multi_query_results', [])
+                        stored_single_result = msg.get('auto_result_df')
+                        has_stored_results = (stored_single_result is not None) or (len(stored_multi_results) > 0)
+
+                        # Ensure every SELECT message binds to its own result snapshot,
+                        # not just the latest assistant message.
+                        if is_safe_select and not has_stored_results and not msg.get('auto_bind_attempted', False):
+                            auto_ok = _auto_execute_chatbot_select_query(
+                                sql_query,
+                                msg.get('timestamp', datetime.now().isoformat()),
+                                unique_suffix=f"chatbot_bind_{unique_key_base}"
+                            )
+                            st.session_state.chat_history[idx]['auto_bind_attempted'] = True
+                            if auto_ok:
+                                st.session_state.chat_history[idx]['auto_executed'] = True
+                                st.session_state.chat_history[idx].update(_capture_chatbot_auto_results_snapshot())
+                            st.rerun()
+
+                        # Always render stored results inline to preserve chat sequence.
+                        if has_stored_results:
+                            from utils.helpers import display_paginated_dataframe
+                            st.markdown("---")
+                            if stored_multi_results and len(stored_multi_results) > 1:
+                                st.markdown("### 📋 Query Results (Multiple Queries)")
+                                for result_item in stored_multi_results:
+                                    query_text = result_item.get('query', '')
+                                    result_df = result_item.get('dataframe')
+                                    result_idx = result_item.get('index')
+                                    if result_df is None:
+                                        continue
+                                    if query_text:
+                                        st.markdown(f"**Query {result_idx}:**")
+                                        st.code(query_text, language='sql')
+                                    display_paginated_dataframe(
+                                        result_df,
+                                        unique_suffix=f"chatbot_msg_{unique_key_base}_{result_idx}"
+                                    )
+                                    st.markdown("---")
+                            else:
+                                result_df = stored_single_result
+                                if result_df is None and stored_multi_results:
+                                    result_df = stored_multi_results[0].get('dataframe')
+                                if result_df is not None:
+                                    st.markdown("**📋 Query Results**")
+                                    display_paginated_dataframe(
+                                        result_df,
+                                        unique_suffix=f"chatbot_msg_{unique_key_base}"
+                                    )
+                            # Mark results as already rendered so fallback section doesn't append them at end.
+                            results_shown_for_latest = True
                         
                         # More lenient SQL matching - strip and compare
-                        auto_executed_sql = st.session_state.get('chatbot_last_auto_executed_query', '').strip()
-                        show_results_for = st.session_state.get('chatbot_show_results_for_query', '').strip()
-                        msg_sql = msg['sql_query'].strip() if msg_has_sql else ''
+                        auto_executed_sql = _dedupe_sql_query_text(_normalize_sql_for_execution(st.session_state.get('chatbot_last_auto_executed_query', '')))
+                        show_results_for = _dedupe_sql_query_text(_normalize_sql_for_execution(st.session_state.get('chatbot_show_results_for_query', '')))
+                        msg_sql = _dedupe_sql_query_text(_normalize_sql_for_execution(msg['sql_query'])) if msg_has_sql else ''
                         msg_sql_matches = msg_has_sql and msg_sql == auto_executed_sql
                         msg_should_show = msg_has_sql and msg_sql == show_results_for
                         msg_was_auto_executed = msg.get('auto_executed', False)
+
+                        # Late binding: if this message matches the auto-executed query and has no
+                        # stored snapshot yet, attach current result so it renders inline in sequence.
+                        if (
+                            msg_has_sql and
+                            not has_stored_results and
+                            (msg_sql_matches or msg_should_show or msg_was_auto_executed) and
+                            st.session_state.get('last_result_df') is not None
+                        ):
+                            st.session_state.chat_history[idx]['auto_result_df'] = st.session_state.last_result_df.copy()
+                            stored_single_result = st.session_state.chat_history[idx]['auto_result_df']
+                            has_stored_results = True
+                            from utils.helpers import display_paginated_dataframe
+                            st.markdown("---")
+                            st.markdown("**📋 Query Results**")
+                            display_paginated_dataframe(
+                                stored_single_result,
+                                unique_suffix=f"chatbot_msg_latebind_{unique_key_base}"
+                            )
+                            results_shown_for_latest = True
                         
                         print(f"DEBUG: Message {idx}/{total_messages-1} - is_last={is_last_message}, has_sql={msg_has_sql}")
                         print(f"DEBUG: msg_sql[:50]={msg_sql[:50] if msg_sql else 'None'}")
@@ -662,19 +1120,16 @@ def chatbot_tab():
                         # Check if we have multiple query results from auto-execution
                         has_multi_results = st.session_state.get('chatbot_multi_query_results') is not None and len(st.session_state.get('chatbot_multi_query_results', [])) > 0
                         
-                        # Show results if: (1) it's the last message AND (2) has SQL AND (3) we have results available
-                        # Simplified condition - if it's the last message with SQL and results exist, show them
+                        # Show results for the matching SQL message (not necessarily the last chat message).
                         should_show_results = (
-                            is_last_message and 
                             msg_has_sql and 
-                            (has_last_result or has_multi_results) and 
-                            has_auto_query
-                            # Removed strict matching - if results exist and it's the last message, show them
+                            (has_last_result or has_multi_results or has_auto_error) and
+                            (msg_sql_matches or msg_should_show or msg_was_auto_executed)
                         )
                         
                         print(f"DEBUG: should_show_results={should_show_results}, has_multi_results={has_multi_results}")
                         
-                        if should_show_results:
+                        if should_show_results and not has_stored_results:
                             # Check if we have results or errors to display
                             if has_auto_error:
                                 # Show error
@@ -779,95 +1234,107 @@ def chatbot_tab():
                                     result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
                                     with result_col1:
                                         st.markdown("**📋 Query Results**", unsafe_allow_html=True)
-                                with result_col2:
-                                    # Download CSV button
-                                    csv = st.session_state.last_result_df.to_csv(index=False)
-                                    st.download_button(
-                                        "📥",
-                                        csv,
-                                        "results.csv",
-                                        "text/csv",
-                                        help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
-                                        width="stretch",  # New Streamlit API - replaces use_container_width=True
-                                        key=f"download_auto_{unique_key_base}"
+                                    with result_col2:
+                                        # Download CSV button
+                                        csv = st.session_state.last_result_df.to_csv(index=False)
+                                        st.download_button(
+                                            "📥",
+                                            csv,
+                                            "results.csv",
+                                            "text/csv",
+                                            help=f"Download CSV - {len(st.session_state.last_result_df):,} rows",
+                                            width="stretch",  # New Streamlit API - replaces use_container_width=True
+                                            key=f"download_auto_{unique_key_base}"
+                                        )
+                                    with result_col3:
+                                        # Visualization icon button - positioned next to download CSV
+                                        from utils.helpers import _render_viz_icon_button
+                                        viz_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                        _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
+                                    with result_col4:
+                                        # Data Explorer icon button - positioned next to visualization button
+                                        from utils.helpers import _render_data_explorer_button
+                                        explorer_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                        explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
+                                    with result_col5:
+                                        # SQL Editor icon button
+                                        from utils.helpers import _render_sql_editor_button
+                                        sql_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
+                                        sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
+                                    
+                                    # Display SQL Editor if active
+                                    if sql_active:
+                                        st.markdown("---")
+                                        st.markdown("### 📝 SQL Editor")
+                                        from ui.components import render_sql_editor
+                                        sql_query_editor = render_sql_editor(
+                                            key=f"sql_editor_chatbot_auto_{sql_suffix}",
+                                            height=200,
+                                            placeholder="Enter SQL query here..."
+                                        )
+                                        if sql_query_editor and sql_query_editor.strip():
+                                            if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
+                                                execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
+                                    
+                                    # Display Data Explorer if active
+                                    if explorer_active:
+                                        st.markdown("---")
+                                        st.markdown("### 🔍 Data Explorer")
+                                        try:
+                                            # Show basic statistics
+                                            st.markdown("**Data Overview:**")
+                                            col1, col2, col3 = st.columns(3)
+                                            with col1:
+                                                st.metric("Rows", f"{len(st.session_state.last_result_df):,}")
+                                            with col2:
+                                                st.metric("Columns", len(st.session_state.last_result_df.columns))
+                                            with col3:
+                                                numeric_cols = st.session_state.last_result_df.select_dtypes(include=['number']).columns
+                                                st.metric("Numeric Columns", len(numeric_cols))
+                                            
+                                            # Show column info
+                                            st.markdown("**Column Information:**")
+                                            col_info = pd.DataFrame({
+                                                'Column': st.session_state.last_result_df.columns,
+                                                'Data Type': [str(dtype) for dtype in st.session_state.last_result_df.dtypes],
+                                                'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
+                                                'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
+                                            })
+                                            st.dataframe(col_info, use_container_width=True, hide_index=True)
+                                            
+                                            # Show basic statistics for numeric columns
+                                            if len(numeric_cols) > 0:
+                                                st.markdown("**Numeric Column Statistics:**")
+                                                st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
+                                            
+                                            # Show sample data
+                                            st.markdown("**Sample Data:**")
+                                            st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
+                                        except Exception as e:
+                                            st.error(f"Error displaying data explorer: {str(e)}")
+                                    
+                                    # Search and visualization are now handled inside display_paginated_dataframe
+                                    display_df = st.session_state.last_result_df.copy()
+                                    st.session_state.current_page = 1
+                                    display_paginated_dataframe(
+                                        display_df,
+                                        unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
                                     )
-                                with result_col3:
-                                    # Visualization icon button - positioned next to download CSV
-                                    from utils.helpers import _render_viz_icon_button
-                                    viz_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-                                    _render_viz_icon_button(viz_suffix, st.session_state.last_result_df)
-                                with result_col4:
-                                    # Data Explorer icon button - positioned next to visualization button
-                                    from utils.helpers import _render_data_explorer_button
-                                    explorer_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-                                    explorer_button_key, explorer_active = _render_data_explorer_button(explorer_suffix, st.session_state.last_result_df)
-                                with result_col5:
-                                    # SQL Editor icon button
-                                    from utils.helpers import _render_sql_editor_button
-                                    sql_suffix = f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-                                    sql_button_key, sql_active = _render_sql_editor_button(sql_suffix)
-                                
-                                # Display SQL Editor if active
-                                if sql_active:
-                                    st.markdown("---")
-                                    st.markdown("### 📝 SQL Editor")
-                                    from ui.components import render_sql_editor
-                                    sql_query_editor = render_sql_editor(
-                                        key=f"sql_editor_chatbot_auto_{sql_suffix}",
-                                        height=200,
-                                        placeholder="Enter SQL query here..."
-                                    )
-                                    if sql_query_editor and sql_query_editor.strip():
-                                        if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
-                                            execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
-                                
-                                # Display Data Explorer if active
-                                if explorer_active:
-                                    st.markdown("---")
-                                    st.markdown("### 🔍 Data Explorer")
-                                    try:
-                                        # Show basic statistics
-                                        st.markdown("**Data Overview:**")
-                                        col1, col2, col3 = st.columns(3)
-                                        with col1:
-                                            st.metric("Rows", f"{len(st.session_state.last_result_df):,}")
-                                        with col2:
-                                            st.metric("Columns", len(st.session_state.last_result_df.columns))
-                                        with col3:
-                                            numeric_cols = st.session_state.last_result_df.select_dtypes(include=['number']).columns
-                                            st.metric("Numeric Columns", len(numeric_cols))
-                                        
-                                        # Show column info
-                                        st.markdown("**Column Information:**")
-                                        col_info = pd.DataFrame({
-                                            'Column': st.session_state.last_result_df.columns,
-                                            'Data Type': [str(dtype) for dtype in st.session_state.last_result_df.dtypes],
-                                            'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
-                                            'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
-                                        })
-                                        st.dataframe(col_info, use_container_width=True, hide_index=True)
-                                        
-                                        # Show basic statistics for numeric columns
-                                        if len(numeric_cols) > 0:
-                                            st.markdown("**Numeric Column Statistics:**")
-                                            st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
-                                        
-                                        # Show sample data
-                                        st.markdown("**Sample Data:**")
-                                        st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
-                                    except Exception as e:
-                                        st.error(f"Error displaying data explorer: {str(e)}")
-                                
-                                # Search and visualization are now handled inside display_paginated_dataframe
-                                display_df = st.session_state.last_result_df.copy()
-                                st.session_state.current_page = 1
-                                display_paginated_dataframe(
-                                    display_df, 
-                                    unique_suffix=f"chatbot_auto_result_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
-                                )
-                                results_shown_for_latest = True
+                                    results_shown_for_latest = True
                         else:
                             print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
+
+                        if debug_enabled:
+                            debug_rows.append({
+                                "idx": idx,
+                                "role": "assistant",
+                                "has_sql": bool(msg_has_sql),
+                                "auto_executed": bool(msg_was_auto_executed),
+                                "has_snapshot": bool(has_stored_results),
+                                "bind_attempted": bool(msg.get('auto_bind_attempted', False)),
+                                "is_last": bool(is_last_message),
+                                "sql_preview": (msg_sql[:80] + "...") if msg_sql and len(msg_sql) > 80 else (msg_sql or "")
+                            })
                     except Exception as e:
                         # Fallback if expander fails
                         st.code(msg['sql_query'], language='sql')
@@ -887,8 +1354,27 @@ def chatbot_tab():
     # Re-check has_last_result in case it was cleared in main loop
     has_last_result_fallback = st.session_state.get('last_result_df') is not None
     has_multi_results_fallback = st.session_state.get('chatbot_multi_query_results') is not None and len(st.session_state.get('chatbot_multi_query_results', [])) > 0
+    has_inline_result_messages = any(
+        m.get('role') == 'assistant' and (
+            m.get('auto_result_df') is not None or
+            (m.get('auto_multi_query_results') is not None and len(m.get('auto_multi_query_results', [])) > 0)
+        )
+        for m in st.session_state.get('chat_history', [])
+    )
+    has_any_auto_executed_message = any(
+        m.get('role') == 'assistant' and bool(m.get('auto_executed', False))
+        for m in st.session_state.get('chat_history', [])
+    )
     
-    if not results_shown_for_latest and (has_last_result_fallback or has_multi_results_fallback) and has_auto_query and not has_auto_error:
+    if (
+        False and
+        not results_shown_for_latest and
+        (has_last_result_fallback or has_multi_results_fallback) and
+        has_auto_query and
+        not has_auto_error and
+        not has_inline_result_messages and
+        not has_any_auto_executed_message
+    ):
         print(f"DEBUG: 🔄 Fallback - showing results after chat history loop")
         
         # Check if we have multiple query results
@@ -1071,6 +1557,23 @@ def chatbot_tab():
                 display_df,
                 unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
             )
+
+    if debug_enabled:
+        st.markdown("---")
+        with st.expander("🐞 Chatbot Debug State", expanded=True):
+            st.write("**Global session flags**")
+            st.write({
+                "chat_history_len": len(st.session_state.get("chat_history", [])),
+                "has_last_result_df": st.session_state.get("last_result_df") is not None,
+                "has_multi_query_results": bool(st.session_state.get("chatbot_multi_query_results", [])),
+                "chatbot_last_auto_executed_query": (st.session_state.get("chatbot_last_auto_executed_query", "") or "")[:120],
+                "chatbot_show_results_for_query": (st.session_state.get("chatbot_show_results_for_query", "") or "")[:120],
+                "chatbot_auto_execution_error": st.session_state.get("chatbot_auto_execution_error"),
+                "results_shown_for_latest": results_shown_for_latest,
+            })
+            if debug_rows:
+                st.write("**Per-message render diagnostics**")
+                st.dataframe(pd.DataFrame(debug_rows), use_container_width=True, hide_index=True)
     
     # else:
     #     st.info("💬 Start chatting by typing a message below!")
@@ -1606,72 +2109,30 @@ def chatbot_tab():
                     # Add assistant response to history
                     try:
                         response_content = response.get('response', response.get('content', str(response)))
-                        sql_query = response.get('sql_query', response.get('sql', None))
+                        sql_query = _dedupe_sql_query_text(response.get('sql_query', response.get('sql', None)))
+                        cleaned_response_content = _clean_assistant_content_for_sql(response_content, sql_query)
                         timestamp = response.get('timestamp', datetime.now().isoformat())
                         print(f"DEBUG: Adding response to chat history - content length: {len(response_content) if response_content else 0}, has sql: {bool(sql_query)}")
                         
                         # Check if SQL is a SELECT query (data retrieval) - auto-execute it
                         auto_executed = False
                         if sql_query:
-                            sql_upper = sql_query.strip().upper()
                             print(f"DEBUG: Extracted SQL query: {sql_query[:200]}...")
-                            print(f"DEBUG: SQL query upper: {sql_upper[:200]}...")
-                            # Check if it's a SELECT query (data retrieval)
-                            is_select = sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')
-                            # Check if it's NOT DDL or DML (for safety)
-                            is_not_ddl_dml = not any(sql_upper.startswith(cmd) for cmd in [
-                                'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'INSERT', 'UPDATE', 'DELETE',
-                                'GRANT', 'REVOKE', 'COMMENT', 'ANALYZE', 'VACUUM'
-                            ])
-                            
-                            print(f"DEBUG: is_select={is_select}, is_not_ddl_dml={is_not_ddl_dml}")
-                            
-                            if is_select and is_not_ddl_dml:
-                                # Auto-execute SELECT queries
-                                try:
-                                    print(f"DEBUG: Auto-executing SELECT query: {sql_query[:100]}...")
-                                    # Store the query BEFORE execution so it's available after rerun
-                                    st.session_state['chatbot_last_auto_executed_query'] = sql_query
-                                    st.session_state['chatbot_auto_executed_timestamp'] = timestamp
-                                    st.session_state['chatbot_auto_execution_error'] = None  # Clear any previous error
-                                    # Clear any previous multi-query results
-                                    st.session_state.pop('chatbot_multi_query_results', None)
-                                    print(f"DEBUG: Flag set before execute_query")
-                                    execute_query(sql_query, enable_agents=False, unique_suffix="chatbot_auto")
-                                    # Verify results were stored
-                                    has_results = st.session_state.get('last_result_df') is not None
-                                    print(f"DEBUG: After execute_query - has_results={has_results}, last_result_df type: {type(st.session_state.get('last_result_df'))}")
-                                    # Clear any previous error on success
-                                    st.session_state.pop('chatbot_auto_execution_error', None)
-                                    st.session_state.pop('chatbot_auto_execution_error_trace', None)
-                                    # Set flag to indicate results should be shown for this query
-                                    st.session_state['chatbot_show_results_for_query'] = sql_query
-                                    auto_executed = True
-                                    print(f"DEBUG: Auto-execution successful, auto_executed={auto_executed}, show_results_flag set")
-                                except Exception as exec_error:
-                                    print(f"DEBUG: Auto-execution failed: {exec_error}")
-                                    import traceback
-                                    error_trace = traceback.format_exc()
-                                    traceback.print_exc()
-                                    # Store error in session state so it can be displayed after rerun
-                                    st.session_state['chatbot_auto_execution_error'] = str(exec_error)
-                                    st.session_state['chatbot_auto_execution_error_trace'] = error_trace
-                                    # Keep the query flag so we can show the error with context
-                                    # Don't clear chatbot_last_auto_executed_query - we need it to show error
-                                    auto_executed = False
-                                    # Show error immediately (before rerun)
-                                    st.error(f"❌ Auto-execution failed: {str(exec_error)}")
-                                    st.code(sql_query, language='sql')
-                                    print(f"DEBUG: Error stored in session state for display after rerun")
+                            auto_executed = _auto_execute_chatbot_select_query(
+                                sql_query,
+                                timestamp,
+                                unique_suffix="chatbot_auto"
+                            )
                         else:
                             print(f"DEBUG: No SQL query extracted from response")
                         
-                        st.session_state.chat_history.append({
+                        _append_assistant_message({
                             'role': 'assistant',
-                            'content': response_content,
+                            'content': cleaned_response_content,
                             'sql_query': sql_query,
                             'timestamp': timestamp,
-                            'auto_executed': auto_executed  # Track if query was auto-executed
+                            'auto_executed': auto_executed,  # Track if query was auto-executed
+                            **(_capture_chatbot_auto_results_snapshot() if auto_executed else {})
                         })
                         
                         # If we auto-executed, results are already displayed and stored in session state
