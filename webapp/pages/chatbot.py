@@ -1406,10 +1406,21 @@ def chatbot_tab():
                             print(f"DEBUG: ❌ Not showing results - is_last={is_last_message}, has_sql={msg_has_sql}, has_result={has_last_result}, has_query={has_auto_query}")
 
                     except Exception as e:
-                        # Fallback if expander fails
-                        st.code(msg['sql_query'], language='sql')
-                        if st.button(f"Execute Query", key=f"exec_fallback_{unique_key_base}"):
-                            execute_generated_query(msg['sql_query'])
+                        # Render-safe fallback: if auto-executed snapshot exists, show it instead of manual button.
+                        if debug_enabled:
+                            st.error(f"Render fallback triggered: {str(e)}")
+                        has_snapshot = (
+                            msg.get('auto_result_df') is not None or
+                            (msg.get('auto_multi_query_results') is not None and len(msg.get('auto_multi_query_results', [])) > 0)
+                        )
+                        if msg.get('auto_executed', False) and has_snapshot:
+                            rendered = _render_inline_snapshot_results(msg, f"{unique_key_base}_except")
+                            if rendered:
+                                results_shown_for_latest = True
+                        else:
+                            st.code(msg['sql_query'], language='sql')
+                            if st.button(f"Execute Query", key=f"exec_fallback_{unique_key_base}"):
+                                execute_generated_query(msg['sql_query'])
     
     # Fallback: If we have results but didn't show them in the loop, show them after chat history
     # Also check if there's an error that should be shown
