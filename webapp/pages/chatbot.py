@@ -380,6 +380,45 @@ def _append_assistant_message(message: Dict[str, Any]) -> None:
     st.session_state.chat_history.append(message)
 
 
+def _get_message_result_row_count(msg: Dict[str, Any]) -> int:
+    """Return total rows captured in message snapshot results."""
+    total_rows = 0
+    multi_results = msg.get('auto_multi_query_results', [])
+    if multi_results:
+        for item in multi_results:
+            df = item.get('dataframe')
+            if df is not None:
+                total_rows += len(df)
+        return total_rows
+
+    single_df = msg.get('auto_result_df')
+    if single_df is not None:
+        return len(single_df)
+    return 0
+
+
+def _render_sql_status_chips(msg: Dict[str, Any]) -> None:
+    """Render compact SQL status chips near generated SQL."""
+    auto_executed = bool(msg.get('auto_executed', False))
+    rows = _get_message_result_row_count(msg)
+
+    auto_chip = (
+        "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
+        "background:#e7f8ee;color:#137333;font-size:12px;font-weight:600;'>Auto-executed</span>"
+        if auto_executed else
+        "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
+        "background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:600;'>Not auto-executed</span>"
+    )
+    rows_chip = (
+        f"<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
+        f"background:#eef2ff;color:#3730a3;font-size:12px;font-weight:600;'>Rows: {rows:,}</span>"
+        if rows > 0 else
+        "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
+        "background:#fff7ed;color:#9a3412;font-size:12px;font-weight:600;'>Rows: 0</span>"
+    )
+    st.markdown(f"{auto_chip}&nbsp;&nbsp;{rows_chip}", unsafe_allow_html=True)
+
+
 def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**📋 Query Results**") -> None:
     """Render one result block with action icons above the table."""
     result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
@@ -1126,6 +1165,7 @@ def chatbot_tab():
                         # Show SQL
                         with st.expander("📝 Generated SQL", expanded=True):
                             st.code(sql_query, language='sql')
+                            _render_sql_status_chips(msg)
                             
                             # For SELECT queries, show that it was auto-executed (results appear below)
                             if is_safe_select:
