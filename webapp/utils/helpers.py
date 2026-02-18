@@ -903,3 +903,36 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("Pie chart requires at least one categorical and one numeric column")
+
+
+def display_data_explorer(df: pd.DataFrame):
+    """Display an interactive data explorer summary for a dataframe."""
+    if df is None or len(df) == 0:
+        st.info("No data available for exploration")
+        return
+
+    st.markdown("**Data Overview:**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Rows", f"{len(df):,}")
+    with col2:
+        st.metric("Columns", len(df.columns))
+    with col3:
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        st.metric("Numeric Columns", len(numeric_cols))
+
+    st.markdown("**Column Information:**")
+    col_info = pd.DataFrame({
+        "Column": df.columns,
+        "Data Type": [str(dtype) for dtype in df.dtypes],
+        "Non-Null Count": [df[col].notna().sum() for col in df.columns],
+        "Null Count": [df[col].isna().sum() for col in df.columns],
+    })
+    st.dataframe(col_info, use_container_width=True, hide_index=True)
+
+    if len(numeric_cols) > 0:
+        st.markdown("**Numeric Column Statistics:**")
+        st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+
+    st.markdown("**Sample Data:**")
+    st.dataframe(df.head(10), use_container_width=True, hide_index=True)
