@@ -701,6 +701,7 @@ def chatbot_tab():
         value=st.session_state.get("chatbot_debug_enabled", False),
         key="chatbot_debug_enabled"
     )
+    debug_panel_container = st.container() if debug_enabled else None
 
     # Debug section for agent SQL execution (DISABLED for performance)
     # with st.expander("🔍 Agent SQL Execution Debug", expanded=False):
@@ -1627,23 +1628,23 @@ def chatbot_tab():
                 unique_suffix=f"chatbot_auto_result_fallback_{hash(st.session_state.chatbot_last_auto_executed_query) % 10000}"
             )
 
-    if debug_enabled:
-        st.markdown("---")
-        with st.expander("🐞 Chatbot Debug State", expanded=True):
-            st.write("**Global session flags**")
-            st.write({
-                "chat_history_len": len(st.session_state.get("chat_history", [])),
-                "chat_history_roles": [m.get("role", "unknown") for m in st.session_state.get("chat_history", [])],
-                "has_last_result_df": st.session_state.get("last_result_df") is not None,
-                "has_multi_query_results": bool(st.session_state.get("chatbot_multi_query_results", [])),
-                "chatbot_last_auto_executed_query": (st.session_state.get("chatbot_last_auto_executed_query", "") or "")[:120],
-                "chatbot_show_results_for_query": (st.session_state.get("chatbot_show_results_for_query", "") or "")[:120],
-                "chatbot_auto_execution_error": st.session_state.get("chatbot_auto_execution_error"),
-                "results_shown_for_latest": results_shown_for_latest,
-            })
-            if debug_rows:
-                st.write("**Per-message render diagnostics**")
-                st.dataframe(pd.DataFrame(debug_rows), use_container_width=True, hide_index=True)
+    if debug_enabled and debug_panel_container is not None:
+        with debug_panel_container:
+            with st.expander("🐞 Chatbot Debug State", expanded=True):
+                st.write("**Global session flags**")
+                st.write({
+                    "chat_history_len": len(st.session_state.get("chat_history", [])),
+                    "chat_history_roles": [m.get("role", "unknown") for m in st.session_state.get("chat_history", [])],
+                    "has_last_result_df": st.session_state.get("last_result_df") is not None,
+                    "has_multi_query_results": bool(st.session_state.get("chatbot_multi_query_results", [])),
+                    "chatbot_last_auto_executed_query": (st.session_state.get("chatbot_last_auto_executed_query", "") or "")[:120],
+                    "chatbot_show_results_for_query": (st.session_state.get("chatbot_show_results_for_query", "") or "")[:120],
+                    "chatbot_auto_execution_error": st.session_state.get("chatbot_auto_execution_error"),
+                    "results_shown_for_latest": results_shown_for_latest,
+                })
+                if debug_rows:
+                    st.write("**Per-message render diagnostics**")
+                    st.dataframe(pd.DataFrame(debug_rows), use_container_width=True, hide_index=True)
     
     # else:
     #     st.info("💬 Start chatting by typing a message below!")
