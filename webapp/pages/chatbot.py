@@ -468,8 +468,14 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
             "No rows returned. Quick checks: remove/relax filters, verify table has data, "
             "or run a broader query like `SELECT * FROM <table> LIMIT 20;`."
         )
+    table_height = 520 if row_count > 15 else None
+    if table_height:
+        st.caption("Scrollable table enabled for long results (toolbar remains above).")
     try:
-        st.dataframe(result_df, use_container_width=True)
+        if table_height:
+            st.dataframe(result_df, use_container_width=True, height=table_height)
+        else:
+            st.dataframe(result_df, use_container_width=True)
     except Exception:
         st.write(result_df)
 
