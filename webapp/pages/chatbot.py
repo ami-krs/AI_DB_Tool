@@ -380,6 +380,60 @@ def _append_assistant_message(message: Dict[str, Any]) -> None:
     st.session_state.chat_history.append(message)
 
 
+def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**📋 Query Results**") -> None:
+    """Render one result block with action icons above the table."""
+    result_col1, result_col2, result_col3, result_col4, result_col5 = st.columns([6.8, 0.4, 0.4, 0.4, 0.4], gap="small")
+    with result_col1:
+        st.markdown(title, unsafe_allow_html=True)
+    with result_col2:
+        csv = result_df.to_csv(index=False)
+        st.download_button(
+            "📥",
+            csv,
+            "results.csv",
+            "text/csv",
+            help=f"Download CSV - {len(result_df):,} rows",
+            width="stretch",
+            key=f"download_snapshot_{block_suffix}"
+        )
+    with result_col3:
+        from utils.helpers import _render_viz_icon_button
+        _render_viz_icon_button(f"snapshot_{block_suffix}", result_df)
+    with result_col4:
+        from utils.helpers import _render_data_explorer_button
+        _, explorer_active = _render_data_explorer_button(f"snapshot_{block_suffix}", result_df)
+    with result_col5:
+        from utils.helpers import _render_sql_editor_button
+        _, sql_active = _render_sql_editor_button(f"snapshot_{block_suffix}")
+
+    st.caption(f"Rows: {len(result_df):,}")
+    try:
+        st.dataframe(result_df, use_container_width=True)
+    except Exception:
+        st.write(result_df)
+
+    if explorer_active:
+        st.markdown("---")
+        st.markdown("### 🔍 Data Explorer")
+        try:
+            from utils.helpers import display_data_explorer
+            display_data_explorer(result_df)
+        except Exception as e:
+            st.error(f"Error displaying data explorer: {str(e)}")
+
+    if sql_active:
+        st.markdown("---")
+        st.markdown("### 📝 SQL Editor")
+        sql_query_editor = render_sql_editor(
+            key=f"sql_editor_snapshot_{block_suffix}",
+            height=200,
+            placeholder="Enter SQL query here..."
+        )
+        if sql_query_editor and sql_query_editor.strip():
+            if st.button("Execute SQL", key=f"execute_sql_snapshot_{block_suffix}"):
+                execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_snapshot_{block_suffix}")
+
+
 def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -> bool:
     """Render stored snapshot results for a specific assistant message."""
     stored_multi_results = msg.get('auto_multi_query_results', [])
@@ -402,12 +456,11 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
             if query_text:
                 st.markdown(f"**Query {result_idx}:**")
                 st.code(query_text, language='sql')
-            st.caption(f"Rows: {len(result_df):,}")
-            try:
-                # Keep this minimal for Streamlit Cloud compatibility.
-                st.dataframe(result_df, use_container_width=True)
-            except Exception:
-                st.write(result_df)
+            _render_snapshot_result_block(
+                result_df,
+                block_suffix=f"{unique_key_base}_{result_idx}",
+                title=f"**📋 Results {result_idx}**"
+            )
             rendered_any = True
             st.markdown("---")
     else:
@@ -415,24 +468,21 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
         if result_df is None and stored_multi_results:
             result_df = stored_multi_results[0].get('dataframe')
         if result_df is not None:
-            st.markdown("**📋 Query Results**")
-            st.caption(f"Rows: {len(result_df):,}")
-            try:
-                # Keep this minimal for Streamlit Cloud compatibility.
-                st.dataframe(result_df, use_container_width=True)
-            except Exception:
-                st.write(result_df)
+            _render_snapshot_result_block(
+                result_df,
+                block_suffix=f"{unique_key_base}",
+                title="**📋 Query Results**"
+            )
             rendered_any = True
 
     # Fallback safety: if snapshot flags exist but data object is missing, show last_result_df.
     if not rendered_any and st.session_state.get("last_result_df") is not None:
         fallback_df = st.session_state.get("last_result_df")
-        st.markdown("**📋 Query Results**")
-        st.caption(f"Rows: {len(fallback_df):,}")
-        try:
-            st.dataframe(fallback_df, use_container_width=True)
-        except Exception:
-            st.write(fallback_df)
+        _render_snapshot_result_block(
+            fallback_df,
+            block_suffix=f"{unique_key_base}_fallback",
+            title="**📋 Query Results**"
+        )
         rendered_any = True
 
     return rendered_any
