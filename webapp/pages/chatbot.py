@@ -509,12 +509,12 @@ def chatbot_compact():
             else:
                 display_content = _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
                 # Show explanation in collapsed expander by default
-                with st.expander("💡 View Explanation", expanded=False, key=f"compact_explanation_{original_idx}"):
+                with st.expander("💡 View Explanation", expanded=False):
                     st.chat_message("assistant").write(display_content)
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
-                    with st.expander("📝 Generated SQL", expanded=True, key=f"compact_sql_{original_idx}"):
+                    with st.expander("📝 Generated SQL", expanded=True):
                         st.code(msg['sql_query'], language='sql')
     else:
         if not st.session_state.chatbot:
@@ -1063,7 +1063,7 @@ def chatbot_tab():
                 display_content = "SQL generated successfully." if has_sql_in_msg else _clean_assistant_content_for_sql(msg.get('content', ''), msg.get('sql_query', ''))
                 # Show explanation in collapsed expander by default
                 try:
-                    with st.expander("💡 View Explanation", expanded=False, key=f"explanation_{unique_key_base}"):
+                    with st.expander("💡 View Explanation", expanded=False):
                         st.chat_message("assistant").write(display_content)
                 except Exception as e:
                     # Fallback if expander fails
@@ -1086,7 +1086,7 @@ def chatbot_tab():
                         is_last_message = (idx == total_messages - 1)
                         
                         # Show SQL
-                        with st.expander("📝 Generated SQL", expanded=True, key=f"sql_{unique_key_base}"):
+                        with st.expander("📝 Generated SQL", expanded=True):
                             st.code(sql_query, language='sql')
                             
                             # For SELECT queries, show that it was auto-executed (results appear below)
