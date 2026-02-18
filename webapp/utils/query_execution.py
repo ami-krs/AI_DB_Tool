@@ -23,6 +23,64 @@ except ImportError:
     AGENTS_AVAILABLE = False
     AgentOrchestrator = None
 
+
+def _is_server_side_copy_from_file(statement: str) -> bool:
+    """Detect PostgreSQL COPY ... FROM '/path/file' server-side file loads."""
+    sql = (statement or "").strip()
+    if not sql:
+        return False
+    if not re.match(r"^\s*COPY\s+", sql, flags=re.IGNORECASE):
+        return False
+    # Server-side file COPY typically uses single-quoted file path after FROM.
+    return bool(re.search(r"\bFROM\s+'[^']+'", sql, flags=re.IGNORECASE))
+
+
+def _is_psql_copy_command(statement: str) -> bool:
+    """Detect psql meta-command \\copy which is unsupported in app SQL execution."""
+    sql = (statement or "").strip()
+    return bool(re.match(r"^\s*\\copy\s+", sql, flags=re.IGNORECASE))
+
+
+def _is_file_copy_command(statement: str) -> bool:
+    """Detect COPY-style file load commands that should route to uploader UI."""
+    return _is_server_side_copy_from_file(statement) or _is_psql_copy_command(statement)
+
+
+def _extract_copy_target_table(statement: str) -> str:
+    """Best-effort extraction of target table name from COPY statement."""
+    sql = (statement or "").strip()
+    match = re.match(r"^\s*(?:COPY|\\copy)\s+([A-Za-z_][\w\.]*)", sql, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return ""
+
+
+def _normalize_sql_signature(sql: str) -> str:
+    """Normalize SQL text for fuzzy matching in chat history."""
+    text = (sql or "").strip().rstrip(";")
+    return " ".join(text.split()).lower()
+
+
+def _enable_upload_panel_for_copy_query(copy_sql: str, target_table: str = "") -> bool:
+    """Mark matching assistant chat message to show upload panel."""
+    history = st.session_state.get("chat_history")
+    if not isinstance(history, list) or not history:
+        return False
+
+    copy_sig = _normalize_sql_signature(copy_sql)
+    for idx in range(len(history) - 1, -1, -1):
+        msg = history[idx]
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        msg_sql = msg.get("sql_query", "")
+        msg_sig = _normalize_sql_signature(msg_sql)
+        if msg_sig == copy_sig or _is_file_copy_command(msg_sql):
+            st.session_state.chat_history[idx]["show_upload_panel"] = True
+            if target_table:
+                st.session_state.chat_history[idx]["upload_target_table"] = target_table
+            return True
+    return False
+
 def split_sql_statements(query: str) -> List[str]:
     """Split SQL query into individual statements, handling semicolons in strings/comments"""
     if not query.strip():
@@ -139,6 +197,16 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
     }
     
     if not statement.strip():
+        return result
+
+    if _is_file_copy_command(statement):
+        target_table = _extract_copy_target_table(statement)
+        table_hint = f" for table `{target_table}`" if target_table else ""
+        result['error'] = (
+            "COPY from local file is not supported from this app environment. "
+            "Use the chatbot upload flow (CSV/Excel uploader) instead"
+            f"{table_hint}."
+        )
         return result
     
     statement_upper = statement.strip().upper()
@@ -415,6 +483,18 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     """
     if not query.strip():
         st.warning("Please enter a query")
+        return
+
+    if _is_file_copy_command(query):
+        target_table = _extract_copy_target_table(query)
+        _enable_upload_panel_for_copy_query(query, target_table)
+        st.warning(
+            "This COPY command cannot load files directly in this app/database environment. "
+            "Use the chatbot Upload panel (CSV/Excel) instead."
+        )
+        if target_table:
+            st.info(f"Detected target table: `{target_table}`")
+        st.code(query, language="sql")
         return
     
     # Use session state setting if enable_agents not explicitly provided
@@ -979,6 +1059,19 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
 
 def execute_generated_query(query: str):
     """Execute AI-generated query"""
+    if _is_file_copy_command(query):
+        target_table = _extract_copy_target_table(query)
+        panel_opened = _enable_upload_panel_for_copy_query(query, target_table)
+        st.warning(
+            "COPY from local path is blocked here. Use Upload panel to load CSV/Excel into the table."
+        )
+        if panel_opened:
+            st.success("Upload panel opened for this chatbot message.")
+        if target_table:
+            st.info(f"Detected target table: `{target_table}`")
+        st.code(query, language="sql")
+        return
+
     # Guardrail: prevent executing AI SQL that references tables that don't exist.
     # This is especially common when the model falls back to placeholders like "example_table".
     try:

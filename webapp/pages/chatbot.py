@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from utils.query_execution import (
@@ -565,6 +565,205 @@ def _render_inline_snapshot_results(msg: Dict[str, Any], unique_key_base: str) -
     return rendered_any
 
 
+def _is_upload_data_request(user_text: str) -> bool:
+    """Detect chat requests asking to upload/import local files into DB tables."""
+    text = (user_text or "").strip().lower()
+    if not text:
+        return False
+
+    upload_terms = ["upload", "import", "load"]
+    file_terms = ["file", "csv", "excel", "xlsx", "xls"]
+    table_terms = ["table", "database", "db"]
+    return (
+        any(term in text for term in upload_terms) and
+        any(term in text for term in file_terms) and
+        any(term in text for term in table_terms)
+    )
+
+
+def _is_copy_from_local_file_sql(sql_query: str) -> bool:
+    """Detect server-side COPY FROM '/path/file' SQL that fails on managed PG."""
+    sql = (sql_query or "").strip()
+    if not sql:
+        return False
+    if re.match(r"^\s*\\copy\s+", sql, flags=re.IGNORECASE):
+        return True
+    if not re.match(r"^\s*COPY\s+", sql, flags=re.IGNORECASE):
+        return False
+    return bool(re.search(r"\bFROM\s+'[^']+'", sql, flags=re.IGNORECASE))
+
+
+def _extract_copy_target_table(sql_query: str) -> Optional[str]:
+    """Extract target table from COPY statement."""
+    sql = (sql_query or "").strip()
+    match = re.match(r"^\s*(?:COPY|\\copy)\s+([A-Za-z_][\w\.]*)", sql, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _infer_target_table_from_text(user_text: str) -> Optional[str]:
+    """Try to infer target table from user message."""
+    text = (user_text or "").strip().lower()
+    db_manager = st.session_state.get("db_manager")
+    if not text or db_manager is None:
+        return None
+
+    try:
+        tables = db_manager.get_tables() or []
+    except Exception:
+        return None
+
+    best_match = None
+    best_len = 0
+    for table_name in tables:
+        table_text = str(table_name).strip().lower()
+        if not table_text:
+            continue
+        pattern = rf"\b{re.escape(table_text)}\b"
+        if re.search(pattern, text) and len(table_text) > best_len:
+            best_match = str(table_name)
+            best_len = len(table_text)
+    return best_match
+
+
+def _read_uploaded_dataframe(uploaded_file) -> pd.DataFrame:
+    """Read user-uploaded CSV/TSV/Excel file into a DataFrame."""
+    file_name = (uploaded_file.name or "").lower()
+
+    if file_name.endswith((".csv", ".tsv", ".txt")):
+        uploaded_file.seek(0)
+        return pd.read_csv(uploaded_file, sep=None, engine="python")
+    if file_name.endswith((".xlsx", ".xls")):
+        uploaded_file.seek(0)
+        return pd.read_excel(uploaded_file)
+    raise ValueError("Unsupported file type. Please upload CSV or Excel (.xlsx/.xls).")
+
+
+def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Dict[str, Any]:
+    """Append uploaded dataframe rows to an existing database table."""
+    db_manager = st.session_state.get("db_manager")
+    if db_manager is None:
+        raise ValueError("No active database manager found.")
+
+    engine = db_manager.get_engine()
+    if engine is None:
+        raise ValueError("No active database connection.")
+
+    schema = db_manager.get_table_schema(table_name)
+    table_columns = [col.get("name") for col in (schema.get("columns") or []) if col.get("name")]
+    if not table_columns:
+        raise ValueError(f"Could not fetch columns for table '{table_name}'.")
+
+    # Match uploaded columns case-insensitively to table columns.
+    table_lookup = {str(col).strip().lower(): str(col) for col in table_columns}
+    rename_map: Dict[str, str] = {}
+    unmatched_columns: List[str] = []
+    for raw_col in df.columns:
+        normalized = str(raw_col).strip().lower()
+        if normalized in table_lookup:
+            rename_map[raw_col] = table_lookup[normalized]
+        else:
+            unmatched_columns.append(str(raw_col))
+
+    if unmatched_columns:
+        raise ValueError(
+            "File has columns that do not exist in target table: "
+            + ", ".join(unmatched_columns)
+        )
+
+    prepared_df = df.rename(columns=rename_map).copy()
+    ordered_columns = [col for col in table_columns if col in prepared_df.columns]
+    if not ordered_columns:
+        raise ValueError(
+            "No matching columns found between uploaded file and target table."
+        )
+
+    load_df = prepared_df[ordered_columns]
+    if load_df.empty:
+        raise ValueError("Uploaded file has no rows to insert.")
+
+    load_df.to_sql(
+        table_name,
+        con=engine,
+        if_exists="append",
+        index=False,
+        method="multi",
+        chunksize=1000
+    )
+    return {
+        "inserted_rows": len(load_df),
+        "loaded_columns": ordered_columns
+    }
+
+
+def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base: str) -> None:
+    """Render upload UI for chatbot messages requesting file-to-table load."""
+    st.markdown("---")
+    st.markdown("### 📤 Upload local file to database table")
+
+    if not st.session_state.get("connected") or st.session_state.get("db_manager") is None:
+        st.warning("Connect to a database first, then upload a file.")
+        return
+
+    try:
+        tables = st.session_state.db_manager.get_tables() or []
+    except Exception as table_error:
+        st.error(f"Unable to fetch tables: {table_error}")
+        return
+
+    if not tables:
+        st.info("No tables found in the connected database.")
+        return
+
+    suggested_table = (msg.get("upload_target_table") or "").strip()
+    if suggested_table and suggested_table not in tables and "." in suggested_table:
+        suggested_table = suggested_table.split(".")[-1]
+    default_index = 0
+    if suggested_table and suggested_table in tables:
+        default_index = tables.index(suggested_table)
+
+    selected_table = st.selectbox(
+        "Target table",
+        options=tables,
+        index=default_index,
+        key=f"upload_table_{unique_key_base}"
+    )
+    uploaded_file = st.file_uploader(
+        "Choose a file",
+        type=["csv", "tsv", "txt", "xlsx", "xls"],
+        key=f"upload_file_{unique_key_base}"
+    )
+    st.caption("Rows are appended to the selected table. Column names are matched case-insensitively.")
+
+    if not uploaded_file:
+        return
+
+    try:
+        preview_df = _read_uploaded_dataframe(uploaded_file)
+    except Exception as read_error:
+        st.error(f"Could not read file: {read_error}")
+        return
+
+    st.caption(f"File preview: {len(preview_df):,} rows, {len(preview_df.columns):,} columns")
+    st.dataframe(preview_df.head(20), use_container_width=True, height=240)
+
+    if st.button("Load file to table", key=f"upload_submit_{unique_key_base}"):
+        try:
+            with st.spinner("Uploading data to database table..."):
+                load_result = _append_uploaded_dataframe_to_table(preview_df, selected_table)
+            inserted_rows = int(load_result.get("inserted_rows", 0))
+            loaded_columns = load_result.get("loaded_columns", [])
+            st.success(
+                f"Loaded {inserted_rows:,} rows into `{selected_table}` "
+                f"using {len(loaded_columns)} matched columns."
+            )
+            st.session_state.chat_history[idx]["upload_completed"] = True
+            st.session_state.chat_history[idx]["show_upload_panel"] = False
+        except Exception as load_error:
+            st.error(f"Upload failed: {load_error}")
+
+
 def chatbot_compact():
     """Compact chatbot for three column layout"""
     st.markdown("### 💬 AI Assistant")
@@ -643,6 +842,8 @@ def chatbot_compact():
                 if 'sql_query' in msg and msg['sql_query']:
                     with st.expander("📝 Generated SQL", expanded=_should_expand_sql(msg['sql_query'])):
                         st.code(msg['sql_query'], language='sql')
+                if msg.get("show_upload_panel", False):
+                    _render_chatbot_upload_panel(msg, original_idx, f"compact_{original_idx}")
     else:
         if not st.session_state.chatbot:
             st.info("💡 AI chatbot requires an API key. Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable.")
@@ -734,6 +935,21 @@ def chatbot_compact():
         else:
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
+
+            # Handle explicit upload-to-table requests with a guided uploader UI.
+            if _is_upload_data_request(user_input):
+                target_table = _infer_target_table_from_text(user_input)
+                _append_assistant_message({
+                    'role': 'assistant',
+                    'content': (
+                        "Upload mode enabled. Choose a local CSV/Excel file and target table below, "
+                        "then click **Load file to table**."
+                    ),
+                    'timestamp': datetime.now().isoformat(),
+                    'show_upload_panel': True,
+                    'upload_target_table': target_table or ''
+                })
+                st.rerun()
             
             # Get AI response
             try:
@@ -1173,6 +1389,9 @@ def chatbot_tab():
                 except Exception as e:
                     # Fallback if expander fails
                     st.chat_message("assistant").write(display_content)
+
+                if msg.get("show_upload_panel", False):
+                    _render_chatbot_upload_panel(msg, idx, unique_key_base)
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
@@ -1188,6 +1407,7 @@ def chatbot_tab():
                             continue
                         prev_assistant_sql = current_sql_signature
                         is_safe_select = _is_safe_select_query(sql_query)
+                        is_copy_local = _is_copy_from_local_file_sql(sql_query)
                         is_last_message = (idx == total_messages - 1)
                         
                         # Show SQL
@@ -1196,7 +1416,16 @@ def chatbot_tab():
                             _render_sql_status_chips(msg)
                             
                             # For SELECT queries, show that it was auto-executed (results appear below)
-                            if is_safe_select:
+                            if is_copy_local:
+                                st.warning(
+                                    "Server-side `COPY ... FROM '/path/file'` cannot access local files here. "
+                                    "Use the upload panel to load your CSV/Excel into the table."
+                                )
+                                if st.button("Open Upload Panel", key=f"open_upload_{unique_key_base}"):
+                                    st.session_state.chat_history[idx]["show_upload_panel"] = True
+                                    st.session_state.chat_history[idx]["upload_target_table"] = _extract_copy_target_table(sql_query) or ""
+                                    st.rerun()
+                            elif is_safe_select:
                                 # Deterministic auto-run for SELECT: attempt once for any unexecuted SQL message.
                                 if not msg.get('auto_executed', False):
                                     retry_key = f"chatbot_auto_retry_{unique_key_base}"
@@ -1930,6 +2159,21 @@ def chatbot_tab():
             
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
+
+            # If user asks to upload/import a local file, show guided upload UI.
+            if _is_upload_data_request(user_input):
+                target_table = _infer_target_table_from_text(user_input)
+                _append_assistant_message({
+                    'role': 'assistant',
+                    'content': (
+                        "Upload mode enabled. Choose a local CSV/Excel file and target table below, "
+                        "then click **Load file to table**."
+                    ),
+                    'timestamp': datetime.now().isoformat(),
+                    'show_upload_panel': True,
+                    'upload_target_table': target_table or ''
+                })
+                st.rerun()
             
             # Check if this is an INSERT/UPDATE/DELETE request - if so, use SchemaDataAgent first
             user_upper = user_input.upper()
