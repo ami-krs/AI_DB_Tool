@@ -411,6 +411,7 @@ def _render_sql_status_chips(msg: Dict[str, Any]) -> None:
     """Render compact SQL status chips near generated SQL."""
     auto_executed = bool(msg.get('auto_executed', False))
     rows = _get_message_result_row_count(msg)
+    result_source = "Auto" if auto_executed else "Manual"
 
     auto_chip = (
         "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
@@ -426,7 +427,12 @@ def _render_sql_status_chips(msg: Dict[str, Any]) -> None:
         "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
         "background:#fff7ed;color:#9a3412;font-size:12px;font-weight:600;'>Rows: 0</span>"
     )
-    st.markdown(f"{auto_chip}&nbsp;&nbsp;{rows_chip}", unsafe_allow_html=True)
+    source_chip = (
+        "<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
+        "background:#f3f4f6;color:#374151;font-size:12px;font-weight:600;'>"
+        f"Result source: {result_source}</span>"
+    )
+    st.markdown(f"{auto_chip}&nbsp;&nbsp;{rows_chip}&nbsp;&nbsp;{source_chip}", unsafe_allow_html=True)
 
 
 def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**📋 Query Results**") -> None:
@@ -455,7 +461,13 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
         from utils.helpers import _render_sql_editor_button
         _, sql_active = _render_sql_editor_button(f"snapshot_{block_suffix}")
 
-    st.caption(f"Rows: {len(result_df):,}")
+    row_count = len(result_df)
+    st.caption(f"Rows: {row_count:,}")
+    if row_count == 0:
+        st.info(
+            "No rows returned. Quick checks: remove/relax filters, verify table has data, "
+            "or run a broader query like `SELECT * FROM <table> LIMIT 20;`."
+        )
     try:
         st.dataframe(result_df, use_container_width=True)
     except Exception:
