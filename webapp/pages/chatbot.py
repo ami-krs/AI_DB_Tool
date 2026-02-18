@@ -290,47 +290,48 @@ def _auto_execute_chatbot_select_query(sql_query: str, timestamp: str, unique_su
         return False
 
     try:
-        st.session_state['chatbot_last_auto_executed_query'] = normalized_sql
-        st.session_state['chatbot_auto_executed_timestamp'] = timestamp
-        st.session_state['chatbot_auto_execution_error'] = None
-        st.session_state.pop('chatbot_multi_query_results', None)
-        st.session_state.pop('last_result_df', None)
-        st.session_state.pop('last_result', None)
+        with st.spinner("⚡ Auto-executing SELECT query..."):
+            st.session_state['chatbot_last_auto_executed_query'] = normalized_sql
+            st.session_state['chatbot_auto_executed_timestamp'] = timestamp
+            st.session_state['chatbot_auto_execution_error'] = None
+            st.session_state.pop('chatbot_multi_query_results', None)
+            st.session_state.pop('last_result_df', None)
+            st.session_state.pop('last_result', None)
 
-        # Silent execution path for chatbot auto-run:
-        # Execute without rendering UI here, then render inline per message order.
-        statements = split_sql_statements(normalized_sql)
-        multi_results: List[Dict[str, Any]] = []
-        last_df = None
+            # Silent execution path for chatbot auto-run:
+            # Execute without rendering UI here, then render inline per message order.
+            statements = split_sql_statements(normalized_sql)
+            multi_results: List[Dict[str, Any]] = []
+            last_df = None
 
-        for stmt_idx, stmt in enumerate(statements, 1):
-            stmt_clean = (stmt or "").strip()
-            if not stmt_clean:
-                continue
-            result = execute_single_statement(stmt_clean)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'Unknown query execution error'))
+            for stmt_idx, stmt in enumerate(statements, 1):
+                stmt_clean = (stmt or "").strip()
+                if not stmt_clean:
+                    continue
+                result = execute_single_statement(stmt_clean)
+                if not result.get('success'):
+                    raise Exception(result.get('error', 'Unknown query execution error'))
 
-            if result.get('type') == 'SELECT':
-                df = result.get('dataframe')
-                if df is not None:
-                    last_df = df
-                    multi_results.append({
-                        'query': stmt_clean,
-                        'dataframe': df,
-                        'index': stmt_idx
-                    })
+                if result.get('type') == 'SELECT':
+                    df = result.get('dataframe')
+                    if df is not None:
+                        last_df = df
+                        multi_results.append({
+                            'query': stmt_clean,
+                            'dataframe': df,
+                            'index': stmt_idx
+                        })
 
-        if last_df is not None:
-            st.session_state['last_result_df'] = last_df
-            st.session_state['last_result'] = last_df
-        if multi_results:
-            st.session_state['chatbot_multi_query_results'] = multi_results
+            if last_df is not None:
+                st.session_state['last_result_df'] = last_df
+                st.session_state['last_result'] = last_df
+            if multi_results:
+                st.session_state['chatbot_multi_query_results'] = multi_results
 
-        st.session_state.pop('chatbot_auto_execution_error', None)
-        st.session_state.pop('chatbot_auto_execution_error_trace', None)
-        st.session_state['chatbot_show_results_for_query'] = normalized_sql
-        return True
+            st.session_state.pop('chatbot_auto_execution_error', None)
+            st.session_state.pop('chatbot_auto_execution_error_trace', None)
+            st.session_state['chatbot_show_results_for_query'] = normalized_sql
+            return True
     except Exception as exec_error:
         print(f"DEBUG: Auto-execution failed: {exec_error}")
         import traceback
