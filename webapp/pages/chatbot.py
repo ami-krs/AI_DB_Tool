@@ -421,6 +421,16 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
         except Exception as e:
             st.error(f"Error displaying data explorer: {str(e)}")
 
+    # Visualization rendering for the snapshot visualization icon toggle.
+    viz_button_key = f"viz_btn_viz_icon_snapshot_{block_suffix}"
+    if st.session_state.get(viz_button_key, False):
+        st.markdown("---")
+        try:
+            from utils.helpers import visualize_dataframe
+            visualize_dataframe(result_df, unique_suffix=f"snapshot_{block_suffix}")
+        except Exception as e:
+            st.error(f"Error displaying visualization: {str(e)}")
+
     if sql_active:
         st.markdown("---")
         st.markdown("### 📝 SQL Editor")
