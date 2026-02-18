@@ -257,6 +257,15 @@ def _dedupe_sql_query_text(sql_query: str) -> str:
     return ";\n".join(unique_statements) + ";"
 
 
+def _should_expand_sql(sql_query: str) -> bool:
+    """Expand short SQL by default; collapse long SQL for readability."""
+    if not sql_query:
+        return True
+    sql_text = str(sql_query).strip()
+    line_count = sql_text.count("\n") + 1
+    return len(sql_text) <= 220 and line_count <= 4
+
+
 def _clean_assistant_content_for_sql(content: str, sql_query: str) -> str:
     """Avoid rendering duplicate SQL in assistant explanation area."""
     # If we already extracted SQL separately, keep explanation concise and non-SQL.
@@ -614,7 +623,7 @@ def chatbot_compact():
                 
                 # Show SQL query in expanded form by default
                 if 'sql_query' in msg and msg['sql_query']:
-                    with st.expander("📝 Generated SQL", expanded=True):
+                    with st.expander("📝 Generated SQL", expanded=_should_expand_sql(msg['sql_query'])):
                         st.code(msg['sql_query'], language='sql')
     else:
         if not st.session_state.chatbot:
@@ -1164,7 +1173,7 @@ def chatbot_tab():
                         is_last_message = (idx == total_messages - 1)
                         
                         # Show SQL
-                        with st.expander("📝 Generated SQL", expanded=True):
+                        with st.expander("📝 Generated SQL", expanded=_should_expand_sql(sql_query)):
                             st.code(sql_query, language='sql')
                             _render_sql_status_chips(msg)
                             
