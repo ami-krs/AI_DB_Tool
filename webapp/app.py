@@ -303,6 +303,8 @@ def main():
     # Main content area
     # Header - only show when not on home page or smart email agent page
     if st.session_state.active_section not in ['home', 'smart_email_agent']:
+        # Pull header controls up to reduce blank top space on tool pages.
+        st.markdown("<div style='margin-top:-1.25rem;'></div>", unsafe_allow_html=True)
         # Home icon button at top left
         home_col1, home_col2 = st.columns([1, 20])
         with home_col1:

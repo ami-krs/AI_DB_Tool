@@ -111,13 +111,22 @@ def inject_base_css():
     }
     
     /* Hide Streamlit multipage sidebar nav list (app/chatbot/etc.) */
-    section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+    section[data-testid="stSidebar"] [data-testid="stSidebarNav"],
+    section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"],
+    section[data-testid="stSidebar"] nav[aria-label*="Sidebar" i] {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         overflow: hidden !important;
+    }
+
+    /* Collapse any reserved top space in sidebar containers */
+    section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
     }
 
     /* Remove spacing from sidebar that might affect layout */
@@ -128,7 +137,7 @@ def inject_base_css():
 
     /* Pull custom sidebar content up after hiding default nav */
     section[data-testid="stSidebar"] .block-container {
-        padding-top: 0.35rem !important;
+        padding-top: 0 !important;
         margin-top: 0 !important;
     }
     
