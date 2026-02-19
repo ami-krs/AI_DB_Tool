@@ -109,6 +109,21 @@ def inject_base_css():
         padding-top: 0 !important;
         margin-top: 0 !important;
     }
+
+    /* Extra-aggressive main area top-gap collapse for newer Streamlit DOM variants */
+    div[data-testid="stAppViewBlockContainer"],
+    div[data-testid="stMainBlockContainer"],
+    section[data-testid="stMain"] .block-container {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* Prevent invisible script-markdown containers from reserving top space */
+    section[data-testid="stMain"] .element-container:has(> div[data-testid="stMarkdownContainer"] > script) {
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+    }
     
     /* Hide Streamlit multipage sidebar nav list (app/chatbot/etc.) */
     section[data-testid="stSidebar"] [data-testid="stSidebarNav"],
