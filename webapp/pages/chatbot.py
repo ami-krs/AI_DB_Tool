@@ -683,6 +683,56 @@ def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Di
     if load_df.empty:
         raise ValueError("Uploaded file has no rows to insert.")
 
+    remapped_pk_count = 0
+    remapped_pk_column = ""
+    primary_keys = [pk for pk in (schema.get("primary_keys") or []) if pk]
+    if len(primary_keys) == 1:
+        pk_col = str(primary_keys[0])
+        if pk_col in load_df.columns:
+            numeric_pk = pd.to_numeric(load_df[pk_col], errors="coerce")
+            has_non_numeric_values = bool(
+                numeric_pk.isna().any() and load_df[pk_col].notna().any()
+            )
+            if not has_non_numeric_values:
+                db_type = (st.session_state.get("db_type") or "").lower()
+                pk_ident = _quote_identifier(pk_col, db_type)
+                table_ref = _quote_table_reference(table_name, db_type)
+
+                max_df = db_manager.execute_query(
+                    f"SELECT COALESCE(MAX({pk_ident}), 0) AS max_id FROM {table_ref}"
+                )
+                max_existing_id = int(max_df.iloc[0, 0]) if max_df is not None and len(max_df) else 0
+
+                upload_ids = [int(v) for v in numeric_pk.fillna(0).tolist()]
+                unique_ids = sorted(set(upload_ids))
+                existing_ids: set = set()
+                if unique_ids:
+                    in_clause = ", ".join(str(v) for v in unique_ids)
+                    overlap_df = db_manager.execute_query(
+                        f"SELECT {pk_ident} AS id FROM {table_ref} WHERE {pk_ident} IN ({in_clause})"
+                    )
+                    if overlap_df is not None and len(overlap_df) > 0:
+                        existing_ids = {int(v) for v in overlap_df["id"].tolist() if pd.notna(v)}
+
+                seen_ids = set()
+                next_id = max_existing_id + 1
+                remapped_ids: List[int] = []
+                for original_id in upload_ids:
+                    if original_id in existing_ids or original_id in seen_ids:
+                        while next_id in existing_ids or next_id in seen_ids:
+                            next_id += 1
+                        remapped_ids.append(next_id)
+                        seen_ids.add(next_id)
+                        remapped_pk_count += 1
+                        next_id += 1
+                    else:
+                        remapped_ids.append(original_id)
+                        seen_ids.add(original_id)
+
+                if remapped_pk_count > 0:
+                    load_df[pk_col] = remapped_ids
+                    remapped_pk_column = pk_col
+
     load_df.to_sql(
         table_name,
         con=engine,
@@ -693,7 +743,9 @@ def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Di
     )
     return {
         "inserted_rows": len(load_df),
-        "loaded_columns": ordered_columns
+        "loaded_columns": ordered_columns,
+        "remapped_pk_count": remapped_pk_count,
+        "remapped_pk_column": remapped_pk_column
     }
 
 
@@ -729,6 +781,28 @@ def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base:
         index=default_index,
         key=f"upload_table_{unique_key_base}"
     )
+    try:
+        table_schema = st.session_state.db_manager.get_table_schema(selected_table)
+        template_columns = [
+            col.get("name")
+            for col in (table_schema.get("columns") or [])
+            if col.get("name")
+        ]
+    except Exception:
+        template_columns = []
+
+    if template_columns:
+        template_df = pd.DataFrame(columns=template_columns)
+        st.download_button(
+            "Download template CSV",
+            template_df.to_csv(index=False),
+            file_name=f"{selected_table}_template.csv",
+            mime="text/csv",
+            key=f"download_upload_template_{unique_key_base}",
+            help=f"Download column template for `{selected_table}`"
+        )
+        st.caption(f"Expected columns for `{selected_table}`: {', '.join(template_columns)}")
+
     uploaded_file = st.file_uploader(
         "Choose a file",
         type=["csv", "tsv", "txt", "xlsx", "xls"],
@@ -754,10 +828,17 @@ def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base:
                 load_result = _append_uploaded_dataframe_to_table(preview_df, selected_table)
             inserted_rows = int(load_result.get("inserted_rows", 0))
             loaded_columns = load_result.get("loaded_columns", [])
+            remapped_pk_count = int(load_result.get("remapped_pk_count", 0))
+            remapped_pk_column = str(load_result.get("remapped_pk_column", "") or "")
             st.success(
                 f"Loaded {inserted_rows:,} rows into `{selected_table}` "
                 f"using {len(loaded_columns)} matched columns."
             )
+            if remapped_pk_count > 0 and remapped_pk_column:
+                st.info(
+                    f"Auto-adjusted {remapped_pk_count:,} duplicate `{remapped_pk_column}` value(s) "
+                    "to the next available IDs."
+                )
             st.session_state.chat_history[idx]["upload_completed"] = True
             st.session_state.chat_history[idx]["show_upload_panel"] = False
         except Exception as load_error:
