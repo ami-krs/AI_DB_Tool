@@ -685,6 +685,8 @@ def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Di
 
     remapped_pk_count = 0
     remapped_pk_column = ""
+    skipped_existing_pk_count = 0
+    skipped_file_duplicate_pk_count = 0
     primary_keys = [pk for pk in (schema.get("primary_keys") or []) if pk]
     if len(primary_keys) == 1:
         pk_col = str(primary_keys[0])
@@ -732,6 +734,53 @@ def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Di
                 if remapped_pk_count > 0:
                     load_df[pk_col] = remapped_ids
                     remapped_pk_column = pk_col
+            else:
+                # For non-numeric single primary keys, skip rows that would conflict.
+                db_type = (st.session_state.get("db_type") or "").lower()
+                pk_ident = _quote_identifier(pk_col, db_type)
+                table_ref = _quote_table_reference(table_name, db_type)
+
+                def _sql_literal(value: Any) -> str:
+                    if pd.isna(value):
+                        return "NULL"
+                    text_value = str(value).replace("'", "''")
+                    return f"'{text_value}'"
+
+                pk_values = [v for v in load_df[pk_col].tolist() if not pd.isna(v)]
+                unique_pk_values = list(dict.fromkeys(pk_values))
+                existing_pk_values: set = set()
+
+                chunk_size = 500
+                for start in range(0, len(unique_pk_values), chunk_size):
+                    chunk = unique_pk_values[start:start + chunk_size]
+                    if not chunk:
+                        continue
+                    in_clause = ", ".join(_sql_literal(v) for v in chunk)
+                    overlap_df = db_manager.execute_query(
+                        f"SELECT {pk_ident} AS id FROM {table_ref} WHERE {pk_ident} IN ({in_clause})"
+                    )
+                    if overlap_df is not None and len(overlap_df) > 0:
+                        for val in overlap_df["id"].tolist():
+                            if pd.isna(val):
+                                continue
+                            existing_pk_values.add(str(val))
+
+                pk_as_str = load_df[pk_col].astype(str)
+                existing_mask = pk_as_str.isin(existing_pk_values)
+                duplicate_mask = pk_as_str.duplicated(keep="first")
+                keep_mask = ~(existing_mask | duplicate_mask)
+
+                skipped_existing_pk_count = int(existing_mask.sum())
+                skipped_file_duplicate_pk_count = int((~existing_mask & duplicate_mask).sum())
+                load_df = load_df.loc[keep_mask].copy()
+
+    if load_df.empty:
+        if skipped_existing_pk_count > 0 or skipped_file_duplicate_pk_count > 0:
+            raise ValueError(
+                "No rows inserted: all uploaded rows had duplicate primary key values "
+                "that already exist (or were duplicated in the uploaded file)."
+            )
+        raise ValueError("Uploaded file has no rows to insert.")
 
     load_df.to_sql(
         table_name,
@@ -745,7 +794,9 @@ def _append_uploaded_dataframe_to_table(df: pd.DataFrame, table_name: str) -> Di
         "inserted_rows": len(load_df),
         "loaded_columns": ordered_columns,
         "remapped_pk_count": remapped_pk_count,
-        "remapped_pk_column": remapped_pk_column
+        "remapped_pk_column": remapped_pk_column,
+        "skipped_existing_pk_count": skipped_existing_pk_count,
+        "skipped_file_duplicate_pk_count": skipped_file_duplicate_pk_count
     }
 
 
@@ -830,6 +881,8 @@ def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base:
             loaded_columns = load_result.get("loaded_columns", [])
             remapped_pk_count = int(load_result.get("remapped_pk_count", 0))
             remapped_pk_column = str(load_result.get("remapped_pk_column", "") or "")
+            skipped_existing_pk_count = int(load_result.get("skipped_existing_pk_count", 0))
+            skipped_file_duplicate_pk_count = int(load_result.get("skipped_file_duplicate_pk_count", 0))
             st.success(
                 f"Loaded {inserted_rows:,} rows into `{selected_table}` "
                 f"using {len(loaded_columns)} matched columns."
@@ -838,6 +891,11 @@ def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base:
                 st.info(
                     f"Auto-adjusted {remapped_pk_count:,} duplicate `{remapped_pk_column}` value(s) "
                     "to the next available IDs."
+                )
+            if skipped_existing_pk_count > 0 or skipped_file_duplicate_pk_count > 0:
+                st.warning(
+                    f"Skipped {skipped_existing_pk_count:,} row(s) with PK values already in the table "
+                    f"and {skipped_file_duplicate_pk_count:,} duplicate PK row(s) inside the uploaded file."
                 )
             st.session_state.chat_history[idx]["upload_completed"] = True
             st.session_state.chat_history[idx]["show_upload_panel"] = False
