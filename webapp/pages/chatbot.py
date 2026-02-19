@@ -167,6 +167,34 @@ def _leading_sql_keyword(sql_text: str) -> str:
     return match.group(1) if match else ""
 
 
+def _looks_like_sql(sql_text: str) -> bool:
+    """Heuristic guard to avoid treating plain English as SQL."""
+    if not sql_text or not str(sql_text).strip():
+        return False
+
+    text = str(sql_text).strip()
+    upper_text = text.upper()
+    first_keyword = _leading_sql_keyword(text)
+
+    if first_keyword in ("SELECT", "WITH"):
+        # WITH should usually drive a SELECT in this app context.
+        if first_keyword == "WITH" and "SELECT" not in upper_text:
+            return False
+        # Basic signal for query shape. Allow SELECT 1 style probes.
+        return (" FROM " in f" {upper_text} ") or re.search(r"^\s*SELECT\s+\d+\s*;?\s*$", text, flags=re.IGNORECASE) is not None
+
+    if first_keyword == "INSERT":
+        return " INTO " in f" {upper_text} "
+    if first_keyword == "UPDATE":
+        return " SET " in f" {upper_text} "
+    if first_keyword == "DELETE":
+        return " FROM " in f" {upper_text} "
+    if first_keyword in ("CREATE", "DROP", "ALTER", "TRUNCATE"):
+        return True
+
+    return False
+
+
 def _is_safe_select_query(sql_query: str) -> bool:
     """Return True when the SQL can be safely auto-executed."""
     normalized_sql = _normalize_sql_for_execution(sql_query)
@@ -186,7 +214,8 @@ def _extract_sql_from_response_payload(response: Dict[str, Any]) -> str:
     """Extract SQL from chatbot response dict with fallbacks."""
     sql_query = response.get('sql_query', response.get('sql', '')) if isinstance(response, dict) else ''
     if sql_query and str(sql_query).strip():
-        return str(sql_query).strip()
+        candidate = str(sql_query).strip()
+        return candidate if _looks_like_sql(candidate) else ""
 
     response_text = response.get('response', '') if isinstance(response, dict) else ''
     if not response_text:
@@ -195,14 +224,17 @@ def _extract_sql_from_response_payload(response: Dict[str, Any]) -> str:
     # Prefer fenced sql blocks when present.
     sql_block_match = re.search(r"```sql\s*(.*?)```", response_text, flags=re.IGNORECASE | re.DOTALL)
     if sql_block_match:
-        return sql_block_match.group(1).strip()
+        candidate = sql_block_match.group(1).strip()
+        return candidate if _looks_like_sql(candidate) else ""
 
     # Fallback to any fenced block.
     any_block_match = re.search(r"```\s*(.*?)```", response_text, flags=re.DOTALL)
     if any_block_match:
-        return any_block_match.group(1).strip()
+        candidate = any_block_match.group(1).strip()
+        return candidate if _looks_like_sql(candidate) else ""
 
-    return response_text.strip()
+    candidate = response_text.strip()
+    return candidate if _looks_like_sql(candidate) else ""
 
 
 def _normalize_sql_for_execution(sql_query: str) -> str:
@@ -227,7 +259,7 @@ def _normalize_sql_for_execution(sql_query: str) -> str:
     if keyword_match and keyword_match.start() > 0:
         sql_text = sql_text[keyword_match.start():].strip()
 
-    return sql_text
+    return sql_text if _looks_like_sql(sql_text) else ''
 
 
 def _dedupe_sql_query_text(sql_query: str) -> str:
