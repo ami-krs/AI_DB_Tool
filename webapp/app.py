@@ -314,7 +314,7 @@ def main():
                 st.rerun()
         with home_col2:
             st.markdown(
-                "<div style='font-size: 2rem; font-weight: 600; line-height: 1.2; margin-top: 0.1rem;'>"
+                "<div style='font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin-top: 0;'>"
                 "🤖 AI Database Tool"
                 "</div>",
                 unsafe_allow_html=True
