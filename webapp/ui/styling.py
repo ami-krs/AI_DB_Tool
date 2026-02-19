@@ -110,10 +110,26 @@ def inject_base_css():
         margin-top: 0 !important;
     }
     
+    /* Hide Streamlit multipage sidebar nav list (app/chatbot/etc.) */
+    section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
     /* Remove spacing from sidebar that might affect layout */
     section[data-testid="stSidebar"] {
-        padding-top: 0.5rem !important;
+        padding-top: 0 !important;
         padding-bottom: 0.5rem !important;
+    }
+
+    /* Pull custom sidebar content up after hiding default nav */
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 0.35rem !important;
+        margin-top: 0 !important;
     }
     
     /* Hide sidebar on home page */
