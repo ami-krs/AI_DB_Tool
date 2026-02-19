@@ -49,6 +49,8 @@ def initialize_session_state():
     # Determine active section (used by navigation and home/dashboard logic)
     if "active_section" not in st.session_state:
         st.session_state.active_section = _get_active_section()
+    current_section = st.session_state.get("active_section", "home")
+    should_defer_heavy_init = (current_section == "home")
 
     # Core database manager
     if 'db_manager' not in st.session_state:
@@ -62,9 +64,9 @@ def initialize_session_state():
     if 'db_type' not in st.session_state:
         st.session_state.db_type = None
 
-    # --- Eager DB auto-connect & schema fetch (original behaviour) ---
-    # Auto-load saved database connection on startup (if not already connected)
-    if not st.session_state.connected:
+    # --- Startup optimization ---
+    # On Home, defer expensive DB auto-connect/schema/AI setup until user enters a tool page.
+    if not st.session_state.connected and not should_defer_heavy_init:
         saved_config = load_db_config()
         if saved_config:
             try:
@@ -120,7 +122,7 @@ def initialize_session_state():
                 pass
 
     # Ensure schema_info exists if connected (and may have been created manually)
-    if st.session_state.connected and "schema_info" not in st.session_state:
+    if st.session_state.connected and "schema_info" not in st.session_state and not should_defer_heavy_init:
         try:
             tables = st.session_state.db_manager.get_tables()
             try:
@@ -153,8 +155,12 @@ def initialize_session_state():
                 "total_tables": 0,
             }
 
-    # Initialize chatbot and AI query builder eagerly once DB is connected
-    if st.session_state.connected and (st.session_state.chatbot is None or st.session_state.query_builder is None):
+    # Initialize chatbot and AI query builder once DB is connected (defer on Home for faster load)
+    if (
+        st.session_state.connected and
+        (st.session_state.chatbot is None or st.session_state.query_builder is None) and
+        not should_defer_heavy_init
+    ):
         try:
             openai_key = get_api_key("OPENAI_API_KEY")
             anthropic_key = get_api_key("ANTHROPIC_API_KEY")

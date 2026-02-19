@@ -87,9 +87,12 @@ except Exception as e:
 
 def main():
     """Main application"""
-    
-    # Add autocomplete attributes to form fields via JavaScript
-    st.markdown("""
+    current_section = st.session_state.get('active_section', 'home')
+
+    # Home should render as quickly as possible; defer heavy DOM observers/scripts.
+    if current_section != 'home':
+        # Add autocomplete attributes to form fields via JavaScript
+        st.markdown("""
     <script>
     (function() {
         function setAutocompleteAttributes() {
@@ -132,9 +135,9 @@ def main():
     })();
     </script>
     """, unsafe_allow_html=True)
-    
-    # Add id and name attributes to form fields
-    st.markdown("""
+        
+        # Add id and name attributes to form fields
+        st.markdown("""
     <script>
     (function() {
         function setFormFieldAttributes() {
@@ -172,9 +175,9 @@ def main():
     })();
     </script>
     """, unsafe_allow_html=True)
-    
-    # Add navigation dropdown JavaScript
-    st.markdown("""
+        
+        # Add navigation dropdown JavaScript
+        st.markdown("""
     <script>
     (function() {
         console.log('Navigation script loading...');
