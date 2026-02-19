@@ -178,17 +178,20 @@ def _looks_like_sql(sql_text: str) -> bool:
 
     if first_keyword in ("SELECT", "WITH"):
         # WITH should usually drive a SELECT in this app context.
-        if first_keyword == "WITH" and "SELECT" not in upper_text:
+        if first_keyword == "WITH" and re.search(r"\bSELECT\b", upper_text) is None:
             return False
         # Basic signal for query shape. Allow SELECT 1 style probes.
-        return (" FROM " in f" {upper_text} ") or re.search(r"^\s*SELECT\s+\d+\s*;?\s*$", text, flags=re.IGNORECASE) is not None
+        return (
+            re.search(r"\bFROM\b", upper_text) is not None
+            or re.search(r"^\s*SELECT\s+\d+\s*;?\s*$", text, flags=re.IGNORECASE) is not None
+        )
 
     if first_keyword == "INSERT":
-        return " INTO " in f" {upper_text} "
+        return re.search(r"\bINTO\b", upper_text) is not None
     if first_keyword == "UPDATE":
-        return " SET " in f" {upper_text} "
+        return re.search(r"\bSET\b", upper_text) is not None
     if first_keyword == "DELETE":
-        return " FROM " in f" {upper_text} "
+        return re.search(r"\bFROM\b", upper_text) is not None
     if first_keyword in ("CREATE", "DROP", "ALTER", "TRUNCATE"):
         return True
 
