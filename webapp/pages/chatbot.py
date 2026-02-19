@@ -1176,7 +1176,12 @@ def chatbot_tab():
                     agent_sql = potential_sql
                     break
     
-    st.header("💬 AI SQL Assistant")
+    st.markdown(
+        "<div style='font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin: 0;'>"
+        "💬 AI SQL Assistant"
+        "</div>",
+        unsafe_allow_html=True
+    )
     st.markdown("Ask questions in natural language and get SQL queries generated automatically")
 
     # Debug section for agent SQL execution (DISABLED for performance)
