@@ -252,6 +252,7 @@ def _render_data_explorer_button(unique_suffix, df):
         st.session_state[explorer_state_key] = False
     
     current_explorer_state = st.session_state.get(button_key, False)
+    effective_explorer_state = current_explorer_state
     
     # Button click toggles the state
     # Use width='stretch' to match download button behavior (new Streamlit API)
@@ -268,6 +269,10 @@ def _render_data_explorer_button(unique_suffix, df):
         new_state = not current_explorer_state
         st.session_state[button_key] = new_state
         st.session_state[explorer_state_key] = new_state
+        effective_explorer_state = new_state
+    else:
+        # Keep the state aligned with session_state during regular reruns.
+        effective_explorer_state = st.session_state.get(button_key, False)
     
     # Inject CSS only once per session (shared with viz button)
     css_key = "explorer_button_css_injected"
@@ -373,7 +378,7 @@ def _render_data_explorer_button(unique_suffix, df):
         st.session_state[css_key] = True
     
     # Return the state key for checking if explorer should be displayed
-    return button_key, current_explorer_state
+    return button_key, effective_explorer_state
 
 
 def _render_sql_editor_button(unique_suffix):
