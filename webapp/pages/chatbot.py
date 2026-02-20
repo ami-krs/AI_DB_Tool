@@ -153,6 +153,56 @@ def _build_default_question_sql(question: str) -> str:
     return ""
 
 
+def _ensure_chatbot_schema_context(with_spinner: bool = False) -> bool:
+    """Ensure schema_info exists and chatbot has current schema context."""
+    if not st.session_state.get("connected") or st.session_state.get("db_manager") is None:
+        return False
+
+    schema_info = st.session_state.get("schema_info") or {}
+    needs_schema_fetch = not schema_info.get("tables")
+
+    def _fetch_schema() -> Dict[str, Any]:
+        db_manager = st.session_state.get("db_manager")
+        db_type = st.session_state.get("db_type", "unknown")
+        tables = db_manager.get_tables() or []
+        full_table_schemas: List[Dict[str, Any]] = []
+        for table_name in tables:
+            try:
+                table_schema = db_manager.get_table_schema(table_name)
+                if table_schema:
+                    full_table_schemas.append(table_schema)
+                else:
+                    full_table_schemas.append({"table_name": table_name, "columns": []})
+            except Exception:
+                full_table_schemas.append({"table_name": table_name, "columns": []})
+        return {
+            "tables": full_table_schemas,
+            "db_type": db_type,
+            "total_tables": len(tables),
+            "database_name": db_manager.config.database if db_manager and db_manager.config else "unknown",
+        }
+
+    if needs_schema_fetch:
+        try:
+            if with_spinner:
+                with st.spinner("📊 Loading database schema..."):
+                    schema_info = _fetch_schema()
+            else:
+                schema_info = _fetch_schema()
+            st.session_state.schema_info = schema_info
+        except Exception:
+            return False
+
+    chatbot = st.session_state.get("chatbot")
+    if chatbot and schema_info.get("tables"):
+        try:
+            chatbot.set_schema_context(schema_info)
+        except Exception:
+            return False
+
+    return bool(schema_info.get("tables"))
+
+
 def _leading_sql_keyword(sql_text: str) -> str:
     """Return the first SQL keyword after skipping comments/whitespace."""
     if not sql_text:
@@ -1097,6 +1147,10 @@ def chatbot_compact():
     </script>
     """, unsafe_allow_html=True)
     
+    # Ensure schema context is ready in compact mode as well.
+    if st.session_state.get("connected") and st.session_state.get("chatbot"):
+        _ensure_chatbot_schema_context(with_spinner=False)
+
     # Chat input
     user_input = st.chat_input("Ask about your database...")
     
@@ -1108,6 +1162,9 @@ def chatbot_compact():
             print(f"DEBUG: Chatbot is None (chatbot_compact), showing error message")
             st.error("❌ AI Chatbot is not available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to enable AI features.")
         else:
+            if not _ensure_chatbot_schema_context(with_spinner=True):
+                st.error("❌ Database schema information is not available yet. Please reconnect or try again.")
+                return
             # Add user message to history
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
 
@@ -2232,53 +2289,9 @@ def chatbot_tab():
     </script>
     """, unsafe_allow_html=True)
     
-    # Ensure schema is fetched when chatbot page loads (if connected but schema is empty)
-    if st.session_state.connected and st.session_state.db_manager:
-        schema_info = st.session_state.get('schema_info')
-        # Check if schema_info is missing or empty (just placeholder)
-        needs_schema_fetch = (
-            not schema_info or 
-            not schema_info.get('tables') or 
-            len(schema_info.get('tables', [])) == 0
-        )
-        
-        if needs_schema_fetch:
-            try:
-                with st.spinner("📊 Loading database schema..."):
-                    tables = st.session_state.db_manager.get_tables()
-                    if tables:
-                        # Fetch full schema info with column details
-                        schema_info = st.session_state.db_manager.get_database_info()
-                        if schema_info:
-                            schema_info['tables'] = schema_info.get('tables', [])
-                            schema_info['total_tables'] = len(schema_info.get('tables', []))
-                        else:
-                            # Fallback: build schema_info from individual table schemas
-                            full_table_schemas = []
-                            for table_name in tables:
-                                try:
-                                    table_schema = st.session_state.db_manager.get_table_schema(table_name)
-                                    if table_schema:
-                                        full_table_schemas.append(table_schema)
-                                except Exception as e:
-                                    full_table_schemas.append({'table_name': table_name, 'columns': []})
-                            
-                            schema_info = {
-                                'tables': full_table_schemas,
-                                'db_type': st.session_state.get('db_type', 'unknown'),
-                                'total_tables': len(tables) if tables else 0,
-                                'database_name': st.session_state.db_manager.config.database if st.session_state.db_manager.config else 'unknown'
-                            }
-                        
-                        st.session_state.schema_info = schema_info
-                        # Update chatbot schema context
-                        if st.session_state.chatbot:
-                            st.session_state.chatbot.set_schema_context(schema_info)
-                        print(f"DEBUG: Fetched schema_info on chatbot page load - {len(schema_info.get('tables', []))} tables")
-            except Exception as e:
-                print(f"DEBUG: Could not fetch schema_info on chatbot page load: {e}")
-                import traceback
-                traceback.print_exc()
+    # Ensure schema context is refreshed when chatbot page loads.
+    if st.session_state.get("connected") and st.session_state.get("chatbot"):
+        _ensure_chatbot_schema_context(with_spinner=False)
     
     # Chat input (outside scrollable container, stays at bottom)
     user_input = st.chat_input("Ask me anything about your database...")

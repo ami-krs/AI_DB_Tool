@@ -153,10 +153,14 @@ def handle_connection(db_type, host, port, database, username, password):
                     st.session_state.chatbot = SQLChatbot(api_key=api_key, provider=provider)
                     st.session_state.query_builder = AIQueryBuilder(api_key=api_key, provider=provider)
                     
-                    if (st.session_state.chatbot and 
-                        hasattr(st.session_state.chatbot, 'client') and
-                        st.session_state.chatbot.client is not None):
-                        st.session_state.chatbot.set_schema_context(schema_info)
+                    if (
+                        st.session_state.chatbot
+                        and hasattr(st.session_state.chatbot, 'client')
+                        and st.session_state.chatbot.client is not None
+                    ):
+                        latest_schema = st.session_state.get("schema_info", {})
+                        if latest_schema and latest_schema.get("tables"):
+                            st.session_state.chatbot.set_schema_context(latest_schema)
             except Exception as e:
                 st.session_state.chatbot = None
                 st.session_state.query_builder = None
