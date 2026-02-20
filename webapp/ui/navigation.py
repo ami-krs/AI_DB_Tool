@@ -9,6 +9,62 @@ from ai_db_tool.connectors import DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 
 
+def _build_connection_signature(config: DatabaseConfig) -> str:
+    """Build a stable signature for the active database connection target."""
+    return "|".join([
+        str(config.db_type or ""),
+        str(config.host or ""),
+        str(config.port or ""),
+        str(config.database or ""),
+        str(config.username or ""),
+    ])
+
+
+def _reset_state_for_connection_switch() -> None:
+    """Clear chat/result UI state so a new DB starts with a clean context."""
+    # Explicit keys that should not carry over across database targets.
+    keys_to_clear = [
+        "chat_history",
+        "query_history",
+        "schema_info",
+        "last_result_df",
+        "last_result",
+        "chatbot_multi_query_results",
+        "chatbot_last_auto_executed_query",
+        "chatbot_show_results_for_query",
+        "chatbot_auto_execution_error",
+        "chatbot_auto_execution_error_trace",
+        "agent_sql_to_run",
+        "agent_sql_source",
+        "agent_sql_timestamp",
+        "agent_sql_execution_result",
+        "chatbot_debug_forced",
+        "chatbot_debug_last_context",
+        "current_page",
+    ]
+    for key in keys_to_clear:
+        st.session_state.pop(key, None)
+
+    # Clear dynamic toolbar toggle keys from prior result blocks.
+    dynamic_prefixes = (
+        "viz_btn_",
+        "viz_active_",
+        "viz_debug_",
+        "explorer_btn_",
+        "explorer_active_",
+        "sql_btn_",
+        "sql_active_",
+        "sql_editor_",
+        "chatbot_auto_retry_",
+    )
+    for key in list(st.session_state.keys()):
+        if key.startswith(dynamic_prefixes):
+            st.session_state.pop(key, None)
+
+    # Reset UI flow to a stable starting point for new connection.
+    st.session_state.active_section = "home"
+
+
 def handle_connection(db_type, host, port, database, username, password):
     """Handle database connection logic"""
     # Warn if using /tmp/ for SQLite (will be wiped on restart)
@@ -67,12 +123,19 @@ def handle_connection(db_type, host, port, database, username, password):
         
     try:
         if st.session_state.db_manager.connect(config):
+            new_signature = _build_connection_signature(config)
+            previous_signature = st.session_state.get("active_connection_signature")
+            switched_target = bool(previous_signature) and previous_signature != new_signature
+            if switched_target:
+                _reset_state_for_connection_switch()
+
             # Save connection config for persistence
             save_db_config(config)
             
             st.success("✅ Connected successfully! Connection saved for next session.")
             st.session_state.connected = True
             st.session_state.db_type = config.db_type
+            st.session_state.active_connection_signature = new_signature
             
             # Get table names directly first (more reliable)
             tables = st.session_state.db_manager.get_tables()
