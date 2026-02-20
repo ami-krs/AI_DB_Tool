@@ -403,6 +403,7 @@ def _render_sql_editor_button(unique_suffix):
         st.session_state[sql_state_key] = False
     
     current_sql_state = st.session_state.get(button_key, False)
+    effective_sql_state = current_sql_state
     
     # Button click toggles the state
     # Use width='stretch' to match download button behavior (new Streamlit API)
@@ -419,6 +420,10 @@ def _render_sql_editor_button(unique_suffix):
         new_state = not current_sql_state
         st.session_state[button_key] = new_state
         st.session_state[sql_state_key] = new_state
+        effective_sql_state = new_state
+    else:
+        # Keep the returned state aligned with the persisted button state.
+        effective_sql_state = st.session_state.get(button_key, False)
     
     # Inject CSS only once per session (shared with other icon buttons)
     css_key = "sql_editor_button_css_injected"
@@ -523,7 +528,7 @@ def _render_sql_editor_button(unique_suffix):
         """, unsafe_allow_html=True)
         st.session_state[css_key] = True
     
-    return button_key, st.session_state.get(sql_state_key, False)
+    return button_key, effective_sql_state
 
 
 def display_paginated_dataframe(df, unique_suffix=None):
