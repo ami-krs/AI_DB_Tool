@@ -711,7 +711,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 sql_query_editor = render_sql_editor(
                     key=f"sql_editor_result_{sql_suffix}",
                     height=200,
-                    placeholder="Enter SQL query here..."
+                    placeholder="Enter SQL query here...",
+                    lightweight=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
                     if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
@@ -1035,7 +1036,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             sql_query_editor = render_sql_editor(
                 key=f"sql_editor_last_{sql_suffix}",
                 height=200,
-                placeholder="Enter SQL query here..."
+                placeholder="Enter SQL query here...",
+                lightweight=True
             )
             if sql_query_editor and sql_query_editor.strip():
                 if st.button("Execute SQL", key=f"execute_sql_last_{sql_suffix}"):

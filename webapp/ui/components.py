@@ -438,7 +438,12 @@ def render_connection_setting():
 
 
 
-def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * FROM table_name LIMIT 10;"):
+def render_sql_editor(
+    key: str,
+    height: int = 250,
+    placeholder: str = "SELECT * FROM table_name LIMIT 10;",
+    lightweight: bool = False,
+):
     """
     Render SQL editor (Monaco, CodeMirror, or regular text area)
     
@@ -451,11 +456,24 @@ def render_sql_editor(key: str, height: int = 250, placeholder: str = "SELECT * 
     placeholder : str
         Placeholder text
     
+    lightweight : bool
+        If True, render a fast text-area editor without schema/autocomplete loading.
+
     Returns:
     --------
     str
         Current SQL query value
     """
+    # Fast path for inline/toggle editors to avoid heavy schema fetch and editor init.
+    if lightweight:
+        return st.text_area(
+            "Enter SQL Query",
+            height=height,
+            placeholder=placeholder,
+            key=key,
+            help="💡 Use sidebar to insert table names"
+        )
+
     # Get current query value
     current_query = st.session_state.get('sql_editor', '')
     
