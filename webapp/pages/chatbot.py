@@ -1444,7 +1444,7 @@ def chatbot_tab():
         cols = st.columns(3)
         for idx, question in enumerate(example_questions):
             with cols[idx]:
-                if st.button(f"❓ {question}", key=f"example_{idx}", use_container_width=True):
+                if st.button(question, key=f"example_{idx}", use_container_width=True):
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
                     try:
