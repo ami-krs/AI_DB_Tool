@@ -591,8 +591,7 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
             height=200,
             placeholder="Enter SQL query here...",
             lightweight=True,
-            prefer_smart=True,
-            minimal_schema=True
+            guided_sql_assist=True
         )
         if sql_query_editor and sql_query_editor.strip():
             if st.button("Execute SQL", key=f"execute_sql_snapshot_{block_suffix}"):
@@ -1851,8 +1850,7 @@ def chatbot_tab():
                                                 height=200,
                                                 placeholder="Enter SQL query here...",
                                                 lightweight=True,
-                                                prefer_smart=True,
-                                                minimal_schema=True
+                                                guided_sql_assist=True
                                             )
                                             if sql_query_editor and sql_query_editor.strip():
                                                 if st.button("Execute SQL", key=f"execute_sql_chatbot_multi_{result_idx}_{sql_suffix}"):
@@ -1930,8 +1928,7 @@ def chatbot_tab():
                                             height=200,
                                             placeholder="Enter SQL query here...",
                                             lightweight=True,
-                                            prefer_smart=True,
-                                            minimal_schema=True
+                                            guided_sql_assist=True
                                         )
                                         if sql_query_editor and sql_query_editor.strip():
                                             if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
@@ -2095,8 +2092,7 @@ def chatbot_tab():
                         height=200,
                         placeholder="Enter SQL query here...",
                         lightweight=True,
-                        prefer_smart=True,
-                        minimal_schema=True
+                        guided_sql_assist=True
                     )
                     if sql_query_editor and sql_query_editor.strip():
                         if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_multi_{result_idx}_{sql_suffix}"):
@@ -2172,8 +2168,7 @@ def chatbot_tab():
                     height=200,
                     placeholder="Enter SQL query here...",
                     lightweight=True,
-                    prefer_smart=True,
-                    minimal_schema=True
+                    guided_sql_assist=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
                     if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}"):

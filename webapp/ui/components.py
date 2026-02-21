@@ -446,6 +446,7 @@ def render_sql_editor(
     lightweight: bool = False,
     prefer_smart: bool = False,
     minimal_schema: bool = False,
+    guided_sql_assist: bool = False,
 ):
     """
     Render SQL editor (Monaco, CodeMirror, or regular text area)
@@ -465,21 +466,52 @@ def render_sql_editor(
         If True, prefer Monaco/CodeMirror even when global editor mode is textarea.
     minimal_schema : bool
         If True, only load table names (faster) for smart autocomplete contexts.
+    guided_sql_assist : bool
+        If True, enable non-intrusive SQL hints (e.g., SEL -> SELECT, table picker after SELECT * FROM ).
 
     Returns:
     --------
     str
         Current SQL query value
     """
+    def _replace_last_word(text: str, replacement: str) -> str:
+        return re.sub(r"([A-Za-z_][A-Za-z0-9_]*)\s*$", replacement, text)
+
     # Fast path for inline/toggle editors to avoid heavy schema fetch and editor init.
     if lightweight and not prefer_smart:
-        return st.text_area(
+        query = st.text_area(
             "Enter SQL Query",
             height=height,
             placeholder=placeholder,
             key=key,
             help="💡 Use sidebar to insert table names"
         )
+        if guided_sql_assist:
+            tables = []
+            if st.session_state.connected and st.session_state.db_manager:
+                try:
+                    tables = st.session_state.db_manager.get_tables() or []
+                except Exception:
+                    tables = []
+
+            # Non-intrusive keyword completion hint: user can choose it or keep typing.
+            if re.search(r"(^|\W)SEL$", query.strip(), flags=re.IGNORECASE):
+                if st.button("Use keyword: SELECT", key=f"{key}_assist_select_keyword"):
+                    st.session_state[key] = _replace_last_word(query, "SELECT")
+                    st.rerun()
+
+            # Show table picker when query ends with "SELECT * FROM " (after space).
+            if re.search(r"SELECT\s+\*\s+FROM\s+$", query, flags=re.IGNORECASE) and tables:
+                picked_table = st.selectbox(
+                    "Choose table",
+                    options=[""] + [str(t) for t in tables],
+                    key=f"{key}_smart_table_picker",
+                    help="Press space after FROM, then choose a table."
+                )
+                if picked_table and st.button("Insert table", key=f"{key}_insert_table"):
+                    st.session_state[key] = f"{query}{picked_table}"
+                    st.rerun()
+        return query
 
     # Get current query value
     current_query = st.session_state.get('sql_editor', '')
