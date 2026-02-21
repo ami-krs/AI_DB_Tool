@@ -642,7 +642,7 @@ def render_sql_editor(
     st.session_state[editor_state_key] = query
     if key == "sql_editor":
         st.session_state.sql_editor = query
-    if guided_sql_assist:
+    if guided_sql_assist and (not prefer_smart or effective_editor_mode == 'textarea'):
         _render_guided_assist_controls(query, tables or [])
 
     return query
