@@ -447,6 +447,7 @@ def render_sql_editor(
     prefer_smart: bool = False,
     minimal_schema: bool = False,
     guided_sql_assist: bool = False,
+    local_autocomplete_only: bool = False,
 ):
     """
     Render SQL editor (Monaco, CodeMirror, or regular text area)
@@ -468,6 +469,8 @@ def render_sql_editor(
         If True, only load table names (faster) for smart autocomplete contexts.
     guided_sql_assist : bool
         If True, enable non-intrusive SQL hints (e.g., SEL -> SELECT, table picker after SELECT * FROM ).
+    local_autocomplete_only : bool
+        If True, disable backend autocomplete calls and use local keyword/table hints only.
 
     Returns:
     --------
@@ -585,7 +588,7 @@ def render_sql_editor(
                 height=height,
                 language="sql",
                 theme=theme,
-                api_url=st.session_state.api_server_url,
+                api_url="" if local_autocomplete_only else st.session_state.api_server_url,
                 database_type=st.session_state.db_type,
                 schema_info=schema_info,
                 tables=tables,
@@ -613,7 +616,7 @@ def render_sql_editor(
                 height=height,
                 language="sql",
                 theme=theme,
-                api_url=st.session_state.api_server_url,
+                api_url="" if local_autocomplete_only else st.session_state.api_server_url,
                 database_type=st.session_state.db_type,
                 schema_info=schema_info,
                 tables=tables,

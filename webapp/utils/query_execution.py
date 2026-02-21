@@ -715,7 +715,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     lightweight=True,
                     prefer_smart=True,
                     minimal_schema=True,
-                    guided_sql_assist=True
+                    guided_sql_assist=True,
+                    local_autocomplete_only=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
                     if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
@@ -1043,7 +1044,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 lightweight=True,
                 prefer_smart=True,
                 minimal_schema=True,
-                guided_sql_assist=True
+                guided_sql_assist=True,
+                local_autocomplete_only=True
             )
             if sql_query_editor and sql_query_editor.strip():
                 if st.button("Execute SQL", key=f"execute_sql_last_{sql_suffix}"):
