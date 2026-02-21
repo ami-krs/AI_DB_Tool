@@ -567,6 +567,7 @@ def render_sql_editor(
         "theme": "darcula",
         "autoCloseBrackets": True,
         "lineNumbers": True,
+        "syncOnChange": (not local_autocomplete_only),
         "sql": {
             "tables": table_columns
             or {

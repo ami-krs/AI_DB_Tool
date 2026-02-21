@@ -61,19 +61,19 @@ def sql_editor_compact():
     # Action buttons - Execute and Generate SQL icon-only on left, others on right
     action_col1, action_col2, action_col3, action_col4, action_col5 = st.columns([1, 1, 2, 2, 2])
     with action_col1:
-        if st.button("▶️", type="primary", use_container_width=True, key="run_btn_compact", help="Execute Query"):
+        if st.button("▶️", type="primary", width="stretch", key="run_btn_compact", help="Execute Query"):
             execute_query(query)
     with action_col2:
-        if st.button("🤖", use_container_width=True, help="Generate SQL"):
+        if st.button("🤖", width="stretch", help="Generate SQL"):
             generate_sql_query()
     with action_col3:
-        if st.button("🚀 AI Opt", use_container_width=True):
+        if st.button("🚀 AI Opt", width="stretch"):
             optimize_query(query)
     with action_col4:
-        if st.button("🔧 Fix", use_container_width=True):
+        if st.button("🔧 Fix", width="stretch"):
             debug_query(query)
     with action_col5:
-        if st.button("💾 Save", use_container_width=True):
+        if st.button("💾 Save", width="stretch"):
             save_query_to_history(query)
     
     # Query history
@@ -108,11 +108,11 @@ def sql_editor_tab():
             st.markdown("**📋 Quick Insert:**")
             cols = st.columns(min(6, len(tables) + 1))
             with cols[0]:
-                if st.button("📋 Table List", use_container_width=True):
+                if st.button("📋 Table List", width="stretch"):
                     st.session_state.show_table_list = not st.session_state.get('show_table_list', False)
             for i, table in enumerate(tables[:5], 1):
                 with cols[i % len(cols)]:
-                    if st.button(f"📊 {table}", key=f"insert_{table}", use_container_width=True):
+                    if st.button(f"📊 {table}", key=f"insert_{table}", width="stretch"):
                         # Insert table name at cursor position
                         current_query = st.session_state.get('sql_editor', '')
                         st.session_state.sql_editor = current_query + f" {table} "
@@ -126,7 +126,7 @@ def sql_editor_tab():
             with st.expander("📊 Available Tables", expanded=True):
                 tables = st.session_state.db_manager.get_tables()
                 for i, table in enumerate(tables):
-                    if st.button(f"📋 {table}", key=f"table_btn_{i}", use_container_width=True):
+                    if st.button(f"📋 {table}", key=f"table_btn_{i}", width="stretch"):
                         st.session_state.sql_editor = st.session_state.get('sql_editor', '') + f"{table}"
                         st.session_state.show_table_list = False
                         st.rerun()
@@ -148,28 +148,28 @@ def sql_editor_tab():
         # Compact buttons: Execute Query and Generate SQL on same line, icon-only with hover tooltips
         action_col1, action_col2, action_col3 = st.columns([1, 1, 10])
         with action_col1:
-            if st.button("▶️", type="primary", use_container_width=True, key="run_btn_tab", help="Execute Query"):
+            if st.button("▶️", type="primary", width="stretch", key="run_btn_tab", help="Execute Query"):
                 execute_query(query)
         with action_col2:
-            if st.button("🤖", use_container_width=True, help="Generate SQL"):
+            if st.button("🤖", width="stretch", help="Generate SQL"):
                 generate_sql_query()
         
-        if st.button("🔧 AI Optimize", use_container_width=True):
+        if st.button("🔧 AI Optimize", width="stretch"):
             optimize_query(query)
         
-        if st.button("🐛 AI Debug", use_container_width=True):
+        if st.button("🐛 AI Debug", width="stretch"):
             debug_query(query)
         
-        if st.button("💾 Save to History", use_container_width=True):
+        if st.button("💾 Save to History", width="stretch"):
             save_query_to_history(query)
         
         # Smart suggestions
         if st.session_state.connected:
             st.markdown("---")
             st.markdown("### 💡 Smart Help")
-            if st.button("📋 Show Tables", use_container_width=True):
+            if st.button("📋 Show Tables", width="stretch"):
                 show_table_details()
-            if st.button("❓ Common Queries", use_container_width=True):
+            if st.button("❓ Common Queries", width="stretch"):
                 show_common_queries()
     
     # Query history

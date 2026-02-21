@@ -40,7 +40,7 @@ def visualizations_tab():
         df = st.session_state.last_result_df
         
         st.subheader("Data Preview")
-        st.dataframe(df.head(20), use_container_width=True)
+        st.dataframe(df.head(20), width="stretch")
         
         # Basic visualizations
         if len(df.columns) >= 2:

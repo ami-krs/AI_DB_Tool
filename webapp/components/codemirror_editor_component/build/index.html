@@ -341,6 +341,7 @@
             var value = typeof args.value === 'string' ? args.value : '';
             var height = Number(args.height) || 300;
             var editorConfig = args.config || {};
+            var syncOnChange = editorConfig.syncOnChange !== false;
             var baseLanguage = (editorConfig.language || 'sql').toLowerCase();
             var mode = baseLanguage === 'sql' ? 'text/x-sql' : baseLanguage;
             var theme = editorConfig.theme || (args.theme === 'vs-dark' ? 'material' : 'default');
@@ -390,6 +391,9 @@
               editor.on('change', function (cmInstance, changeObj) {
                 if (changeObj && changeObj.origin === 'setValue') {
                   lastEmittedValues[componentId] = cmInstance.getValue();
+                  return;
+                }
+                if (!syncOnChange) {
                   return;
                 }
                 var newValue = cmInstance.getValue();

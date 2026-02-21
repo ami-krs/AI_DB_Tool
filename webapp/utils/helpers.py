@@ -686,7 +686,7 @@ def display_paginated_dataframe(df, unique_suffix=None):
     """, unsafe_allow_html=True)
     
     # Display dataframe first
-    st.dataframe(paginated_df, hide_index=True, use_container_width=True)
+    st.dataframe(paginated_df, hide_index=True, width="stretch")
     
     # Add visualization toggle checkbox right after dataframe
     button_key = f"viz_btn_{viz_icon_key}"
@@ -833,7 +833,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.bar(agg_df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
             else:
                 fig = px.bar(df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Bar chart requires at least one categorical and one numeric column")
     
@@ -850,7 +850,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             else:
                 sorted_df = df.sort_values(x_col)
             fig = px.line(sorted_df, x=x_col, y=y_col, title=f"{y_col} over {x_col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Line chart requires at least one categorical/numeric and one numeric column")
     
@@ -867,7 +867,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.scatter(df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
             else:
                 fig = px.scatter(df, x=x_col, y=y_col, title=f"{y_col} vs {x_col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Scatter plot requires at least two numeric columns")
     
@@ -878,7 +878,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             bins_key = f"hist_bins_{unique_suffix}"
             bins = st.slider("Number of bins:", 10, 100, 30, key=bins_key)
             fig = px.histogram(df, x=col, nbins=bins, title=f"Distribution of {col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Histogram requires at least one numeric column")
     
@@ -893,7 +893,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.box(df, x=x_col, y=y_col, title=f"Box Plot: {y_col} by {x_col}")
             else:
                 fig = px.box(df, y=y_col, title=f"Box Plot: {y_col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Box plot requires at least one numeric column")
     
@@ -910,7 +910,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.pie(agg_df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
             else:
                 fig = px.pie(df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.warning("Pie chart requires at least one categorical and one numeric column")
 
@@ -938,11 +938,11 @@ def display_data_explorer(df: pd.DataFrame):
         "Non-Null Count": [df[col].notna().sum() for col in df.columns],
         "Null Count": [df[col].isna().sum() for col in df.columns],
     })
-    st.dataframe(col_info, use_container_width=True, hide_index=True)
+    st.dataframe(col_info, width="stretch", hide_index=True)
 
     if len(numeric_cols) > 0:
         st.markdown("**Numeric Column Statistics:**")
-        st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+        st.dataframe(df[numeric_cols].describe(), width="stretch")
 
     st.markdown("**Sample Data:**")
-    st.dataframe(df.head(10), use_container_width=True, hide_index=True)
+    st.dataframe(df.head(10), width="stretch", hide_index=True)

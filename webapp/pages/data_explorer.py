@@ -26,10 +26,10 @@ def data_explorer_compact():
                 # Quick preview
                 preview_query = f"SELECT * FROM {selected_table} LIMIT 100"
                 
-                if st.button("📊 Load Preview", use_container_width=True):
+                if st.button("📊 Load Preview", width="stretch"):
                     try:
                         df = st.session_state.db_manager.execute_query(preview_query)
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, width="stretch")
                         st.session_state.last_result = df
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -57,7 +57,7 @@ def data_explorer_tab():
                 
                 # Display columns
                 col_df = pd.DataFrame(schema['columns'])
-                st.dataframe(col_df, use_container_width=True)
+                st.dataframe(col_df, width="stretch")
                 
                 # Quick query
                 st.subheader("Quick Preview")
@@ -67,11 +67,11 @@ def data_explorer_tab():
                     with st.spinner("Loading data..."):
                         try:
                             df = st.session_state.db_manager.execute_query(preview_query)
-                            st.dataframe(df, use_container_width=True)
+                            st.dataframe(df, width="stretch")
                             
                             # Statistics
                             st.subheader("Statistics")
-                            st.dataframe(df.describe(), use_container_width=True)
+                            st.dataframe(df.describe(), width="stretch")
                         except Exception as e:
                             st.error(f"Error loading data: {e}")
         except Exception as e:

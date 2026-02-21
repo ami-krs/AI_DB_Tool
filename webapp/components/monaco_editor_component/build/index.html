@@ -309,6 +309,7 @@
           var height = Number(args.height) || 300;
           var theme = args.theme || 'vs';
           var language = args.language || 'sql';
+          var syncOnChange = !args.config || args.config.syncOnChange !== false;
           var componentId = args.componentId || 'monaco-editor';
           var root = document.getElementById('root');
           var container = document.getElementById(componentId);
@@ -347,6 +348,9 @@
             lastEmittedValues[componentId] = value;
 
             editor.onDidChangeModelContent(function () {
+              if (!syncOnChange) {
+                return;
+              }
               var newValue = editor.getValue();
               scheduleValue(Streamlit, componentId, newValue, false);
             });

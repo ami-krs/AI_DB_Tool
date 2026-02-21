@@ -558,9 +558,9 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
         st.caption("Scrollable table enabled for long results (toolbar remains above).")
     try:
         if table_height:
-            st.dataframe(result_df, use_container_width=True, height=table_height)
+            st.dataframe(result_df, width="stretch", height=table_height)
         else:
-            st.dataframe(result_df, use_container_width=True)
+            st.dataframe(result_df, width="stretch")
     except Exception:
         st.write(result_df)
 
@@ -961,7 +961,7 @@ def _render_chatbot_upload_panel(msg: Dict[str, Any], idx: int, unique_key_base:
         return
 
     st.caption(f"File preview: {len(preview_df):,} rows, {len(preview_df.columns):,} columns")
-    st.dataframe(preview_df.head(20), use_container_width=True, height=240)
+    st.dataframe(preview_df.head(20), width="stretch", height=240)
 
     if st.button("Load file to table", key=f"upload_submit_{unique_key_base}"):
         try:
@@ -1010,7 +1010,7 @@ def chatbot_compact():
         cols = st.columns(3)
         for idx, (display_text, full_question) in enumerate(example_questions):
             with cols[idx]:
-                if st.button(f"💬 {display_text}", key=f"compact_example_{idx}", use_container_width=True):
+                if st.button(f"💬 {display_text}", key=f"compact_example_{idx}", width="stretch"):
                     # Process the question
                     st.session_state.chat_history.append({'role': 'user', 'content': full_question})
                     default_sql = _build_default_question_sql(full_question)
@@ -1506,7 +1506,7 @@ def chatbot_tab():
         cols = st.columns(3)
         for idx, question in enumerate(example_questions):
             with cols[idx]:
-                if st.button(question, key=f"example_{idx}", use_container_width=True):
+                if st.button(question, key=f"example_{idx}", width="stretch"):
                     # Add the question to chat history and process it
                     st.session_state.chat_history.append({'role': 'user', 'content': question})
                     try:
@@ -1704,7 +1704,7 @@ def chatbot_tab():
                                     st.markdown("---")
                                     st.markdown("**📋 Query Results**")
                                     st.caption(f"Rows: {len(fallback_df):,}")
-                                    st.dataframe(fallback_df, use_container_width=True, hide_index=True)
+                                    st.dataframe(fallback_df, width="stretch", hide_index=True)
                                     st.session_state.chat_history[idx]['auto_result_df'] = fallback_df.copy()
                                     snapshot_rendered = True
                         if snapshot_rendered:
@@ -1967,16 +1967,16 @@ def chatbot_tab():
                                                 'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
                                                 'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
                                             })
-                                            st.dataframe(col_info, use_container_width=True, hide_index=True)
+                                            st.dataframe(col_info, width="stretch", hide_index=True)
                                             
                                             # Show basic statistics for numeric columns
                                             if len(numeric_cols) > 0:
                                                 st.markdown("**Numeric Column Statistics:**")
-                                                st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
+                                                st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), width="stretch")
                                             
                                             # Show sample data
                                             st.markdown("**Sample Data:**")
-                                            st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
+                                            st.dataframe(st.session_state.last_result_df.head(10), width="stretch", hide_index=True)
                                         except Exception as e:
                                             st.error(f"Error displaying data explorer: {str(e)}")
                                     
@@ -2213,16 +2213,16 @@ def chatbot_tab():
                         'Non-Null Count': [st.session_state.last_result_df[col].notna().sum() for col in st.session_state.last_result_df.columns],
                         'Null Count': [st.session_state.last_result_df[col].isna().sum() for col in st.session_state.last_result_df.columns]
                     })
-                    st.dataframe(col_info, use_container_width=True, hide_index=True)
+                    st.dataframe(col_info, width="stretch", hide_index=True)
                     
                     # Show basic statistics for numeric columns
                     if len(numeric_cols) > 0:
                         st.markdown("**Numeric Column Statistics:**")
-                        st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), use_container_width=True)
+                        st.dataframe(st.session_state.last_result_df[numeric_cols].describe(), width="stretch")
                     
                     # Show sample data
                     st.markdown("**Sample Data:**")
-                    st.dataframe(st.session_state.last_result_df.head(10), use_container_width=True, hide_index=True)
+                    st.dataframe(st.session_state.last_result_df.head(10), width="stretch", hide_index=True)
                 except Exception as e:
                     st.error(f"Error displaying data explorer: {str(e)}")
             

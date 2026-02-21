@@ -33,9 +33,9 @@ def three_column_layout():
             # Smart Help at the top
             if st.session_state.connected:
                 st.markdown("**💡 Smart Help**")
-                if st.button("📋 Show Tables", use_container_width=True):
+                if st.button("📋 Show Tables", width="stretch"):
                     show_table_details()
-                if st.button("❓ Common Queries", use_container_width=True):
+                if st.button("❓ Common Queries", width="stretch"):
                     show_common_queries()
                 st.markdown("---")
             
