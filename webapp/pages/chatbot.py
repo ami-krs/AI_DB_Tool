@@ -585,7 +585,7 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
 
     if sql_active:
         st.markdown("---")
-        st.markdown("**📝 SQL Editor**")
+        st.markdown("**📝 Smart SQL Editor**")
         sql_query_editor = render_sql_editor(
             key=f"sql_editor_snapshot_{block_suffix}",
             height=200,
@@ -1849,7 +1849,7 @@ def chatbot_tab():
                                         # Display SQL Editor if active
                                         if sql_active:
                                             st.markdown("---")
-                                            st.markdown("**📝 SQL Editor**")
+                                            st.markdown("**📝 Smart SQL Editor**")
                                             from ui.components import render_sql_editor
                                             sql_query_editor = render_sql_editor(
                                                 key=f"sql_editor_chatbot_multi_{result_idx}_{sql_suffix}",
@@ -1933,7 +1933,7 @@ def chatbot_tab():
                                     # Display SQL Editor if active
                                     if sql_active:
                                         st.markdown("---")
-                                        st.markdown("**📝 SQL Editor**")
+                                        st.markdown("**📝 Smart SQL Editor**")
                                         from ui.components import render_sql_editor
                                         sql_query_editor = render_sql_editor(
                                             key=f"sql_editor_chatbot_auto_{sql_suffix}",
@@ -2103,7 +2103,7 @@ def chatbot_tab():
                 # Display SQL Editor if active
                 if sql_active:
                     st.markdown("---")
-                    st.markdown("**📝 SQL Editor**")
+                    st.markdown("**📝 Smart SQL Editor**")
                     from ui.components import render_sql_editor
                     sql_query_editor = render_sql_editor(
                         key=f"sql_editor_chatbot_fallback_multi_{result_idx}_{sql_suffix}",
@@ -2185,7 +2185,7 @@ def chatbot_tab():
             # Display SQL Editor if active
             if sql_active:
                 st.markdown("---")
-                st.markdown("**📝 SQL Editor**")
+                st.markdown("**📝 Smart SQL Editor**")
                 from ui.components import render_sql_editor
                 sql_query_editor = render_sql_editor(
                     key=f"sql_editor_chatbot_fallback_{sql_suffix}",

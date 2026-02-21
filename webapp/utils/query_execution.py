@@ -706,7 +706,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Display SQL Editor if active
             if sql_active:
                 st.markdown("---")
-                st.markdown("**📝 SQL Editor**")
+                st.markdown("**📝 Smart SQL Editor**")
                 from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
                 sql_query_editor = render_sql_editor(
                     key=f"sql_editor_result_{sql_suffix}",
@@ -1038,7 +1038,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         # Display SQL Editor if active
         if sql_active:
             st.markdown("---")
-            st.markdown("**📝 SQL Editor**")
+            st.markdown("**📝 Smart SQL Editor**")
             from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
             sql_query_editor = render_sql_editor(
                 key=f"sql_editor_last_{sql_suffix}",
