@@ -515,10 +515,14 @@ def render_sql_editor(
             _render_guided_assist_controls(query, tables)
         return query
 
-    # Get current query value
-    current_query = st.session_state.get('sql_editor', '')
-    if key in st.session_state and isinstance(st.session_state.get(key), str):
-        current_query = st.session_state.get(key)
+    # Keep editor value isolated per instance to avoid cursor/value jitter across reruns.
+    editor_state_key = f"{key}__query_value"
+    current_query = st.session_state.get(editor_state_key, "")
+    if not isinstance(current_query, str) or current_query == "":
+        if key in st.session_state and isinstance(st.session_state.get(key), str):
+            current_query = st.session_state.get(key)
+        else:
+            current_query = st.session_state.get('sql_editor', '')
 
     editor_mode = st.session_state.get('editor_mode', 'textarea')
     effective_editor_mode = editor_mode
@@ -590,7 +594,10 @@ def render_sql_editor(
             )
 
             if editor_value != current_query:
-                st.session_state.sql_editor = editor_value
+                st.session_state[editor_state_key] = editor_value
+                st.session_state[key] = editor_value
+                if key == "sql_editor":
+                    st.session_state.sql_editor = editor_value
             return editor_value
         except Exception as e:
             st.warning(f"Monaco editor error: {e}. Falling back to regular editor.")
@@ -615,7 +622,10 @@ def render_sql_editor(
             )
 
             if editor_value != current_query:
-                st.session_state.sql_editor = editor_value
+                st.session_state[editor_state_key] = editor_value
+                st.session_state[key] = editor_value
+                if key == "sql_editor":
+                    st.session_state.sql_editor = editor_value
             return editor_value
         except Exception as e:
             st.warning(f"CodeMirror editor error: {e}. Falling back to regular editor.")
@@ -629,6 +639,9 @@ def render_sql_editor(
         key=key,
         help="💡 Use sidebar to insert table names"
     )
+    st.session_state[editor_state_key] = query
+    if key == "sql_editor":
+        st.session_state.sql_editor = query
     if guided_sql_assist:
         _render_guided_assist_controls(query, tables or [])
 
