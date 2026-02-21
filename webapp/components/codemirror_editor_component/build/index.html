@@ -381,6 +381,24 @@
                       showHints(cm, suggestions);
                     });
                   },
+                  'Ctrl-Enter': function (cm) {
+                    var currentValue = cm.getValue();
+                    lastEmittedValues[componentId] = currentValue;
+                    Streamlit.setComponentValue({
+                      value: currentValue,
+                      execute: true,
+                      ts: Date.now(),
+                    });
+                  },
+                  'Cmd-Enter': function (cm) {
+                    var currentValue = cm.getValue();
+                    lastEmittedValues[componentId] = currentValue;
+                    Streamlit.setComponentValue({
+                      value: currentValue,
+                      execute: true,
+                      ts: Date.now(),
+                    });
+                  },
                 },
               });
 

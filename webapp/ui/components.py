@@ -1,6 +1,6 @@
 """UI component rendering functions"""
 import streamlit as st
-from typing import Dict, List
+from typing import Dict, List, Any
 from pathlib import Path
 import re
 
@@ -11,6 +11,15 @@ from ui.navigation import handle_connection
 
 from ai_db_tool.connectors import DatabaseConfig
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
+
+
+def consume_sql_editor_execute_shortcut(editor_key: str) -> bool:
+    """Return and clear Cmd/Ctrl+Enter execute flag for an editor instance."""
+    flag_key = f"{editor_key}__execute_shortcut"
+    triggered = bool(st.session_state.get(flag_key, False))
+    if triggered:
+        st.session_state[flag_key] = False
+    return triggered
 
 
 def render_db_details():
@@ -597,6 +606,14 @@ def render_sql_editor(
                 key=f"monaco_{key}"
             )
 
+            execute_shortcut = False
+            if isinstance(editor_value, dict):
+                execute_shortcut = bool(editor_value.get("execute"))
+                editor_value = str(editor_value.get("value", current_query))
+
+            if execute_shortcut:
+                st.session_state[f"{key}__execute_shortcut"] = True
+
             if editor_value != current_query:
                 st.session_state[editor_state_key] = editor_value
                 st.session_state[key] = editor_value
@@ -624,6 +641,14 @@ def render_sql_editor(
                 config=sql_hint_config,
                 key=f"codemirror_{key}"
             )
+
+            execute_shortcut = False
+            if isinstance(editor_value, dict):
+                execute_shortcut = bool(editor_value.get("execute"))
+                editor_value = str(editor_value.get("value", current_query))
+
+            if execute_shortcut:
+                st.session_state[f"{key}__execute_shortcut"] = True
 
             if editor_value != current_query:
                 st.session_state[editor_state_key] = editor_value

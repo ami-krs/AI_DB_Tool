@@ -11,7 +11,7 @@ from utils.query_execution import (
     debug_query, save_query_to_history, split_sql_statements, execute_single_statement
 )
 from utils.helpers import get_api_key
-from ui.components import render_sql_editor
+from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
 from shared import CODEMIRROR_AVAILABLE, MONACO_EDITOR_AVAILABLE, codemirror_editor, monaco_editor
 
 
@@ -597,7 +597,10 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
             local_autocomplete_only=True
         )
         if sql_query_editor and sql_query_editor.strip():
-            if st.button("Execute SQL", key=f"execute_sql_snapshot_{block_suffix}"):
+            editor_key = f"sql_editor_snapshot_{block_suffix}"
+            execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_snapshot_{block_suffix}")
+            execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+            if execute_btn_clicked or execute_shortcut:
                 execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_snapshot_{block_suffix}")
 
 
@@ -1859,7 +1862,10 @@ def chatbot_tab():
                                                 local_autocomplete_only=True
                                             )
                                             if sql_query_editor and sql_query_editor.strip():
-                                                if st.button("Execute SQL", key=f"execute_sql_chatbot_multi_{result_idx}_{sql_suffix}"):
+                                                editor_key = f"sql_editor_chatbot_multi_{result_idx}_{sql_suffix}"
+                                                execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_chatbot_multi_{result_idx}_{sql_suffix}")
+                                                execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                                                if execute_btn_clicked or execute_shortcut:
                                                     execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_multi_{result_idx}_{sql_suffix}")
                                         
                                         # Display Data Explorer if active
@@ -1940,7 +1946,10 @@ def chatbot_tab():
                                             local_autocomplete_only=True
                                         )
                                         if sql_query_editor and sql_query_editor.strip():
-                                            if st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}"):
+                                            editor_key = f"sql_editor_chatbot_auto_{sql_suffix}"
+                                            execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_chatbot_auto_{sql_suffix}")
+                                            execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                                            if execute_btn_clicked or execute_shortcut:
                                                 execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_auto_{sql_suffix}")
                                     
                                     # Display Data Explorer if active
@@ -2107,7 +2116,10 @@ def chatbot_tab():
                         local_autocomplete_only=True
                     )
                     if sql_query_editor and sql_query_editor.strip():
-                        if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_multi_{result_idx}_{sql_suffix}"):
+                        editor_key = f"sql_editor_chatbot_fallback_multi_{result_idx}_{sql_suffix}"
+                        execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_multi_{result_idx}_{sql_suffix}")
+                        execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                        if execute_btn_clicked or execute_shortcut:
                             execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_multi_{result_idx}_{sql_suffix}")
                 
                 # Display Data Explorer if active
@@ -2186,7 +2198,10 @@ def chatbot_tab():
                     local_autocomplete_only=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
-                    if st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}"):
+                    editor_key = f"sql_editor_chatbot_fallback_{sql_suffix}"
+                    execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_chatbot_fallback_{sql_suffix}")
+                    execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                    if execute_btn_clicked or execute_shortcut:
                         execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_chatbot_fallback_{sql_suffix}")
             
             # Display Data Explorer if active

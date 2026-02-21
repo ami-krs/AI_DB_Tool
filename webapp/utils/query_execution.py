@@ -707,7 +707,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             if sql_active:
                 st.markdown("---")
                 st.markdown("**📝 SQL Editor**")
-                from ui.components import render_sql_editor
+                from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
                 sql_query_editor = render_sql_editor(
                     key=f"sql_editor_result_{sql_suffix}",
                     height=200,
@@ -719,7 +719,10 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     local_autocomplete_only=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
-                    if st.button("Execute SQL", key=f"execute_sql_{sql_suffix}"):
+                    editor_key = f"sql_editor_result_{sql_suffix}"
+                    execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_{sql_suffix}")
+                    execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                    if execute_btn_clicked or execute_shortcut:
                         # execute_query is already imported at module level, no need to import again
                         execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_{sql_suffix}")
             
@@ -1036,7 +1039,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         if sql_active:
             st.markdown("---")
             st.markdown("**📝 SQL Editor**")
-            from ui.components import render_sql_editor
+            from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
             sql_query_editor = render_sql_editor(
                 key=f"sql_editor_last_{sql_suffix}",
                 height=200,
@@ -1048,7 +1051,10 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 local_autocomplete_only=True
             )
             if sql_query_editor and sql_query_editor.strip():
-                if st.button("Execute SQL", key=f"execute_sql_last_{sql_suffix}"):
+                editor_key = f"sql_editor_last_{sql_suffix}"
+                execute_btn_clicked = st.button("Execute SQL", key=f"execute_sql_last_{sql_suffix}")
+                execute_shortcut = consume_sql_editor_execute_shortcut(editor_key)
+                if execute_btn_clicked or execute_shortcut:
                     # execute_query is already available in this module, no need to import
                     execute_query(sql_query_editor, enable_agents=True, unique_suffix=f"sql_editor_last_{sql_suffix}")
         

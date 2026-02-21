@@ -359,6 +359,16 @@
               scheduleValue(Streamlit, componentId, editor.getValue(), true);
             });
 
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
+              var currentValue = editor.getValue();
+              lastEmittedValues[componentId] = currentValue;
+              Streamlit.setComponentValue({
+                value: currentValue,
+                execute: true,
+                ts: Date.now(),
+              });
+            });
+
             renderEditor.editors[componentId] = editor;
           } else {
             var shouldApplyValue = value !== lastEmittedValues[componentId];

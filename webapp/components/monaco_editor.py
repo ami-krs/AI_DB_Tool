@@ -47,7 +47,7 @@ def monaco_editor(
     tables: Optional[List[str]] = None,
     config: Optional[Dict[str, Any]] = None,
     key: Optional[str] = None,
-) -> str:
+) -> Any:
     """Render the Monaco editor with AI autocomplete."""
 
     if _monaco_component is None:
