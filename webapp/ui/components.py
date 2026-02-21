@@ -2,6 +2,7 @@
 import streamlit as st
 from typing import Dict, List
 from pathlib import Path
+import re
 
 from config.database_config import get_persistent_sqlite_path, CONFIG_FILE, save_db_config
 from utils.helpers import get_api_key
@@ -443,6 +444,8 @@ def render_sql_editor(
     height: int = 250,
     placeholder: str = "SELECT * FROM table_name LIMIT 10;",
     lightweight: bool = False,
+    prefer_smart: bool = False,
+    minimal_schema: bool = False,
 ):
     """
     Render SQL editor (Monaco, CodeMirror, or regular text area)
@@ -458,6 +461,10 @@ def render_sql_editor(
     
     lightweight : bool
         If True, render a fast text-area editor without schema/autocomplete loading.
+    prefer_smart : bool
+        If True, prefer Monaco/CodeMirror even when global editor mode is textarea.
+    minimal_schema : bool
+        If True, only load table names (faster) for smart autocomplete contexts.
 
     Returns:
     --------
@@ -465,7 +472,7 @@ def render_sql_editor(
         Current SQL query value
     """
     # Fast path for inline/toggle editors to avoid heavy schema fetch and editor init.
-    if lightweight:
+    if lightweight and not prefer_smart:
         return st.text_area(
             "Enter SQL Query",
             height=height,
@@ -476,6 +483,16 @@ def render_sql_editor(
 
     # Get current query value
     current_query = st.session_state.get('sql_editor', '')
+    if key in st.session_state and isinstance(st.session_state.get(key), str):
+        current_query = st.session_state.get(key)
+
+    editor_mode = st.session_state.get('editor_mode', 'textarea')
+    effective_editor_mode = editor_mode
+    if prefer_smart and editor_mode == 'textarea':
+        if MONACO_EDITOR_AVAILABLE and monaco_editor:
+            effective_editor_mode = 'monaco'
+        elif CODEMIRROR_AVAILABLE and codemirror_editor:
+            effective_editor_mode = 'codemirror'
     
     # Get schema info if connected
     schema_info = None
@@ -484,7 +501,7 @@ def render_sql_editor(
     if st.session_state.connected and st.session_state.db_manager:
         try:
             tables = st.session_state.db_manager.get_tables()
-            if tables:
+            if tables and not minimal_schema:
                 for table_name in tables[:20]:
                     try:
                         schema = st.session_state.db_manager.get_table_schema(table_name)
@@ -495,6 +512,9 @@ def render_sql_editor(
                         continue
                 if tables:
                     schema_info = st.session_state.db_manager.get_table_schema(tables[0])
+            elif tables and minimal_schema:
+                table_columns = {table: [] for table in tables[:30]}
+                schema_info = st.session_state.get('schema_info')
         except Exception:
             pass
 
@@ -515,11 +535,10 @@ def render_sql_editor(
         },
     }
 
-    editor_mode = st.session_state.get('editor_mode', 'textarea')
-    st.session_state.use_codemirror_editor = editor_mode != 'textarea'
+    st.session_state.use_codemirror_editor = effective_editor_mode != 'textarea'
 
     # Use Monaco Editor if selected and available
-    if editor_mode == 'monaco' and MONACO_EDITOR_AVAILABLE and monaco_editor:
+    if effective_editor_mode == 'monaco' and MONACO_EDITOR_AVAILABLE and monaco_editor:
         try:
             theme = "vs-dark" if st.session_state.dark_mode else "vs"
 
@@ -541,11 +560,10 @@ def render_sql_editor(
             return editor_value
         except Exception as e:
             st.warning(f"Monaco editor error: {e}. Falling back to regular editor.")
-            st.session_state.editor_mode = 'textarea'
             st.session_state.use_codemirror_editor = False
 
     # Use CodeMirror Editor if selected and available
-    if editor_mode == 'codemirror' and CODEMIRROR_AVAILABLE and codemirror_editor:
+    if effective_editor_mode == 'codemirror' and CODEMIRROR_AVAILABLE and codemirror_editor:
         try:
             theme = "vs-dark" if st.session_state.dark_mode else "vs"
 
@@ -567,7 +585,6 @@ def render_sql_editor(
             return editor_value
         except Exception as e:
             st.warning(f"CodeMirror editor error: {e}. Falling back to regular editor.")
-            st.session_state.editor_mode = 'textarea'
             st.session_state.use_codemirror_editor = False
 
     # Regular text area (fallback or default)
@@ -578,6 +595,22 @@ def render_sql_editor(
         key=key,
         help="💡 Use sidebar to insert table names"
     )
+    if prefer_smart:
+        if query.strip().upper() == "SELECT":
+            st.session_state[key] = "SELECT * FROM "
+            st.rerun()
+
+        if re.search(r"SELECT\s+\*\s+FROM\s*$", query, flags=re.IGNORECASE) and tables:
+            picked_table = st.selectbox(
+                "Choose table",
+                options=[""] + [str(t) for t in tables],
+                key=f"{key}_smart_table_picker",
+                help="Table suggestions for SELECT * FROM ..."
+            )
+            if picked_table:
+                st.session_state[key] = f"{query}{picked_table}"
+                st.rerun()
+
     return query
 
 
