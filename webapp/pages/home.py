@@ -114,7 +114,7 @@ def home_dashboard():
                 if st.button(
                     button_text,
                     key=f"app_card_{idx}",
-                    use_container_width=True
+                    width="stretch"
                 ):
                     st.session_state.active_section = app['section']
                     # Set query param to persist section across refreshes

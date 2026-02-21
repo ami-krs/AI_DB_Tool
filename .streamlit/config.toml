@@ -1,0 +1,6 @@
+[server]
+# Streamlit Cloud can hit inotify limits with large apps/components.
+# Disable file watching in deployed environments to avoid noisy ENOSPC/EMFILE logs.
+fileWatcherType = "none"
+runOnSave = false
+

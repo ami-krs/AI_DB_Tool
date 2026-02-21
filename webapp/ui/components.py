@@ -401,10 +401,10 @@ def render_connection_setting():
         
         col1, col2 = st.columns(2)
         with col1:
-            connect_button = st.form_submit_button("Connect", type="primary", use_container_width=True)
+            connect_button = st.form_submit_button("Connect", type="primary", width="stretch")
         with col2:
             if st.session_state.connected:
-                disconnect_button = st.form_submit_button("Disconnect", use_container_width=True)
+                disconnect_button = st.form_submit_button("Disconnect", width="stretch")
             else:
                 disconnect_button = False
         

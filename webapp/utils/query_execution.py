@@ -1159,7 +1159,7 @@ def show_table_details():
         
         # Display columns
         df_cols = pd.DataFrame(schema['columns'])
-        st.dataframe(df_cols, use_container_width=True)
+        st.dataframe(df_cols, width="stretch")
         
         # Show primary keys
         if schema.get('primary_keys'):

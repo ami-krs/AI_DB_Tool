@@ -44,7 +44,8 @@ venv.bak/
 .env.local
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 
 # Database
 *.db
