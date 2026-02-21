@@ -706,7 +706,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Display SQL Editor if active
             if sql_active:
                 st.markdown("---")
-                st.markdown("### 📝 SQL Editor")
+                st.markdown("**📝 SQL Editor**")
                 from ui.components import render_sql_editor
                 sql_query_editor = render_sql_editor(
                     key=f"sql_editor_result_{sql_suffix}",
@@ -722,7 +722,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
             # Display Data Explorer if active
             if explorer_active:
                 st.markdown("---")
-                st.markdown("### 🔍 Data Explorer")
+                st.markdown("**🔍 Data Explorer**")
                 try:
                     from utils.helpers import display_data_explorer
                     display_data_explorer(result['dataframe'])
@@ -1031,7 +1031,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         # Display SQL Editor if active
         if sql_active:
             st.markdown("---")
-            st.markdown("### 📝 SQL Editor")
+            st.markdown("**📝 SQL Editor**")
             from ui.components import render_sql_editor
             sql_query_editor = render_sql_editor(
                 key=f"sql_editor_last_{sql_suffix}",
@@ -1047,7 +1047,7 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         # Display Data Explorer if active
         if explorer_active:
             st.markdown("---")
-            st.markdown("### 🔍 Data Explorer")
+            st.markdown("**🔍 Data Explorer**")
             try:
                 from utils.helpers import display_data_explorer
                 display_data_explorer(last_select_result)

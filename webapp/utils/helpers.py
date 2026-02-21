@@ -802,7 +802,7 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
         unique_suffix = f"{id(df)}_{int(time.time() * 1000000) % 1000000}"
     
     # Don't use expander - display directly to avoid hiding issues
-    st.markdown("### 📊 Data Visualization")
+    st.markdown("**📊 Data Visualization**")
     # Get numeric columns for charts
     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
