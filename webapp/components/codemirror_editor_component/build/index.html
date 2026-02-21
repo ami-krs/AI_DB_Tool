@@ -195,10 +195,65 @@
             }, 200);
           }
 
+          function buildLocalSuggestions(cm, args) {
+            var doc = cm.getDoc();
+            var cursor = doc.getCursor();
+            var text = doc.getValue();
+            var before = text.slice(0, doc.indexFromPos(cursor));
+            var after = text.slice(doc.indexFromPos(cursor));
+            var tables = Array.isArray(args.tables) ? args.tables : [];
+            var keywordPool = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT', 'JOIN', 'LEFT JOIN', 'INSERT INTO', 'UPDATE', 'DELETE'];
+            var suggestions = [];
+
+            if (/SELECT\s+\*\s+FROM\s+$/i.test(before)) {
+              suggestions = tables.map(function (tableName) {
+                return {
+                  label: String(tableName),
+                  insertText: String(tableName),
+                  documentation: 'table',
+                  detail: 'Table',
+                };
+              });
+              return suggestions;
+            }
+
+            var tokenMatch = before.match(/([A-Za-z_][A-Za-z0-9_]*)$/);
+            var token = tokenMatch ? tokenMatch[1] : '';
+            if (!token) {
+              return [];
+            }
+            var upperToken = token.toUpperCase();
+
+            keywordPool.forEach(function (kw) {
+              if (kw.indexOf(upperToken) === 0) {
+                suggestions.push({
+                  label: kw,
+                  insertText: kw,
+                  documentation: 'keyword',
+                  detail: 'SQL keyword',
+                });
+              }
+            });
+
+            tables.forEach(function (tableName) {
+              var tableText = String(tableName);
+              if (tableText.toUpperCase().indexOf(upperToken) === 0) {
+                suggestions.push({
+                  label: tableText,
+                  insertText: tableText,
+                  documentation: 'table',
+                  detail: 'Table',
+                });
+              }
+            });
+
+            return suggestions;
+          }
+
           function fetchSuggestions(cm, args) {
             var apiUrl = args.apiUrl;
             if (!apiUrl) {
-              return Promise.resolve([]);
+              return Promise.resolve(buildLocalSuggestions(cm, args));
             }
 
             var doc = cm.getDoc();
@@ -224,11 +279,15 @@
                 return response.json();
               })
               .then(function (data) {
-                return Array.isArray(data.suggestions) ? data.suggestions : [];
+                var remote = Array.isArray(data.suggestions) ? data.suggestions : [];
+                if (remote.length) {
+                  return remote;
+                }
+                return buildLocalSuggestions(cm, args);
               })
               .catch(function (error) {
                 console.error('Autocomplete error:', error);
-                return [];
+                return buildLocalSuggestions(cm, args);
               });
           }
 
@@ -260,10 +319,18 @@
                   };
                 });
 
+                var cursor = cm.getDoc().getCursor();
+                var lineText = cm.getLine(cursor.line) || '';
+                var beforeLine = lineText.slice(0, cursor.ch);
+                var tokenMatch = beforeLine.match(/([A-Za-z_][A-Za-z0-9_]*)$/);
+                var fromPos = tokenMatch
+                  ? { line: cursor.line, ch: cursor.ch - tokenMatch[1].length }
+                  : cursor;
+
                 return {
                   list: completions,
-                  from: cm.getDoc().getCursor(),
-                  to: cm.getDoc().getCursor(),
+                  from: fromPos,
+                  to: cursor,
                 };
               },
               { completeSingle: false }

@@ -713,6 +713,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                     height=200,
                     placeholder="Enter SQL query here...",
                     lightweight=True,
+                    prefer_smart=True,
+                    minimal_schema=True,
                     guided_sql_assist=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
@@ -1039,6 +1041,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
                 height=200,
                 placeholder="Enter SQL query here...",
                 lightweight=True,
+                prefer_smart=True,
+                minimal_schema=True,
                 guided_sql_assist=True
             )
             if sql_query_editor and sql_query_editor.strip():

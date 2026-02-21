@@ -132,12 +132,79 @@
           }
           registerAutocomplete.registered = true;
 
+          function buildLocalSuggestions(model, position, tables) {
+            var text = model.getValue();
+            var cursorOffset = model.getOffsetAt(position);
+            var before = text.slice(0, cursorOffset);
+            var keywordPool = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT', 'JOIN', 'LEFT JOIN', 'INSERT INTO', 'UPDATE', 'DELETE'];
+            var suggestions = [];
+            var word = model.getWordUntilPosition(position);
+            var replaceRange = {
+              startLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endLineNumber: position.lineNumber,
+              endColumn: word.endColumn,
+            };
+
+            if (/SELECT\s+\*\s+FROM\s+$/i.test(before)) {
+              (tables || []).forEach(function (tableName) {
+                var tableText = String(tableName);
+                suggestions.push({
+                  label: tableText,
+                  insertText: tableText,
+                  documentation: 'table',
+                  detail: 'Table',
+                  kind: monaco.languages.CompletionItemKind.Field,
+                  range: replaceRange,
+                });
+              });
+              return suggestions;
+            }
+
+            var tokenMatch = before.match(/([A-Za-z_][A-Za-z0-9_]*)$/);
+            var token = tokenMatch ? tokenMatch[1] : '';
+            if (!token) {
+              return [];
+            }
+            var upperToken = token.toUpperCase();
+
+            keywordPool.forEach(function (kw) {
+              if (kw.indexOf(upperToken) === 0) {
+                suggestions.push({
+                  label: kw,
+                  insertText: kw,
+                  documentation: 'keyword',
+                  detail: 'SQL keyword',
+                  kind: monaco.languages.CompletionItemKind.Keyword,
+                  range: replaceRange,
+                });
+              }
+            });
+
+            (tables || []).forEach(function (tableName) {
+              var tableText = String(tableName);
+              if (tableText.toUpperCase().indexOf(upperToken) === 0) {
+                suggestions.push({
+                  label: tableText,
+                  insertText: tableText,
+                  documentation: 'table',
+                  detail: 'Table',
+                  kind: monaco.languages.CompletionItemKind.Field,
+                  range: replaceRange,
+                });
+              }
+            });
+
+            return suggestions;
+          }
+
           monaco.languages.registerCompletionItemProvider('sql', {
             triggerCharacters: ['.', ' ', '(', ',', '='],
             provideCompletionItems: async function (model, position) {
               var apiUrl = args.apiUrl;
+              var localTables = Array.isArray(args.tables) ? args.tables : [];
               if (!apiUrl) {
-                return { suggestions: [] };
+                return { suggestions: buildLocalSuggestions(model, position, localTables) };
               }
 
               var text = model.getValue();
@@ -163,6 +230,14 @@
                 var data = await response.json();
                 var suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
 
+                var word = model.getWordUntilPosition(position);
+                var replaceRange = {
+                  startLineNumber: position.lineNumber,
+                  startColumn: word.startColumn,
+                  endLineNumber: position.lineNumber,
+                  endColumn: word.endColumn,
+                };
+
                 var items = suggestions.map(function (suggestion) {
                   var label = suggestion.label || suggestion.insertText || '';
                   var insertText = suggestion.insertText || suggestion.label || '';
@@ -179,19 +254,17 @@
                     documentation: documentation,
                     detail: detail,
                     kind: kind,
-                    range: {
-                      startLineNumber: position.lineNumber,
-                      startColumn: position.column,
-                      endLineNumber: position.lineNumber,
-                      endColumn: position.column,
-                    },
+                    range: replaceRange,
                   };
                 });
 
-                return { suggestions: items };
+                if (items.length) {
+                  return { suggestions: items };
+                }
+                return { suggestions: buildLocalSuggestions(model, position, localTables) };
               } catch (error) {
                 console.error('Autocomplete error:', error);
-                return { suggestions: [] };
+                return { suggestions: buildLocalSuggestions(model, position, localTables) };
               }
             },
           });

@@ -477,6 +477,25 @@ def render_sql_editor(
     def _replace_last_word(text: str, replacement: str) -> str:
         return re.sub(r"([A-Za-z_][A-Za-z0-9_]*)\s*$", replacement, text)
 
+    def _render_guided_assist_controls(current_query: str, table_list: List[str]) -> None:
+        # Non-intrusive keyword completion hint: user can choose it or keep typing.
+        if re.search(r"(^|\W)SEL$", current_query.strip(), flags=re.IGNORECASE):
+            if st.button("Use keyword: SELECT", key=f"{key}_assist_select_keyword"):
+                st.session_state[key] = _replace_last_word(current_query, "SELECT")
+                st.rerun()
+
+        # Show table picker when query ends with "SELECT * FROM " (after space).
+        if re.search(r"SELECT\s+\*\s+FROM\s+$", current_query, flags=re.IGNORECASE) and table_list:
+            picked_table = st.selectbox(
+                "Choose table",
+                options=[""] + [str(t) for t in table_list],
+                key=f"{key}_smart_table_picker",
+                help="Press space after FROM, then choose a table."
+            )
+            if picked_table and st.button("Insert table", key=f"{key}_insert_table"):
+                st.session_state[key] = f"{current_query}{picked_table}"
+                st.rerun()
+
     # Fast path for inline/toggle editors to avoid heavy schema fetch and editor init.
     if lightweight and not prefer_smart:
         query = st.text_area(
@@ -493,24 +512,7 @@ def render_sql_editor(
                     tables = st.session_state.db_manager.get_tables() or []
                 except Exception:
                     tables = []
-
-            # Non-intrusive keyword completion hint: user can choose it or keep typing.
-            if re.search(r"(^|\W)SEL$", query.strip(), flags=re.IGNORECASE):
-                if st.button("Use keyword: SELECT", key=f"{key}_assist_select_keyword"):
-                    st.session_state[key] = _replace_last_word(query, "SELECT")
-                    st.rerun()
-
-            # Show table picker when query ends with "SELECT * FROM " (after space).
-            if re.search(r"SELECT\s+\*\s+FROM\s+$", query, flags=re.IGNORECASE) and tables:
-                picked_table = st.selectbox(
-                    "Choose table",
-                    options=[""] + [str(t) for t in tables],
-                    key=f"{key}_smart_table_picker",
-                    help="Press space after FROM, then choose a table."
-                )
-                if picked_table and st.button("Insert table", key=f"{key}_insert_table"):
-                    st.session_state[key] = f"{query}{picked_table}"
-                    st.rerun()
+            _render_guided_assist_controls(query, tables)
         return query
 
     # Get current query value
@@ -627,21 +629,8 @@ def render_sql_editor(
         key=key,
         help="💡 Use sidebar to insert table names"
     )
-    if prefer_smart:
-        if query.strip().upper() == "SELECT":
-            st.session_state[key] = "SELECT * FROM "
-            st.rerun()
-
-        if re.search(r"SELECT\s+\*\s+FROM\s*$", query, flags=re.IGNORECASE) and tables:
-            picked_table = st.selectbox(
-                "Choose table",
-                options=[""] + [str(t) for t in tables],
-                key=f"{key}_smart_table_picker",
-                help="Table suggestions for SELECT * FROM ..."
-            )
-            if picked_table:
-                st.session_state[key] = f"{query}{picked_table}"
-                st.rerun()
+    if guided_sql_assist:
+        _render_guided_assist_controls(query, tables or [])
 
     return query
 

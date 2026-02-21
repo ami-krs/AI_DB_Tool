@@ -591,6 +591,8 @@ def _render_snapshot_result_block(result_df, block_suffix: str, title: str = "**
             height=200,
             placeholder="Enter SQL query here...",
             lightweight=True,
+            prefer_smart=True,
+            minimal_schema=True,
             guided_sql_assist=True
         )
         if sql_query_editor and sql_query_editor.strip():
@@ -1850,6 +1852,8 @@ def chatbot_tab():
                                                 height=200,
                                                 placeholder="Enter SQL query here...",
                                                 lightweight=True,
+                                                prefer_smart=True,
+                                                minimal_schema=True,
                                                 guided_sql_assist=True
                                             )
                                             if sql_query_editor and sql_query_editor.strip():
@@ -1928,6 +1932,8 @@ def chatbot_tab():
                                             height=200,
                                             placeholder="Enter SQL query here...",
                                             lightweight=True,
+                                            prefer_smart=True,
+                                            minimal_schema=True,
                                             guided_sql_assist=True
                                         )
                                         if sql_query_editor and sql_query_editor.strip():
@@ -2092,6 +2098,8 @@ def chatbot_tab():
                         height=200,
                         placeholder="Enter SQL query here...",
                         lightweight=True,
+                        prefer_smart=True,
+                        minimal_schema=True,
                         guided_sql_assist=True
                     )
                     if sql_query_editor and sql_query_editor.strip():
@@ -2168,6 +2176,8 @@ def chatbot_tab():
                     height=200,
                     placeholder="Enter SQL query here...",
                     lightweight=True,
+                    prefer_smart=True,
+                    minimal_schema=True,
                     guided_sql_assist=True
                 )
                 if sql_query_editor and sql_query_editor.strip():
