@@ -785,13 +785,14 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
         df: DataFrame to visualize
         unique_suffix: Optional unique suffix for session state keys
     """
-    # Lazy import plotly - only import when visualization is actually needed
+    # Prefer plotly if installed; otherwise use Altair (bundled with Streamlit) for faster app install
     try:
         import plotly.express as px
         import plotly.graph_objects as go
+        use_plotly = True
     except ImportError:
-        st.error("Plotly is not installed. Please install it with: pip install plotly")
-        return
+        use_plotly = False
+        import altair as alt
     
     if df is None or len(df) == 0:
         st.warning("No data to visualize")
@@ -828,12 +829,19 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             y_col = st.selectbox("Y-axis (Value):", numeric_cols, key=y_col_key)
             
             # Aggregate if needed (handle duplicates)
-            if df[x_col].duplicated().any():
-                agg_df = df.groupby(x_col)[y_col].sum().reset_index()
-                fig = px.bar(agg_df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
+            if use_plotly:
+                if df[x_col].duplicated().any():
+                    agg_df = df.groupby(x_col)[y_col].sum().reset_index()
+                    fig = px.bar(agg_df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
+                else:
+                    fig = px.bar(df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
+                st.plotly_chart(fig, width="stretch")
             else:
-                fig = px.bar(df, x=x_col, y=y_col, title=f"{y_col} by {x_col}")
-            st.plotly_chart(fig, width="stretch")
+                plot_df = df.groupby(x_col)[y_col].sum().reset_index() if df[x_col].duplicated().any() else df[[x_col, y_col]].copy()
+                chart = alt.Chart(plot_df).mark_bar().encode(
+                    x=alt.X(x_col, sort="-y"), y=alt.Y(y_col, type="quantitative")
+                ).properties(title=f"{y_col} by {x_col}")
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Bar chart requires at least one categorical and one numeric column")
     
@@ -845,12 +853,15 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             y_col = st.selectbox("Y-axis:", numeric_cols, key=y_col_key)
             
             # Sort by x-axis for line chart
-            if x_col in numeric_cols:
-                sorted_df = df.sort_values(x_col)
+            sorted_df = df.sort_values(x_col)
+            if use_plotly:
+                fig = px.line(sorted_df, x=x_col, y=y_col, title=f"{y_col} over {x_col}")
+                st.plotly_chart(fig, width="stretch")
             else:
-                sorted_df = df.sort_values(x_col)
-            fig = px.line(sorted_df, x=x_col, y=y_col, title=f"{y_col} over {x_col}")
-            st.plotly_chart(fig, width="stretch")
+                chart = alt.Chart(sorted_df).mark_line().encode(
+                    x=alt.X(x_col), y=alt.Y(y_col, type="quantitative")
+                ).properties(title=f"{y_col} over {x_col}")
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Line chart requires at least one categorical/numeric and one numeric column")
     
@@ -863,11 +874,18 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             y_col = st.selectbox("Y-axis:", numeric_cols, key=y_col_key)
             color_col = st.selectbox("Color by (optional):", [None] + categorical_cols, key=color_col_key)
             
-            if color_col:
-                fig = px.scatter(df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
+            if use_plotly:
+                if color_col:
+                    fig = px.scatter(df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
+                else:
+                    fig = px.scatter(df, x=x_col, y=y_col, title=f"{y_col} vs {x_col}")
+                st.plotly_chart(fig, width="stretch")
             else:
-                fig = px.scatter(df, x=x_col, y=y_col, title=f"{y_col} vs {x_col}")
-            st.plotly_chart(fig, width="stretch")
+                enc = {"x": alt.X(x_col, type="quantitative"), "y": alt.Y(y_col, type="quantitative")}
+                if color_col:
+                    enc["color"] = alt.Color(color_col, type="nominal")
+                chart = alt.Chart(df).mark_point().encode(**enc).properties(title=f"{y_col} vs {x_col}")
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Scatter plot requires at least two numeric columns")
     
@@ -877,8 +895,15 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             col = st.selectbox("Column:", numeric_cols, key=col_key)
             bins_key = f"hist_bins_{unique_suffix}"
             bins = st.slider("Number of bins:", 10, 100, 30, key=bins_key)
-            fig = px.histogram(df, x=col, nbins=bins, title=f"Distribution of {col}")
-            st.plotly_chart(fig, width="stretch")
+            if use_plotly:
+                fig = px.histogram(df, x=col, nbins=bins, title=f"Distribution of {col}")
+                st.plotly_chart(fig, width="stretch")
+            else:
+                chart = alt.Chart(df).mark_bar().encode(
+                    alt.X(col, bin=alt.Bin(maxbins=bins), type="quantitative"),
+                    alt.Y("count()", type="quantitative"),
+                ).properties(title=f"Distribution of {col}")
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Histogram requires at least one numeric column")
     
@@ -889,11 +914,20 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             y_col = st.selectbox("Y-axis (Value):", numeric_cols, key=y_col_key)
             x_col = st.selectbox("X-axis (Category, optional):", [None] + categorical_cols, key=x_col_key)
             
-            if x_col:
-                fig = px.box(df, x=x_col, y=y_col, title=f"Box Plot: {y_col} by {x_col}")
+            if use_plotly:
+                if x_col:
+                    fig = px.box(df, x=x_col, y=y_col, title=f"Box Plot: {y_col} by {x_col}")
+                else:
+                    fig = px.box(df, y=y_col, title=f"Box Plot: {y_col}")
+                st.plotly_chart(fig, width="stretch")
             else:
-                fig = px.box(df, y=y_col, title=f"Box Plot: {y_col}")
-            st.plotly_chart(fig, width="stretch")
+                enc = {"y": alt.Y(y_col, type="quantitative")}
+                if x_col:
+                    enc["x"] = alt.X(x_col, type="nominal")
+                chart = alt.Chart(df).mark_boxplot().encode(**enc).properties(
+                    title=f"Box Plot: {y_col}" + (f" by {x_col}" if x_col else "")
+                )
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Box plot requires at least one numeric column")
     
@@ -904,13 +938,20 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
             label_col = st.selectbox("Category:", categorical_cols, key=label_col_key)
             value_col = st.selectbox("Value:", numeric_cols, key=value_col_key)
             
-            # Aggregate if needed
+            # Aggregate if needed (pie needs one row per category)
             if df[label_col].duplicated().any():
-                agg_df = df.groupby(label_col)[value_col].sum().reset_index()
-                fig = px.pie(agg_df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
+                plot_df = df.groupby(label_col)[value_col].sum().reset_index()
             else:
-                fig = px.pie(df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
-            st.plotly_chart(fig, width="stretch")
+                plot_df = df[[label_col, value_col]]
+            if use_plotly:
+                fig = px.pie(plot_df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
+                st.plotly_chart(fig, width="stretch")
+            else:
+                chart = alt.Chart(plot_df).mark_arc().encode(
+                    theta=alt.Theta(value_col, type="quantitative"),
+                    color=alt.Color(label_col, type="nominal"),
+                ).properties(title=f"{value_col} by {label_col}")
+                st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Pie chart requires at least one categorical and one numeric column")
 

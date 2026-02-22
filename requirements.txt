@@ -15,13 +15,13 @@ streamlit==1.54.0
 pandas==2.3.3
 numpy==1.26.4
 
-# Visualization
-plotly==6.5.2
+# Visualization: plotly removed to speed install; app uses Altair fallback (bundled with Streamlit)
 
 # SQL parsing and analysis
 sqlparse==0.5.5
 sqlalchemy-utils==0.42.1
 
-# Utilities
+# Utilities (rich pre-installed so Streamlit Cloud skips second install round)
 pydantic==2.12.5
 typing-extensions==4.15.0
+rich==14.3.3
