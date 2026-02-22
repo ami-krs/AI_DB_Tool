@@ -1,42 +1,27 @@
-# Core dependencies
-python-dotenv>=1.0.1
+# Core dependencies (pinned for faster, deterministic installs on Streamlit Cloud)
+python-dotenv==1.2.1
 
-# Database drivers (PostgreSQL is primary, others are optional)
-psycopg2-binary>=2.9.9        # PostgreSQL (required for Neon DB)
-sqlalchemy>=2.0.23             # Universal database toolkit
-# Optional database drivers - uncomment if needed:
-# mysql-connector-python>=8.3.0  # MySQL
-# pymssql>=2.2.11               # Microsoft SQL Server
-# cx_Oracle>=8.3.0               # Oracle (requires Oracle Instant Client)
+# Database drivers (PostgreSQL is primary)
+psycopg2-binary==2.9.11
+sqlalchemy==2.0.46
 
 # AI/ML
-openai>=1.40.0                 # GPT for natural language to SQL
-# anthropic>=0.21.0            # Optional (Claude). Uncomment only if you plan to use Anthropic models.
+openai==2.21.0
 
 # Frontend/UI
-streamlit>=1.32.0              # Main web framework
+streamlit==1.54.0
 
 # Data handling
-pandas>=2.2.0
-numpy>=1.24.0,<2.0.0
-# pyarrow>=14.0.0              # Optional (Parquet export). Uncomment if you need Parquet.
+pandas==2.3.3
+numpy==1.26.4
 
 # Visualization
-plotly>=5.18.0
-# matplotlib>=3.9.0            # Optional - only if needed for specific chart types
+plotly==6.5.2
 
 # SQL parsing and analysis
-sqlparse>=0.5.0
-sqlalchemy-utils>=0.41.1
+sqlparse==0.5.5
+sqlalchemy-utils==0.42.1
 
 # Utilities
-pydantic>=2.6.0
-typing-extensions>=4.9.0
-# keyring>=25.0.0                # Optional - for secure credential storage (not needed on Streamlit Cloud)
-
-# Removed optional dependencies to speed up installation:
-# - fastapi, uvicorn, python-multipart (not used - main app uses Streamlit, api_server.py is separate)
-# - matplotlib (large package, only needed for specific chart types - can be added back if needed)
-# - mysql-connector-python, pymssql (optional database drivers - uncomment if you need MySQL/SQL Server)
-
-
+pydantic==2.12.5
+typing-extensions==4.15.0
