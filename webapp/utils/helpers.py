@@ -777,6 +777,44 @@ def search_dataframe(df: pd.DataFrame, search_term: str) -> pd.DataFrame:
     return df[mask].reset_index(drop=True)
 
 
+def _altair_safe_df(df: pd.DataFrame, candidate_numeric_cols: list) -> pd.DataFrame:
+    """Convert selected numeric-like columns to float for Altair compatibility."""
+    if df is None or len(df) == 0:
+        return df
+    out = df.copy()
+    for col in candidate_numeric_cols:
+        if col not in out.columns:
+            continue
+        try:
+            converted = pd.to_numeric(out[col], errors="coerce")
+            # Only replace when conversion produced actual numeric values.
+            if converted.notna().any():
+                out[col] = converted
+        except Exception:
+            pass
+    return out
+
+
+def _infer_altair_type(df: pd.DataFrame, column: str, known_numeric_cols: list) -> str:
+    """Infer Vega-Lite type while handling decimal/object numeric values."""
+    if column in known_numeric_cols:
+        return "quantitative"
+    if column not in df.columns:
+        return "nominal"
+    series = df[column]
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return "temporal"
+    try:
+        converted = pd.to_numeric(series, errors="coerce")
+        total_non_null = int(series.notna().sum())
+        numeric_non_null = int(converted.notna().sum())
+        if total_non_null > 0 and (numeric_non_null / total_non_null) >= 0.95:
+            return "quantitative"
+    except Exception:
+        pass
+    return "nominal"
+
+
 def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
     """
     Display interactive data visualization options for the dataframe
@@ -838,10 +876,11 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 st.plotly_chart(fig, width="stretch")
             else:
                 plot_df = df.groupby(x_col)[y_col].sum().reset_index() if df[x_col].duplicated().any() else df[[x_col, y_col]].copy()
-                chart = alt.Chart(plot_df).mark_bar().encode(
-                    x=alt.X(x_col, sort="-y"), y=alt.Y(y_col, type="quantitative")
+                chart = alt.Chart(_altair_safe_df(plot_df, [y_col])).mark_bar().encode(
+                    x=alt.X(x_col, type="nominal", sort="-y"),
+                    y=alt.Y(y_col, type="quantitative")
                 ).properties(title=f"{y_col} by {x_col}")
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Bar chart requires at least one categorical and one numeric column")
     
@@ -858,10 +897,13 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.line(sorted_df, x=x_col, y=y_col, title=f"{y_col} over {x_col}")
                 st.plotly_chart(fig, width="stretch")
             else:
-                chart = alt.Chart(sorted_df).mark_line().encode(
-                    x=alt.X(x_col), y=alt.Y(y_col, type="quantitative")
+                x_type = _infer_altair_type(sorted_df, x_col, numeric_cols)
+                safe_df = _altair_safe_df(sorted_df, [x_col, y_col] if x_type == "quantitative" else [y_col])
+                chart = alt.Chart(safe_df).mark_line().encode(
+                    x=alt.X(x_col, type=x_type),
+                    y=alt.Y(y_col, type="quantitative")
                 ).properties(title=f"{y_col} over {x_col}")
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Line chart requires at least one categorical/numeric and one numeric column")
     
@@ -884,8 +926,8 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 enc = {"x": alt.X(x_col, type="quantitative"), "y": alt.Y(y_col, type="quantitative")}
                 if color_col:
                     enc["color"] = alt.Color(color_col, type="nominal")
-                chart = alt.Chart(df).mark_point().encode(**enc).properties(title=f"{y_col} vs {x_col}")
-                st.altair_chart(chart, use_container_width=True)
+                chart = alt.Chart(_altair_safe_df(df, [x_col, y_col])).mark_point().encode(**enc).properties(title=f"{y_col} vs {x_col}")
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Scatter plot requires at least two numeric columns")
     
@@ -899,11 +941,11 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.histogram(df, x=col, nbins=bins, title=f"Distribution of {col}")
                 st.plotly_chart(fig, width="stretch")
             else:
-                chart = alt.Chart(df).mark_bar().encode(
+                chart = alt.Chart(_altair_safe_df(df, [col])).mark_bar().encode(
                     alt.X(col, bin=alt.Bin(maxbins=bins), type="quantitative"),
                     alt.Y("count()", type="quantitative"),
                 ).properties(title=f"Distribution of {col}")
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Histogram requires at least one numeric column")
     
@@ -924,10 +966,10 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 enc = {"y": alt.Y(y_col, type="quantitative")}
                 if x_col:
                     enc["x"] = alt.X(x_col, type="nominal")
-                chart = alt.Chart(df).mark_boxplot().encode(**enc).properties(
+                chart = alt.Chart(_altair_safe_df(df, [y_col])).mark_boxplot().encode(**enc).properties(
                     title=f"Box Plot: {y_col}" + (f" by {x_col}" if x_col else "")
                 )
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Box plot requires at least one numeric column")
     
@@ -947,11 +989,11 @@ def visualize_dataframe(df: pd.DataFrame, unique_suffix: str = None):
                 fig = px.pie(plot_df, names=label_col, values=value_col, title=f"{value_col} by {label_col}")
                 st.plotly_chart(fig, width="stretch")
             else:
-                chart = alt.Chart(plot_df).mark_arc().encode(
+                chart = alt.Chart(_altair_safe_df(plot_df, [value_col])).mark_arc().encode(
                     theta=alt.Theta(value_col, type="quantitative"),
                     color=alt.Color(label_col, type="nominal"),
                 ).properties(title=f"{value_col} by {label_col}")
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, width="stretch")
         else:
             st.warning("Pie chart requires at least one categorical and one numeric column")
 
