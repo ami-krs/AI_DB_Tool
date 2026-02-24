@@ -232,7 +232,12 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
             try:
                 engine = st.session_state.db_manager.get_engine()
                 if not engine:
-                    raise ValueError("No active connection")
+                    # Backend API mode: delegate entire block as non-query.
+                    affected_rows = st.session_state.db_manager.execute_non_query(statement)
+                    result['success'] = True
+                    result['type'] = 'DML' if is_dml else 'DDL' if is_ddl else 'DML'
+                    result['rows_affected'] = affected_rows if affected_rows >= 0 else 0
+                    return result
                 
                 # Execute directly using raw connection to avoid nested transactions
                 # When statement contains BEGIN/COMMIT, we need to execute it as-is

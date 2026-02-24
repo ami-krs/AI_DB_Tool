@@ -11,6 +11,7 @@ from utils.query_execution import (
     debug_query, save_query_to_history, split_sql_statements, execute_single_statement
 )
 from utils.helpers import get_api_key
+from utils.backend_api_client import backend_api_chat, backend_api_enabled
 from ui.components import render_sql_editor, consume_sql_editor_execute_shortcut
 from shared import CODEMIRROR_AVAILABLE, MONACO_EDITOR_AVAILABLE, codemirror_editor, monaco_editor
 
@@ -30,6 +31,28 @@ def _quote_table_reference(table_name: str, db_type: str) -> str:
         schema_name, bare_table = table_name.split(".", 1)
         return f"{_quote_identifier(schema_name, db_type)}.{_quote_identifier(bare_table, db_type)}"
     return _quote_identifier(table_name, db_type)
+
+
+def _chat_with_backend_or_local(user_input: str, include_sql: bool = True) -> Dict[str, Any]:
+    """Route chatbot calls to external FastAPI backend when enabled."""
+    if backend_api_enabled():
+        try:
+            return backend_api_chat(
+                user_message=user_input,
+                include_sql=include_sql,
+                schema_context=st.session_state.get("schema_info"),
+            )
+        except Exception as api_error:
+            # Fall back to in-process chatbot to avoid breaking user flow.
+            print(f"DEBUG: Backend API chat failed, falling back to local chatbot: {api_error}")
+
+    if st.session_state.chatbot is None:
+        return {
+            "error": "Chatbot is not initialized.",
+            "response": "❌ Chatbot is not initialized. Please reconnect and try again.",
+            "timestamp": datetime.now().isoformat(),
+        }
+    return st.session_state.chatbot.chat(user_input, include_sql=include_sql)
 
 
 def _build_tables_with_min_records_sql(min_records: int = 10) -> str:
@@ -1025,7 +1048,7 @@ def chatbot_compact():
                         }
                     else:
                         with st.spinner("🤔 Thinking..."):
-                            response = st.session_state.chatbot.chat(full_question, include_sql=True)
+                            response = _chat_with_backend_or_local(full_question, include_sql=True)
                     
                     if 'error' not in response:
                         sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(_extract_sql_from_response_payload(response)))
@@ -1194,7 +1217,7 @@ def chatbot_compact():
             try:
                 print(f"DEBUG: Calling chatbot.chat() (chatbot_compact) with query: {user_input}")
                 with st.spinner("🤔 Thinking..."):
-                    response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                    response = _chat_with_backend_or_local(user_input, include_sql=True)
                 print(f"DEBUG: Chatbot response received (chatbot_compact): {type(response)}, has error: {'error' in response if isinstance(response, dict) else 'N/A'}")
                 print(f"DEBUG: Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
                 if 'error' not in response:
@@ -1522,7 +1545,7 @@ def chatbot_tab():
                             }
                         else:
                             with st.spinner("🤔 Thinking..."):
-                                response = st.session_state.chatbot.chat(question, include_sql=True)
+                                response = _chat_with_backend_or_local(question, include_sql=True)
                         
                         if 'error' not in response:
                             sql_query = _dedupe_sql_query_text(_normalize_sql_for_execution(_extract_sql_from_response_payload(response)))
@@ -2743,7 +2766,7 @@ def chatbot_tab():
                             enhanced_context['data_analysis'] = enhanced_schema_context
                             st.session_state.chatbot.set_schema_context(enhanced_context)
                     
-                    response = st.session_state.chatbot.chat(user_input, include_sql=True)
+                    response = _chat_with_backend_or_local(user_input, include_sql=True)
                     
                     # Restore original context
                     if original_context and st.session_state.chatbot:

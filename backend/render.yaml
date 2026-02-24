@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ai-db-tool-backend
+    env: docker
+    rootDir: .
+    dockerfilePath: ./backend/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: API_AUTH_TOKEN
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: "*"

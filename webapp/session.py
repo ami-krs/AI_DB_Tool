@@ -4,6 +4,8 @@ from ai_db_tool.connectors import DatabaseManager
 from ai_db_tool.ai import AIQueryBuilder, SQLChatbot
 from config.database_config import load_db_config
 from utils.helpers import get_api_key
+from utils.backend_api_client import backend_api_enabled
+from utils.db_manager_proxy import BackendDatabaseManagerProxy
 import importlib.util
 
 
@@ -54,7 +56,9 @@ def initialize_session_state():
 
     # Core database manager
     if 'db_manager' not in st.session_state:
-        st.session_state.db_manager = DatabaseManager()
+        st.session_state.db_manager = (
+            BackendDatabaseManagerProxy() if backend_api_enabled() else DatabaseManager()
+        )
     if 'chatbot' not in st.session_state:
         st.session_state.chatbot = None
     if 'query_builder' not in st.session_state:
