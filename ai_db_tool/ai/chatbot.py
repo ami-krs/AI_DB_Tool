@@ -128,11 +128,9 @@ You are an intelligent SQL assistant chatbot. You help users:
 7. Insert, update, and delete data
 
 CRITICAL - RESPONSE FORMAT:
-- When user asks for SQL (INSERT, SELECT, UPDATE, DELETE, etc.), you MUST respond with ONLY the SQL code in a ```sql code block
-- DO NOT provide explanations, instructions, or "here's how you can" text BEFORE the SQL
-- DO NOT say "you'll need to" or "first ensure you have" - just generate the SQL directly
-- Start your response with the SQL code block immediately
-- Brief explanations can come AFTER the SQL code block, but the SQL must come first
+- If the user EXPLICITLY asks for SQL (INSERT, SELECT, UPDATE, DELETE, CREATE TABLE, "write query", etc.), respond with SQL-first output in a ```sql code block.
+- If the user asks a conceptual/advisory question (migration strategy, architecture, checklist, best practices, comparison, troubleshooting), respond in clear plain English and DO NOT generate SQL unless they explicitly request SQL.
+- For SQL-first responses: do not put explanations before the SQL block. Brief explanation may come after the SQL block.
 
 IMPORTANT RULES:
 - ONLY generate SQL queries (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, etc.) - NEVER shell commands or CLI syntax
@@ -276,6 +274,9 @@ class SQLChatbot:
                 'timestamp': datetime.now().isoformat()
             }
         
+        # Detect whether this request should return SQL or advisory text.
+        effective_include_sql = include_sql and self._should_generate_sql(user_message)
+
         # Check user request type - CREATE TABLE requests don't need existing schema
         user_upper = user_message.upper()
         is_create_request = any(keyword in user_upper for keyword in [
@@ -286,7 +287,7 @@ class SQLChatbot:
         
         # For CREATE TABLE requests, schema context is optional (we're creating new tables)
         # For other requests (INSERT, SELECT, etc.), schema context is required
-        if not is_create_request:
+        if effective_include_sql and not is_create_request:
             # Check if schema context is available - critical for generating accurate SQL
             if not self.schema_context or not self.schema_context.get('tables'):
                 return {
@@ -351,7 +352,10 @@ class SQLChatbot:
         )
         
         # Build prompt with context
-        prompt = self._build_prompt(user_message, include_sql)
+        if effective_include_sql:
+            prompt = self._build_prompt(user_message, include_sql=True)
+        else:
+            prompt = self._build_advisory_prompt(user_message)
         
         try:
             if self.provider == "openai":
@@ -378,7 +382,7 @@ class SQLChatbot:
             
             # Extract SQL from response if present
             sql_query = None
-            if include_sql:
+            if effective_include_sql:
                 # Look for SQL code block
                 if "```sql" in response_text:
                     sql_start = response_text.find("```sql")
@@ -794,6 +798,55 @@ class SQLChatbot:
                 prompt += "\nIf the question requires SQL, provide the SQL query in a code block. Keep explanations brief and focus on the actual SQL."
         
         return prompt
+
+    def _build_advisory_prompt(self, user_message: str) -> str:
+        """Build prompt for non-SQL advisory/conceptual questions."""
+        prompt = ""
+
+        db_type = self.schema_context.get('db_type', 'unknown') if self.schema_context else 'unknown'
+        if db_type != 'unknown':
+            prompt += f"Current Database Type: {db_type}\n\n"
+
+        if self.schema_context:
+            tables = self.schema_context.get('tables', [])
+            if tables:
+                if isinstance(tables[0], dict):
+                    table_names = [t.get('table_name', 'unknown') for t in tables[:20]]
+                else:
+                    table_names = [str(t) for t in tables[:20]]
+                prompt += f"Available tables (sample): {', '.join(table_names)}\n\n"
+
+        prompt += (
+            "The user is asking for guidance, not SQL generation.\n"
+            "Provide a practical, step-by-step answer with clear phases, risks, and validation steps.\n"
+            "Do NOT generate SQL unless the user explicitly asks for SQL scripts.\n\n"
+        )
+        prompt += f"User Question: {user_message}\n"
+        return prompt
+
+    def _should_generate_sql(self, user_message: str) -> bool:
+        """Heuristic classifier for SQL vs advisory responses."""
+        text = (user_message or "").strip().lower()
+        if not text:
+            return True
+
+        explicit_sql_markers = [
+            "select ", "insert ", "update ", "delete ", "create table", "alter table", "drop table",
+            "write sql", "generate sql", "sql query", "query for", "show me sql", "give me sql",
+            "fix this query", "optimize query", "join ", "where ", "group by", "order by",
+        ]
+        if any(marker in text for marker in explicit_sql_markers):
+            return True
+
+        advisory_markers = [
+            "migrate", "migration", "strategy", "roadmap", "approach", "best practice",
+            "best practices", "architecture", "compare", "comparison", "pros and cons",
+            "checklist", "plan", "steps", "how do i move", "how to move", "troubleshoot",
+        ]
+        if any(marker in text for marker in advisory_markers):
+            return False
+
+        return True
     
     def _build_openai_messages(self) -> List[Dict[str, str]]:
         """Build messages array for OpenAI API"""
