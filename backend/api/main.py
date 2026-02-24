@@ -57,6 +57,12 @@ class SchemaRequest(BaseModel):
     db_config: DBConfigPayload
 
 
+class ImportTableRequest(BaseModel):
+    db_config: DBConfigPayload
+    table_name: str = Field(min_length=1)
+    rows: List[Dict[str, Any]] = Field(min_length=1)
+
+
 def _serialize_value(value: Any) -> Any:
     if isinstance(value, datetime):
         return value.isoformat()
@@ -180,6 +186,31 @@ def schema(request: SchemaRequest, x_api_token: Optional[str] = Header(default=N
         # Chatbot expects db_type for SQL dialect (PostgreSQL vs SQLite etc.)
         base["db_type"] = base.get("database_type") or cfg.db_type or "unknown"
         return base
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        dbm.disconnect()
+
+
+@app.post("/v1/import")
+def import_table(
+    request: ImportTableRequest,
+    x_api_token: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    """Import rows into a table. rows: list of dicts with keys = table column names."""
+    _auth_guard(x_api_token)
+    dbm = DatabaseManager()
+    cfg = _build_config(request.db_config)
+    if not dbm.connect(cfg):
+        raise HTTPException(status_code=400, detail="Failed to connect to database")
+    if not request.rows:
+        raise HTTPException(status_code=400, detail="No rows to import")
+    columns = list(request.rows[0].keys())
+    if not columns:
+        raise HTTPException(status_code=400, detail="Row has no columns")
+    try:
+        inserted = dbm.insert_rows(request.table_name, columns, request.rows)
+        return {"inserted": inserted, "table": request.table_name}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:

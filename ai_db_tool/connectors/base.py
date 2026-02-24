@@ -241,7 +241,39 @@ class DatabaseManager:
             error_msg = f"Query execution failed: {e}"
             print(f"DEBUG: execute_non_query error: {error_msg}")
             raise ValueError(error_msg)
-    
+
+    def insert_rows(
+        self,
+        table_name: str,
+        columns: List[str],
+        rows: List[Dict[str, Any]],
+        connection_id: str = "default",
+    ) -> int:
+        """
+        Insert multiple rows into a table using parameterized queries (safe from SQL injection).
+        columns: list of column names in order; rows: list of dicts with those keys.
+        """
+        engine = self.get_engine(connection_id)
+        if not engine:
+            raise ValueError("No active connection")
+        if not columns or not rows:
+            return 0
+        # Build INSERT with named placeholders (values are bound, so safe from SQL injection)
+        cols = ", ".join(columns)
+        placeholders = ", ".join(f":{c}" for c in columns)
+        stmt = text(f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})")
+        try:
+            with engine.begin() as conn:
+                total = 0
+                for row in rows:
+                    # Only pass keys that are in columns
+                    bound = {c: row.get(c) for c in columns}
+                    conn.execute(stmt, bound)
+                    total += 1
+            return total
+        except SQLAlchemyError as e:
+            raise ValueError(f"Insert failed: {e}") from e
+
     def get_tables(self, connection_id: str = "default") -> List[str]:
         """Get list of all tables in the database"""
         engine = self.get_engine(connection_id)
