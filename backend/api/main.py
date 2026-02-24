@@ -177,6 +177,8 @@ def schema(request: SchemaRequest, x_api_token: Optional[str] = Header(default=N
                 full_tables.append({"table_name": table_name, "columns": []})
         base["tables"] = full_tables
         base["total_tables"] = len(full_tables)
+        # Chatbot expects db_type for SQL dialect (PostgreSQL vs SQLite etc.)
+        base["db_type"] = base.get("database_type") or cfg.db_type or "unknown"
         return base
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -449,10 +449,17 @@ class SQLChatbot:
         """Build prompt with schema context"""
         prompt = ""
         
-        # Add database type if available
+        # Add database type if available (critical for correct SQL dialect)
         db_type = self.schema_context.get('db_type', 'unknown') if self.schema_context else 'unknown'
         if db_type != 'unknown':
-            prompt += f"Database Type: {db_type}\n\n"
+            prompt += f"Database Type: {db_type}\n"
+            prompt += "You MUST generate SQL valid ONLY for this database type. "
+            if db_type == 'postgresql':
+                prompt += "For PostgreSQL: list tables with information_schema.tables (e.g. SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'), NOT sqlite_master.\n\n"
+            elif db_type == 'sqlite':
+                prompt += "For SQLite: list tables with sqlite_master (e.g. SELECT name FROM sqlite_master WHERE type='table').\n\n"
+            else:
+                prompt += "Use the correct system tables/catalog for this database.\n\n"
         
         # Add existing data analysis if available (CRITICAL for INSERT operations)
         if self.schema_context and self.schema_context.get('data_analysis'):
