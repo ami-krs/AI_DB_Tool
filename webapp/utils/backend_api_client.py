@@ -9,23 +9,40 @@ import requests
 import streamlit as st
 
 
+def _get_backend_config(key: str) -> str:
+    """Get config from env or Streamlit secrets (for Streamlit Cloud)."""
+    val = (os.getenv(key) or "").strip()
+    if val:
+        return val
+    try:
+        if hasattr(st, "secrets") and st.secrets:
+            # st.secrets supports dict-like and attribute access
+            secret = st.secrets.get(key) if hasattr(st.secrets, "get") else getattr(st.secrets, key, None)
+            if secret is not None:
+                return str(secret).strip()
+    except Exception:
+        pass
+    return ""
+
+
 def backend_api_enabled() -> bool:
     """Return True when Streamlit should call external backend API."""
-    raw = (os.getenv("USE_BACKEND_API") or "").strip().lower()
+    raw = _get_backend_config("USE_BACKEND_API").lower()
     return raw in {"1", "true", "yes", "on"}
 
 
 def backend_api_base_url() -> str:
-    """Resolve backend base URL from env or session state."""
-    return (
-        os.getenv("BACKEND_API_URL")
+    """Resolve backend base URL from env, secrets, or session state."""
+    url = (
+        _get_backend_config("BACKEND_API_URL")
         or st.session_state.get("api_server_url")
         or "http://localhost:8000"
-    ).rstrip("/")
+    )
+    return url.rstrip("/")
 
 
 def _headers() -> Dict[str, str]:
-    token = (os.getenv("BACKEND_API_TOKEN") or "").strip()
+    token = _get_backend_config("BACKEND_API_TOKEN")
     return {"X-API-Token": token} if token else {}
 
 

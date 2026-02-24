@@ -47,6 +47,43 @@ ANTHROPIC_API_KEY = "sk-ant-your-actual-key-here"
 
 ---
 
+## Using the deployed backend API (e.g. Render)
+
+If you deployed the FastAPI backend (e.g. at `https://datamindai.onrender.com`), point the Streamlit app to it so chat and query execution use the backend instead of running inside Streamlit.
+
+### Where to set these
+
+**Streamlit Cloud (hosted app):**
+
+1. In the Streamlit Cloud app dashboard, click **Manage app** → **Settings**.
+2. Scroll to **Secrets** and click **Edit secrets**.
+3. Add (or append to) your secrets in TOML format:
+
+```toml
+USE_BACKEND_API = "true"
+BACKEND_API_URL = "https://datamindai.onrender.com"
+# Optional, only if you set API_AUTH_TOKEN on the backend:
+# BACKEND_API_TOKEN = "your-token"
+```
+
+4. Save. The app will redeploy and use the backend API.
+
+**Local run:**
+
+1. In the project root (same folder as where you run `streamlit run ...`), create or edit a file named **`.env`**.
+2. Add these lines (no quotes needed for the URL):
+
+```
+USE_BACKEND_API=true
+BACKEND_API_URL=https://datamindai.onrender.com
+```
+3. Optional: if you set `API_AUTH_TOKEN` on the backend, add `BACKEND_API_TOKEN=your-token`.
+4. Restart the Streamlit app.
+
+The app reads these from environment variables or from Streamlit secrets, so either place works.
+
+---
+
 ## What Works Without API Keys
 
 ✅ **All Database Operations:**
