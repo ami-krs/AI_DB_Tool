@@ -213,7 +213,10 @@ def execute_single_statement(statement: str) -> Dict[str, Any]:
     
     # Check if statement contains transaction control (BEGIN/COMMIT/ROLLBACK)
     # If so, we need to execute it differently to avoid nested transactions
-    has_transaction_control = any(cmd in statement_upper for cmd in ['BEGIN', 'COMMIT', 'ROLLBACK', 'END'])
+    has_transaction_control = bool(
+        re.search(r"\b(BEGIN|COMMIT|ROLLBACK)\b", statement_upper)
+        or re.search(r"\bEND\b\s*;?\s*$", statement_upper)
+    )
     
     # Determine query type
     is_ddl = any(statement_upper.startswith(cmd) for cmd in [
@@ -486,7 +489,15 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
         enable_agents: Whether to use AI agents for analysis (default: from session state)
         unique_suffix: Optional unique suffix for widget keys to prevent duplicates
     """
-    if not query.strip():
+    # Older Streamlit + custom editor reruns can occasionally pass an empty value
+    # on click; fall back to the persisted editor state in that case.
+    if not (query or "").strip():
+        query = (
+            st.session_state.get("sql_editor")
+            or st.session_state.get("sql_editor__query_value")
+            or ""
+        )
+    if not str(query).strip():
         st.warning("Please enter a query")
         return
 
@@ -549,8 +560,8 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     # Check if query contains a transaction block (BEGIN...COMMIT)
     # If so, execute it as a single statement to preserve transaction semantics
     query_upper = query.strip().upper()
-    has_begin = 'BEGIN' in query_upper
-    has_commit = 'COMMIT' in query_upper or 'END' in query_upper
+    has_begin = bool(re.search(r"\bBEGIN\b", query_upper))
+    has_commit = bool(re.search(r"\bCOMMIT\b", query_upper) or re.search(r"\bEND\b\s*;?\s*$", query_upper))
     
     # If it's a transaction block, execute as single statement
     if has_begin and has_commit:
@@ -887,95 +898,97 @@ def execute_query(query: str, enable_agents: Optional[bool] = None, unique_suffi
     error_count = 0
     
     for idx, statement in enumerate(statements, 1):
-        with st.expander(f"Statement {idx}/{len(statements)}", expanded=(idx == 1)):
-            st.code(statement, language='sql')
+        # Avoid nested expander rendering issues when execute_query() is called from
+        # chatbot SQL blocks (already inside an expander in that UI path).
+        st.markdown(f"**Statement {idx}/{len(statements)}**")
+        st.code(statement, language='sql')
+        
+        result = execute_single_statement(statement)
+        if not result['success']:
+            auto_fix = _try_auto_fix_duplicate_pk_insert(statement, str(result.get('error', '')))
+            if auto_fix:
+                result = auto_fix["result"]
+                statement = auto_fix["rewritten_statement"]
+                st.info(
+                    f"ℹ️ Statement {idx}: Auto-corrected duplicate primary key on "
+                    f"`{auto_fix['pk_column']}` with next ID `{auto_fix['next_id']}`."
+                )
+        results.append(result)
+        
+        if result['success']:
+            success_count += 1
             
-            result = execute_single_statement(statement)
-            if not result['success']:
-                auto_fix = _try_auto_fix_duplicate_pk_insert(statement, str(result.get('error', '')))
-                if auto_fix:
-                    result = auto_fix["result"]
-                    statement = auto_fix["rewritten_statement"]
-                    st.info(
-                        f"ℹ️ Statement {idx}: Auto-corrected duplicate primary key on "
-                        f"`{auto_fix['pk_column']}` with next ID `{auto_fix['next_id']}`."
-                    )
-            results.append(result)
+            if result['type'] == 'SELECT':
+                st.success(f"✅ Statement {idx} executed: Retrieved {result['rows_retrieved']:,} rows")
+                if result['dataframe'] is not None and len(result['dataframe']) > 0:
+                    st.session_state.current_page = 1
+                    # Display results for each SELECT query
+                    display_paginated_dataframe(result['dataframe'], unique_suffix=f"multi_stmt_{idx}_{len(statements)}")
+                    
+                    # Store last result for visualization (will be overwritten by subsequent SELECT queries)
+                    st.session_state.last_result_df = result['dataframe']
+                    st.session_state.last_result = result['dataframe']
+                    
+                    # For chatbot auto-execution, also store results in a list to show all
+                    if unique_suffix and "chatbot_auto" in unique_suffix:
+                        if 'chatbot_multi_query_results' not in st.session_state:
+                            st.session_state['chatbot_multi_query_results'] = []
+                        st.session_state['chatbot_multi_query_results'].append({
+                            'query': statement,
+                            'dataframe': result['dataframe'],
+                            'index': idx
+                        })
             
-            if result['success']:
-                success_count += 1
-                
-                if result['type'] == 'SELECT':
-                    st.success(f"✅ Statement {idx} executed: Retrieved {result['rows_retrieved']:,} rows")
-                    if result['dataframe'] is not None and len(result['dataframe']) > 0:
-                        st.session_state.current_page = 1
-                        # Display results for each SELECT query
-                        display_paginated_dataframe(result['dataframe'], unique_suffix=f"multi_stmt_{idx}_{len(statements)}")
-                        
-                        # Store last result for visualization (will be overwritten by subsequent SELECT queries)
-                        st.session_state.last_result_df = result['dataframe']
-                        st.session_state.last_result = result['dataframe']
-                        
-                        # For chatbot auto-execution, also store results in a list to show all
-                        if unique_suffix and "chatbot_auto" in unique_suffix:
-                            if 'chatbot_multi_query_results' not in st.session_state:
-                                st.session_state['chatbot_multi_query_results'] = []
-                            st.session_state['chatbot_multi_query_results'].append({
-                                'query': statement,
-                                'dataframe': result['dataframe'],
-                                'index': idx
-                            })
-                
-                elif result['type'] == 'DDL':
-                    st.success(f"✅ Statement {idx} executed: DDL operation completed")
-                
-                else:  # DML
-                    st.success(f"✅ Statement {idx} executed: {result['rows_affected']} row(s) affected")
+            elif result['type'] == 'DDL':
+                st.success(f"✅ Statement {idx} executed: DDL operation completed")
+            
+            else:  # DML
+                st.success(f"✅ Statement {idx} executed: {result['rows_affected']} row(s) affected")
+        else:
+            error_count += 1
+            st.error(f"❌ Statement {idx} failed: {result['error']}")
+            
+            # Debug Agent: Analyze the error for multi-statement queries
+            print(f"DEBUG: Error occurred in statement {idx}, orchestrator={orchestrator is not None}")
+            if orchestrator:
+                try:
+                    from ui.agent_display import display_agent_response
+                    schema_info = st.session_state.get('schema_info', {})
+                    db_type = st.session_state.get('db_type', 'unknown')
+                    
+                    # Extract error information
+                    error_obj = result.get('error', 'Unknown error')
+                    error_message = str(error_obj) if error_obj else 'Unknown error'
+                    
+                    # Extract error type
+                    error_type = type(error_obj).__name__ if error_obj and hasattr(error_obj, '__class__') else 'Error'
+                    
+                    print(f"DEBUG: Calling Debug Agent - error_type={error_type}, error_message length={len(error_message)}")
+                    with st.spinner("🐛 Debugging error with AI..."):
+                        debug_response = orchestrator.debug_error(
+                            statement,
+                            error_type,
+                            error_message,
+                            schema_info,
+                            db_type,
+                            db_manager=st.session_state.get('db_manager')
+                        )
+                        print(f"DEBUG: Debug Agent response received: {debug_response is not None}")
+                        if debug_response:
+                            display_agent_response(debug_response, expanded=True)
+                            print(f"DEBUG: Debug Agent response displayed")
+                        else:
+                            print("DEBUG: Debug Agent returned None response")
+                except Exception as e:
+                    # Show error in debug mode, but don't break the UI
+                    import traceback
+                    print(f"DEBUG: Debug Agent failed: {e}")
+                    print(traceback.format_exc())
+                    st.debug(f"Debug analysis failed: {e}")
             else:
-                error_count += 1
-                st.error(f"❌ Statement {idx} failed: {result['error']}")
-                
-                # Debug Agent: Analyze the error for multi-statement queries
-                print(f"DEBUG: Error occurred in statement {idx}, orchestrator={orchestrator is not None}")
-                if orchestrator:
-                    try:
-                        from ui.agent_display import display_agent_response
-                        schema_info = st.session_state.get('schema_info', {})
-                        db_type = st.session_state.get('db_type', 'unknown')
-                        
-                        # Extract error information
-                        error_obj = result.get('error', 'Unknown error')
-                        error_message = str(error_obj) if error_obj else 'Unknown error'
-                        
-                        # Extract error type
-                        error_type = type(error_obj).__name__ if error_obj and hasattr(error_obj, '__class__') else 'Error'
-                        
-                        print(f"DEBUG: Calling Debug Agent - error_type={error_type}, error_message length={len(error_message)}")
-                        with st.spinner("🐛 Debugging error with AI..."):
-                            debug_response = orchestrator.debug_error(
-                                statement,
-                                error_type,
-                                error_message,
-                                schema_info,
-                                db_type,
-                                db_manager=st.session_state.get('db_manager')
-                            )
-                            print(f"DEBUG: Debug Agent response received: {debug_response is not None}")
-                            if debug_response:
-                                display_agent_response(debug_response, expanded=True)
-                                print(f"DEBUG: Debug Agent response displayed")
-                            else:
-                                print("DEBUG: Debug Agent returned None response")
-                    except Exception as e:
-                        # Show error in debug mode, but don't break the UI
-                        import traceback
-                        print(f"DEBUG: Debug Agent failed: {e}")
-                        print(traceback.format_exc())
-                        st.debug(f"Debug analysis failed: {e}")
-                else:
-                    print(f"DEBUG: Orchestrator is None - enable_agents={enable_agents}, AGENTS_AVAILABLE={AGENTS_AVAILABLE}")
-                
-                st.info("💡 This statement failed, but other statements will continue executing.")
+                print(f"DEBUG: Orchestrator is None - enable_agents={enable_agents}, AGENTS_AVAILABLE={AGENTS_AVAILABLE}")
+            
+            st.info("💡 This statement failed, but other statements will continue executing.")
     
     # Summary
     st.markdown("---")
@@ -1149,8 +1162,9 @@ def execute_generated_query(query: str):
         # If validation fails for any reason, don't block execution
         pass
 
-    # Use unique suffix to prevent duplicate element keys when same query is executed manually after auto-execution
-    execute_query(query, unique_suffix="chatbot_manual")
+    # For chatbot manual execution, prioritize deterministic DB execution over agent analysis.
+    # This avoids pre-analysis interruptions on some environments for multi-statement DML.
+    execute_query(query, enable_agents=False, unique_suffix="chatbot_manual")
 
 def show_table_details():
     """Show detailed table information"""

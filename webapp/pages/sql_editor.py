@@ -62,7 +62,7 @@ def sql_editor_compact():
     action_col1, action_col2, action_col3, action_col4, action_col5 = st.columns([1, 1, 2, 2, 2])
     with action_col1:
         if st.button("▶️", type="primary", width="stretch", key="run_btn_compact", help="Execute Query"):
-            execute_query(query)
+            execute_query(query or st.session_state.get("sql_editor", ""))
     with action_col2:
         if st.button("🤖", width="stretch", help="Generate SQL"):
             generate_sql_query()
@@ -149,7 +149,7 @@ def sql_editor_tab():
         action_col1, action_col2, action_col3 = st.columns([1, 1, 10])
         with action_col1:
             if st.button("▶️", type="primary", width="stretch", key="run_btn_tab", help="Execute Query"):
-                execute_query(query)
+                execute_query(query or st.session_state.get("sql_editor", ""))
         with action_col2:
             if st.button("🤖", width="stretch", help="Generate SQL"):
                 generate_sql_query()

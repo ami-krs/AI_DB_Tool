@@ -8,7 +8,86 @@ Modularized version - imports from separate modules for better organization
 import streamlit as st
 import os
 import sys
+import inspect
+from functools import wraps
 from pathlib import Path
+
+
+def _apply_streamlit_width_compat() -> None:
+    """Backport width=... kwargs to older Streamlit versions.
+
+    Newer Streamlit uses width="stretch"/"content" for many widgets.
+    Older versions still expect use_container_width=... and raise
+    TypeError for unknown width kwarg.
+    """
+    def _patch(func_name: str) -> None:
+        fn = getattr(st, func_name, None)
+        if fn is None:
+            return
+        try:
+            sig = inspect.signature(fn)
+        except Exception:
+            return
+        has_width_param = "width" in sig.parameters
+        has_use_container_param = "use_container_width" in sig.parameters
+
+        @wraps(fn)
+        def _wrapped(*args, **kwargs):
+            original_kwargs = dict(kwargs)
+
+            # Normalize width keywords for mixed Streamlit versions.
+            if "width" in kwargs:
+                width_val = kwargs.get("width")
+                if isinstance(width_val, str):
+                    width_norm = width_val.lower().strip()
+                    if width_norm in {"stretch", "content"}:
+                        # Prefer legacy arg when available.
+                        if has_use_container_param and "use_container_width" not in kwargs:
+                            kwargs["use_container_width"] = width_norm == "stretch"
+                        # If width takes only int in this Streamlit build, drop string width.
+                        if not has_width_param or width_norm in {"stretch", "content"}:
+                            kwargs.pop("width", None)
+
+            # If function has no width support at all, remove any width kwarg.
+            if not has_width_param:
+                kwargs.pop("width", None)
+
+            try:
+                return fn(*args, **kwargs)
+            except TypeError as exc:
+                # Some Streamlit builds expose width but only accept int; retry via legacy arg.
+                msg = str(exc)
+                retriable_width_error = (
+                    "width" in msg.lower()
+                    and ("expected one of: int" in msg.lower() or "unexpected keyword argument" in msg.lower())
+                )
+                if retriable_width_error and "width" in original_kwargs:
+                    retry_kwargs = dict(original_kwargs)
+                    retry_width = retry_kwargs.pop("width", None)
+                    if (
+                        isinstance(retry_width, str)
+                        and has_use_container_param
+                        and "use_container_width" not in retry_kwargs
+                    ):
+                        retry_kwargs["use_container_width"] = retry_width.lower().strip() == "stretch"
+                    return fn(*args, **retry_kwargs)
+                raise
+
+        setattr(st, func_name, _wrapped)
+
+    # Common widgets we use with width=...
+    for _name in (
+        "button",
+        "form_submit_button",
+        "download_button",
+        "dataframe",
+        "plotly_chart",
+        "altair_chart",
+    ):
+        _patch(_name)
+
+
+_apply_streamlit_width_compat()
 
 # Load environment variables (optional - Streamlit Cloud uses secrets.toml instead)
 # Note: python-dotenv is optional - Streamlit Cloud uses .streamlit/secrets.toml
