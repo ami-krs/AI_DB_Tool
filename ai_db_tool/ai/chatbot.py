@@ -839,9 +839,10 @@ class SQLChatbot:
             return True
 
         advisory_markers = [
-            "migrate", "migration", "strategy", "roadmap", "approach", "best practice",
+            "migrate", "migrating", "migration", "strategy", "roadmap", "approach", "best practice",
             "best practices", "architecture", "compare", "comparison", "pros and cons",
-            "checklist", "plan", "steps", "how do i move", "how to move", "troubleshoot",
+            "checklist", "plan", "steps", "how do i move", "how to move", "move from",
+            "how do i migrate", "how to migrate", "troubleshoot",
         ]
         if any(marker in text for marker in advisory_markers):
             return False
