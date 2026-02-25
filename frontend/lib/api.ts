@@ -74,3 +74,85 @@ export async function getSchema(dbConfig: DbConfig): Promise<SchemaResponse> {
   }
   return res.json();
 }
+
+export type DebugErrorResult = {
+  analysis: string | null;
+  suggestions: string[];
+  confidence: number;
+  suggested_sql: string | null;
+  agent_name: string;
+};
+
+export async function debugError(
+  dbConfig: DbConfig,
+  query: string,
+  errorMessage: string
+): Promise<DebugErrorResult> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/v1/debug-error`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      db_config: dbConfig,
+      query: query.trim(),
+      error_message: errorMessage,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || res.statusText);
+  }
+  return res.json();
+}
+
+export async function importTable(
+  dbConfig: DbConfig,
+  tableName: string,
+  rows: Record<string, unknown>[]
+): Promise<{ inserted: number; table: string }> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/v1/import`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      db_config: dbConfig,
+      table_name: tableName,
+      rows,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || res.statusText);
+  }
+  return res.json();
+}
+
+export type SmartImportResult = {
+  inserted: number;
+  table: string;
+  loaded_columns: string[];
+  remapped_pk_count: number;
+  remapped_pk_column: string | null;
+  skipped_existing_pk_count: number;
+  skipped_file_duplicate_pk_count: number;
+  hint: string | null;
+};
+
+export async function importSmart(
+  dbConfig: DbConfig,
+  tableName: string,
+  rows: Record<string, unknown>[]
+): Promise<SmartImportResult> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/v1/import/smart`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      db_config: dbConfig,
+      table_name: tableName,
+      rows,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || res.statusText);
+  }
+  return res.json();
+}

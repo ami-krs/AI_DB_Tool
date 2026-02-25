@@ -10,6 +10,7 @@ This service is designed to run separately from Streamlit and provide:
 from __future__ import annotations
 
 import os
+import re
 import sys
 from datetime import date, datetime
 from decimal import Decimal
@@ -26,6 +27,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from ai_db_tool.ai.agents import DebugAgent
 from ai_db_tool.ai.chatbot import SQLChatbot
 from ai_db_tool.connectors.base import DatabaseConfig, DatabaseManager
 
@@ -57,6 +59,12 @@ class QueryExecuteRequest(BaseModel):
 
 class SchemaRequest(BaseModel):
     db_config: DBConfigPayload
+
+
+class DebugErrorRequest(BaseModel):
+    db_config: DBConfigPayload
+    query: str = Field(min_length=1)
+    error_message: str = Field(min_length=1)
 
 
 class ImportTableRequest(BaseModel):
@@ -93,6 +101,16 @@ def _build_config(payload: DBConfigPayload) -> DatabaseConfig:
 
 def _get_api_key() -> Optional[str]:
     return os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+
+
+def _extract_suggested_sql(analysis: str) -> Optional[str]:
+    """Extract first ```sql ...``` block from analysis text."""
+    if not analysis:
+        return None
+    match = re.search(r"```sql\s*([\s\S]*?)```", analysis, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1).strip() or None
 
 
 def _auth_guard(x_api_token: Optional[str]) -> None:
@@ -243,6 +261,70 @@ def schema(request: SchemaRequest, x_api_token: Optional[str] = Header(default=N
         return base
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        dbm.disconnect()
+
+
+@app.post("/v1/debug-error")
+def debug_error(
+    request: DebugErrorRequest,
+    x_api_token: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    """
+    Run the Debug Agent on a failed SQL query: returns analysis, suggestions,
+    and optional corrected SQL for the user.
+    """
+    _auth_guard(x_api_token)
+    api_key = _get_api_key()
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Debug agent requires OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.",
+        )
+    dbm = DatabaseManager()
+    cfg = _build_config(request.db_config)
+    if not dbm.connect(cfg):
+        raise HTTPException(status_code=400, detail="Failed to connect to database")
+    try:
+        base = dbm.get_database_info()
+        tables = dbm.get_tables()
+        full_tables: List[Dict[str, Any]] = []
+        for table_name in tables:
+            try:
+                full_tables.append(dbm.get_table_schema(table_name))
+            except Exception:
+                full_tables.append({"table_name": table_name, "columns": []})
+        base["tables"] = full_tables
+        base["total_tables"] = len(full_tables)
+        db_type = base.get("database_type") or cfg.db_type or "unknown"
+        base["db_type"] = db_type
+
+        provider = os.getenv("AI_PROVIDER", "openai").lower()
+        model = os.getenv("AI_MODEL", "gpt-4o")
+        debug_agent = DebugAgent(api_key=api_key, provider=provider, model=model)
+        context = {
+            "query": request.query,
+            "error": request.error_message,
+            "error_message": request.error_message,
+            "schema_info": base,
+            "db_type": db_type,
+            "db_manager": dbm,
+        }
+        response = debug_agent.analyze(context)
+        suggested_sql = _extract_suggested_sql(response.analysis or "")
+        return {
+            "analysis": response.analysis,
+            "suggestions": response.suggestions,
+            "confidence": response.confidence,
+            "suggested_sql": suggested_sql,
+            "agent_name": response.agent_name,
+        }
+    except ValueError as exc:
+        if "API key" in str(exc):
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         dbm.disconnect()
 

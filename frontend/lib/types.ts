@@ -9,11 +9,13 @@ export interface DbConfig {
   extra_params?: Record<string, unknown>;
 }
 
-/** Chat response from POST /v1/chat */
+/** Chat response from POST /v1/chat (matches backend SQLChatbot return shape) */
 export interface ChatResponse {
-  message?: string;
-  sql?: string;
-  explanation?: string;
+  response?: string;
+  sql_query?: string;
+  error?: string;
+  show_upload_panel?: boolean;
+  upload_target_table?: string;
   [key: string]: unknown;
 }
 
