@@ -93,9 +93,18 @@ export default function SqlPage() {
   const [suggestions, setSuggestions] = useState<{ label: string; insertText: string; kind: "keyword" | "table" }[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef(0);
   const insertCursorRef = useRef<number | null>(null);
+
+  const copyToClipboard = (text: string) => {
+    if (!text.trim()) return;
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    });
+  };
 
   const getTextarea = () =>
     editorContainerRef.current?.querySelector("textarea") as HTMLTextAreaElement | null;
@@ -269,17 +278,30 @@ export default function SqlPage() {
               )}
               {debugHint.suggested_sql && (
                 <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery(debugHint!.suggested_sql!);
-                      setError(null);
-                      setDebugHint(null);
-                    }}
-                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                  >
-                    Use suggested SQL
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuery(debugHint!.suggested_sql!);
+                        setError(null);
+                        setDebugHint(null);
+                      }}
+                      className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    >
+                      Use suggested SQL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(debugHint.suggested_sql!)}
+                      title="Copy suggested SQL"
+                      className="flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 dark:hover:text-slate-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    </button>
+                  </div>
                   <pre className="mt-2 max-h-40 overflow-auto rounded border border-slate-200 bg-slate-50 p-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-900">
                     <code>{debugHint.suggested_sql}</code>
                   </pre>
@@ -290,7 +312,22 @@ export default function SqlPage() {
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative group">
+        <button
+          type="button"
+          onClick={() => copyToClipboard(query)}
+          title="Copy SQL"
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity hover:bg-slate-50 hover:text-slate-700 group-hover:opacity-100 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+        >
+          {copyFeedback ? (
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Copied!</span>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+        </button>
         <div
           ref={editorContainerRef}
           className="sql-editor-wrapper w-full overflow-hidden rounded-lg border border-slate-300 bg-white p-3 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"

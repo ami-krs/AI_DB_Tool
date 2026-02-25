@@ -254,9 +254,9 @@ class DebugAgent(BaseAgent):
 CRITICAL REQUIREMENTS:
 1. You MUST provide a corrected SQL query in a ```sql code block
 2. Use ONLY actual column names from the provided schema - NEVER use generic names like 'id' unless that column actually exists
-3. For JOIN queries: Use actual foreign key column names from the schema (e.g., 'department_id', 'employee_id')
+3. For JOIN queries: Use actual foreign key column names from the schema (e.g., 'department_id', 'employee_id'). JOIN ORDER: each table must appear in FROM or in an earlier JOIN before you reference it in an ON condition; the referenced (parent) table must appear before the table that has the foreign key (child).
 4. For UPDATE/DELETE: Use actual primary key column names from the schema
-5. Check the schema carefully before suggesting column names
+5. Check the schema carefully before suggesting column names (including Primary key(s) and Foreign key lines)
 6. For MULTIPLE UPDATE statements with foreign key constraints:
    - When updating PRIMARY KEYS that are referenced by FOREIGN KEYS in PostgreSQL:
      * IMPORTANT: Most PostgreSQL foreign key constraints are NOT DEFERRABLE by default
@@ -334,24 +334,41 @@ Be very concise. Provide corrected SQL using actual schema column names."""
             schema_context += f"Database Type: {db_type}\n"
             schema_context += f"Total Tables: {schema_info.get('total_tables', len(tables))}\n\n"
             
-            # Add table and column information
-            for table in tables[:10]:  # Limit to first 10 tables
+            # Add table and column information plus primary keys and foreign keys
+            for table in tables[:15]:  # Include more tables for JOIN context
                 if isinstance(table, dict):
                     table_name = table.get('table_name', 'unknown')
                     columns_list = table.get('columns', [])
+                    primary_keys = table.get('primary_keys', [])
+                    foreign_keys = table.get('foreign_keys', [])
                     if columns_list:
                         if isinstance(columns_list[0], dict):
                             col_names = [col.get('name', str(col)) for col in columns_list]
                         else:
                             col_names = [str(col) for col in columns_list]
-                        schema_context += f"Table: {table_name}\n  Columns: {', '.join(col_names[:20])}\n"
+                        schema_context += f"Table: {table_name}\n  Columns: {', '.join(col_names[:25])}\n"
                     else:
                         schema_context += f"Table: {table_name} (no column info)\n"
+                    if primary_keys:
+                        schema_context += f"  Primary key(s): {', '.join(primary_keys)}\n"
+                    if foreign_keys:
+                        for fk in foreign_keys:
+                            if isinstance(fk, dict):
+                                fk_cols = fk.get('constrained_columns', [])
+                                ref_table = fk.get('referred_table', '')
+                                ref_cols = fk.get('referred_columns', [])
+                                if fk_cols and ref_table:
+                                    fk_col = fk_cols[0] if fk_cols else '?'
+                                    ref_col = ref_cols[0] if ref_cols else '?'
+                                    schema_context += f"  Foreign key: {fk_col} -> {ref_table}({ref_col})\n"
                 elif isinstance(table, str):
                     schema_context += f"Table: {table}\n"
             
             schema_context += "\n=== END SCHEMA ===\n"
             schema_context += "\nCRITICAL: Use ONLY the column names listed above. NEVER use generic names like 'id' unless that exact column exists in the table's column list.\n"
+            schema_context += "\nJOIN ORDER: A table must appear in FROM or in an earlier JOIN before you reference it in an ON condition. "
+            schema_context += "Use the Foreign key lines above: the REFERENCED table (right side of ->) must appear BEFORE the table that has the foreign key. "
+            schema_context += "Example: if procurement has 'Foreign key: purchase_order_id -> purchase_order(purchase_order_id)', then list purchase_order in FROM/JOIN before procurement.\n"
         
         # For UniqueViolation errors, try to query existing primary key values
         existing_pk_values = None
@@ -401,6 +418,10 @@ Be very concise. Provide corrected SQL using actual schema column names."""
             pk_context += f"CRITICAL: You MUST use a value that is NOT in the list above, or use the next available ID.\n"
             pk_context += f"=== END EXISTING PRIMARY KEY VALUES ===\n"
         
+        join_order_hint = ""
+        if "missing FROM-clause" in str(error_message) or "UndefinedTable" in str(error_message) or "undefined table" in str(error_message).lower():
+            join_order_hint = "\nIMPORTANT: This error usually means a table is referenced in an ON clause before it appears in FROM/JOIN. Reorder JOINs so that the REFERENCED table (right side of Foreign key: x -> table(col)) appears BEFORE the table that references it.\n"
+        
         user_prompt = f"""Debug this SQL error and provide a corrected query:
 
 Database: {db_type} ({schema_info.get('total_tables', 0)} tables)
@@ -410,12 +431,12 @@ Query: ```sql
 {query}
 ```
 Error: {error} - {error_message}
-
+{join_order_hint}
 REQUIRED:
 1. Root cause (one sentence)
 2. Provide a CORRECTED SQL query in a ```sql code block using ONLY actual column names from the schema above
 3. Replace any generic column names (like 'id') with actual column names from the schema
-4. For JOIN queries: Use actual foreign key columns from the schema (e.g., 'department_id', 'employee_id')
+4. For JOIN queries: Use actual foreign key columns from the schema and correct JOIN ORDER (referenced table must appear before the table that references it)
 5. For INSERT statements with PRIMARY KEY violations (UniqueViolation/duplicate key):
    - If error mentions "duplicate key value violates unique constraint" or "UniqueViolation" or "Key (column_name)=(value) already exists":
      * The primary key value already exists in the table
