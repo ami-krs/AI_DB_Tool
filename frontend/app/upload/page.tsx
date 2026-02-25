@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useDbConfig } from "@/lib/db-config";
-import { getSchema, importTable } from "@/lib/api";
+import { getSchema, importTable, importSmart } from "@/lib/api";
 import type { SchemaResponse } from "@/lib/types";
 import { parseCsv } from "@/lib/csv-parse";
 
+type ImportMode = "auto" | "manual";
+
 export default function UploadPage() {
   const { dbConfig, isConnected } = useDbConfig();
+  const [importMode, setImportMode] = useState<ImportMode>("auto");
   const [schema, setSchema] = useState<SchemaResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
@@ -18,7 +21,7 @@ export default function UploadPage() {
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ inserted: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ inserted: number; hint?: string | null } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,7 +75,38 @@ export default function UploadPage() {
     });
   };
 
-  const handleImport = async () => {
+  const rowsFromCsvForAuto = (): Record<string, unknown>[] => {
+    if (csvHeaders.length === 0) return [];
+    return csvRows.map((row) => {
+      const obj: Record<string, unknown> = {};
+      csvHeaders.forEach((h, i) => {
+        obj[h] = row[i] ?? "";
+      });
+      return obj;
+    });
+  };
+
+  const handleImportAuto = async () => {
+    if (!dbConfig || !selectedTable) return;
+    const rows = rowsFromCsvForAuto();
+    if (rows.length === 0) {
+      setImportError("CSV has no data rows.");
+      return;
+    }
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const res = await importSmart(dbConfig, selectedTable, rows);
+      setImportResult({ inserted: res.inserted, hint: res.hint ?? null });
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportManual = async () => {
     if (!dbConfig || !selectedTable) return;
     const rows = mappedRows();
     if (rows.length === 0) {
@@ -105,8 +139,45 @@ export default function UploadPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Import data from CSV</h1>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Import mode
+        </label>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === "auto"}
+              onChange={() => setImportMode("auto")}
+              className="text-indigo-600"
+            />
+            <span className="text-slate-700 dark:text-slate-200">Automatic</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              — CSV columns are matched to table columns by name (case-insensitive). Primary keys are handled automatically.
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="importMode"
+              checked={importMode === "manual"}
+              onChange={() => setImportMode("manual")}
+              className="text-indigo-600"
+            />
+            <span className="text-slate-700 dark:text-slate-200">Manual</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              — Choose which CSV column maps to each table column.
+            </span>
+          </label>
+        </div>
+      </div>
+
       <p className="text-slate-600 dark:text-slate-400">
-        Select a table, upload a CSV file, map CSV columns to table columns, then import.
+        {importMode === "auto"
+          ? "Select a table and upload a CSV file. Column names are matched automatically."
+          : "Select a table, upload a CSV file, map CSV columns to table columns, then import."}
       </p>
 
       {loading && <p className="text-slate-500">Loading schema…</p>}
@@ -151,7 +222,23 @@ export default function UploadPage() {
         )}
       </div>
 
-      {csvHeaders.length > 0 && selectedTable && (
+      {importMode === "auto" && (
+        <>
+          {csvHeaders.length > 0 && selectedTable && rowsFromCsvForAuto().length > 0 && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleImportAuto}
+                disabled={importing}
+                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {importing ? "Importing…" : "Import (automatic mapping)"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {importMode === "manual" && csvHeaders.length > 0 && selectedTable && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
           <h2 className="mb-3 text-lg font-semibold text-slate-800 dark:text-slate-100">
             Map CSV columns to table columns
@@ -185,14 +272,14 @@ export default function UploadPage() {
         </div>
       )}
 
-      {csvHeaders.length > 0 && selectedTable && mappedRows().length > 0 && (
+      {importMode === "manual" && csvHeaders.length > 0 && selectedTable && mappedRows().length > 0 && (
         <div className="flex gap-2">
           <button
-            onClick={handleImport}
+            onClick={handleImportManual}
             disabled={importing}
             className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {importing ? "Importing…" : "Import"}
+            {importing ? "Importing…" : "Import (manual mapping)"}
           </button>
         </div>
       )}
@@ -200,6 +287,7 @@ export default function UploadPage() {
       {importResult && (
         <div className="rounded-lg bg-green-50 p-3 text-green-800 dark:bg-green-900/20 dark:text-green-300">
           Imported {importResult.inserted} row(s) into {selectedTable}.
+          {importResult.hint && <p className="mt-1 text-sm opacity-90">{importResult.hint}</p>}
         </div>
       )}
       {importError && (
