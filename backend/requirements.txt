@@ -9,5 +9,5 @@ numpy==1.26.4
 psycopg2-binary==2.9.11
 sqlparse==0.5.5
 sqlalchemy-utils==0.42.1
-passlib[bcrypt]==1.7.4
+bcrypt>=4.0.0
 PyJWT==2.10.1

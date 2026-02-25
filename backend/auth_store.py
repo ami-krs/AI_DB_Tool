@@ -1,6 +1,6 @@
 """
 Simple SQLite-backed user store for email/password auth.
-Passwords are hashed with bcrypt via passlib.
+Passwords are hashed with the bcrypt library (no passlib).
 """
 
 from __future__ import annotations
@@ -10,9 +10,8 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-# Optional: use passlib for bcrypt; fallback to no auth if not installed
 try:
-    from passlib.hash import bcrypt
+    import bcrypt
 
     HAS_BCRYPT = True
 except ImportError:
@@ -21,13 +20,12 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parents[1]
 AUTH_DB_PATH = Path(os.environ.get("AUTH_DB_PATH", str(ROOT_DIR / "data" / "auth.db")))
 
-# Bcrypt supports at most 72 bytes; truncate to avoid error
+# Bcrypt supports at most 72 bytes
 BCRYPT_MAX_PASSWORD_BYTES = 72
 
 
-def _truncate_password_for_bcrypt(password: str) -> str:
-    encoded = password.encode("utf-8")[:BCRYPT_MAX_PASSWORD_BYTES]
-    return encoded.decode("utf-8", errors="ignore")
+def _password_bytes(password: str) -> bytes:
+    return password.encode("utf-8")[:BCRYPT_MAX_PASSWORD_BYTES]
 
 
 def _get_conn():
@@ -60,13 +58,13 @@ def init_db() -> None:
 def register(email: str, password: str, name: Optional[str] = None) -> dict:
     """Register a new user. Returns user dict or raises ValueError."""
     if not HAS_BCRYPT:
-        raise ValueError("Auth not available: install passlib[bcrypt]")
+        raise ValueError("Auth not available: install bcrypt")
     email = email.strip().lower()
     if not email or "@" not in email:
         raise ValueError("Invalid email")
     if not password or len(password) < 6:
         raise ValueError("Password must be at least 6 characters")
-    password_hash = bcrypt.hash(_truncate_password_for_bcrypt(password))
+    password_hash = bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt()).decode("ascii")
     from datetime import datetime
 
     created_at = datetime.utcnow().isoformat()
@@ -96,7 +94,10 @@ def verify_user(email: str, password: str) -> Optional[dict]:
             "SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?",
             (email,),
         ).fetchone()
-        if not row or not bcrypt.verify(_truncate_password_for_bcrypt(password), row["password_hash"]):
+        stored = row["password_hash"]
+        if isinstance(stored, str):
+            stored = stored.encode("ascii")
+        if not row or not bcrypt.checkpw(_password_bytes(password), stored):
             return None
         return {"id": row["id"], "email": row["email"], "name": row["name"], "created_at": row["created_at"]}
     finally:
