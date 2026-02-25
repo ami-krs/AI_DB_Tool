@@ -291,10 +291,19 @@ export default function ChatPage() {
     );
   }
 
+  const dbTypeLabel = dbConfig?.db_type ? dbConfig.db_type.charAt(0).toUpperCase() + dbConfig.db_type.slice(1).toLowerCase() : "DB";
+  const dbName = dbConfig?.database?.split("/").pop()?.split("\\").pop() || dbConfig?.database || "—";
+  const dbLabel = dbConfig ? `${dbTypeLabel} · ${dbName}` : "";
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Chatbot</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Chatbot</h1>
+          {dbLabel && (
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Connected: {dbLabel}</p>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           {messages.length > 0 && (
             <button

@@ -29,6 +29,48 @@ export async function healthCheck(): Promise<{ status: string }> {
   return res.json();
 }
 
+export type AuthUser = { email: string; name?: string | null };
+export type AuthResponse = { user: AuthUser; token: string };
+
+export async function register(
+  email: string,
+  password: string,
+  name?: string
+): Promise<AuthResponse> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password, name: name?.trim() || null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Registration failed");
+  }
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Login failed");
+  }
+  return res.json();
+}
+
+export async function authMe(token: string): Promise<AuthUser> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Invalid or expired token");
+  const data = await res.json();
+  return { email: data.email, name: data.name };
+}
+
 export async function chat(
   userMessage: string,
   options: { includeSql?: boolean; schemaContext?: Record<string, unknown> } = {}

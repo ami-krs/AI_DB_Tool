@@ -12,11 +12,12 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import jwt
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,7 @@ from ai_db_tool.ai.agents import DebugAgent
 from ai_db_tool.ai.chatbot import SQLChatbot
 from ai_db_tool.connectors.base import DatabaseConfig, DatabaseManager
 
+from backend.auth_store import register as auth_register, verify_user
 from backend.smart_import import smart_import  # noqa: E402
 
 load_dotenv()
@@ -71,6 +73,17 @@ class ImportTableRequest(BaseModel):
     db_config: DBConfigPayload
     table_name: str = Field(min_length=1)
     rows: List[Dict[str, Any]] = Field(min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=6)
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
 
 
 def _serialize_value(value: Any) -> Any:
@@ -119,6 +132,25 @@ def _auth_guard(x_api_token: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _jwt_secret() -> str:
+    secret = os.getenv("JWT_SECRET", "").strip()
+    if not secret:
+        secret = os.getenv("API_AUTH_TOKEN", "change-me-in-production")
+    return secret
+
+
+def _encode_jwt(user: Dict[str, Any]) -> str:
+    payload = {"sub": str(user.get("id", user.get("email"))), "email": user.get("email"), "exp": datetime.utcnow() + timedelta(days=7)}
+    return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
+
+
+def _decode_jwt(token: str) -> Optional[Dict[str, Any]]:
+    try:
+        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+    except Exception:
+        return None
+
+
 app = FastAPI(title="AI DB Tool Backend API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -132,6 +164,39 @@ app.add_middleware(
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/auth/register")
+def auth_register_endpoint(request: RegisterRequest) -> Dict[str, Any]:
+    """Register a new user. Returns user and JWT token."""
+    try:
+        user = auth_register(request.email, request.password, request.name)
+        token = _encode_jwt(user)
+        return {"user": {"email": user.get("email"), "name": user.get("name")}, "token": token}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/auth/login")
+def auth_login_endpoint(request: LoginRequest) -> Dict[str, Any]:
+    """Login with email and password. Returns user and JWT token."""
+    user = verify_user(request.email, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = _encode_jwt(user)
+    return {"user": {"email": user.get("email"), "name": user.get("name")}, "token": token}
+
+
+@app.get("/auth/me")
+def auth_me(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    """Return current user from Bearer token."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization")
+    token = authorization[7:].strip()
+    payload = _decode_jwt(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return {"email": payload.get("email"), "sub": payload.get("sub")}
 
 
 def _is_upload_intent(text: str) -> bool:
