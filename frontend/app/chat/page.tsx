@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useDbConfig } from "@/lib/db-config";
 import { chat, getSchema, executeQuery, importSmart, type SmartImportResult } from "@/lib/api";
@@ -10,6 +10,9 @@ import { downloadResultCsv } from "@/lib/csv";
 import { ResultChart } from "@/components/ResultChart";
 import { parseCsv } from "@/lib/csv-parse";
 
+const CHAT_HISTORY_KEY = "chat_history";
+const MAX_SAVED_MESSAGES = 500;
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -18,17 +21,86 @@ type ChatMessage = {
   executionError?: string;
   showUploadPanel?: boolean;
   uploadTargetTable?: string;
+  createdAt?: string;
 };
+
+function getDateKey(iso: string): string {
+  try {
+    return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function getDateLabel(dateKey: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (dateKey === today) return "Today";
+  const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  if (dateKey === yesterday) return "Yesterday";
+  try {
+    const [y, m, d] = dateKey.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return dateKey;
+  }
+}
+
+function groupMessagesByDate(messages: ChatMessage[]): { dateKey: string; dateLabel: string; messages: ChatMessage[] }[] {
+  const withDate = messages.map((m, i) => ({
+    msg: m,
+    dateKey: m.createdAt ? getDateKey(m.createdAt) : new Date().toISOString().slice(0, 10),
+    order: i,
+  }));
+  const byDate = new Map<string, { dateKey: string; messages: ChatMessage[]; order: number }>();
+  withDate.forEach(({ msg, dateKey, order }) => {
+    if (!byDate.has(dateKey)) byDate.set(dateKey, { dateKey, messages: [], order: Number.MAX_SAFE_INTEGER });
+    const g = byDate.get(dateKey)!;
+    g.messages.push(msg);
+    g.order = Math.min(g.order, order);
+  });
+  return Array.from(byDate.values())
+    .sort((a, b) => a.order - b.order)
+    .map((g) => ({ dateKey: g.dateKey, dateLabel: getDateLabel(g.dateKey), messages: g.messages }));
+}
 
 function isSelectLike(sql: string): boolean {
   const t = sql.trim().toUpperCase();
   return t.startsWith("SELECT") || t.startsWith("WITH") || t.startsWith("SHOW") || t.startsWith("DESCRIBE") || t.startsWith("EXPLAIN");
 }
 
+function loadChatHistory(): ChatMessage[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const now = new Date().toISOString();
+    return parsed.slice(-MAX_SAVED_MESSAGES).map((m: Record<string, unknown>) => ({
+      ...m,
+      createdAt: (m.createdAt as string) || now,
+    })) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatHistory(messages: ChatMessage[]) {
+  if (typeof window === "undefined" || messages.length === 0) return;
+  try {
+    const toSave = messages.slice(-MAX_SAVED_MESSAGES);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
+  } catch {
+    // ignore quota or parse errors
+  }
+}
+
 export default function ChatPage() {
   const { dbConfig, isConnected } = useDbConfig();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schemaContext, setSchemaContext] = useState<Record<string, unknown> | null>(null);
@@ -55,6 +127,17 @@ export default function ChatPage() {
   const tableNames = (schemaContext?.tables as { table_name: string }[] | undefined)?.map((t) => t.table_name) ?? [];
 
   useEffect(() => {
+    if (!historyLoaded) {
+      setMessages(loadChatHistory());
+      setHistoryLoaded(true);
+    }
+  }, [historyLoaded]);
+
+  useEffect(() => {
+    if (historyLoaded && messages.length > 0) saveChatHistory(messages);
+  }, [historyLoaded, messages]);
+
+  useEffect(() => {
     if (isConnected && dbConfig) {
       getSchema(dbConfig)
         .then((s: SchemaResponse) => setSchemaContext(s as Record<string, unknown>))
@@ -68,12 +151,15 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: text }]);
+    const userMsg: ChatMessage = { role: "user", content: text, createdAt: new Date().toISOString() };
+    setMessages((m) => [...m, userMsg]);
     setLoading(true);
     setError(null);
     try {
@@ -94,6 +180,7 @@ export default function ChatPage() {
         sql,
         showUploadPanel: !!res.show_upload_panel,
         uploadTargetTable: typeof res.upload_target_table === "string" ? res.upload_target_table : undefined,
+        createdAt: new Date().toISOString(),
       };
       setMessages((m) => {
         const next = [...m, newMsg];
@@ -124,7 +211,10 @@ export default function ChatPage() {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
-      setMessages((m) => [...m, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Request failed"}` }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Request failed"}`, createdAt: new Date().toISOString() },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -205,15 +295,31 @@ export default function ChatPage() {
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">AI Chatbot</h1>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-          <input
-            type="checkbox"
-            checked={autoExecuteSelect}
-            onChange={(e) => setAutoExecuteSelect(e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          Auto-run SELECT queries
-        </label>
+        <div className="flex flex-wrap items-center gap-4">
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.confirm("Clear all chat history?")) {
+                  setMessages([]);
+                  localStorage.removeItem(CHAT_HISTORY_KEY);
+                }
+              }}
+              className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              Clear history
+            </button>
+          )}
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={autoExecuteSelect}
+              onChange={(e) => setAutoExecuteSelect(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Auto-run SELECT queries
+          </label>
+        </div>
       </div>
       {error && (
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
@@ -225,15 +331,24 @@ export default function ChatPage() {
         {messages.length === 0 && (
           <p className="text-slate-500 dark:text-slate-400">Ask a question about your data or ask for SQL.</p>
         )}
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`rounded-lg p-3 ${
-              msg.role === "user"
-                ? "ml-8 bg-indigo-100 dark:bg-indigo-900/30"
-                : "mr-8 bg-slate-100 dark:bg-slate-700"
-            }`}
-          >
+        {messageGroups.map((group) => {
+          const startIdx = messages.indexOf(group.messages[0]);
+          return (
+            <div key={group.dateKey} className="space-y-2">
+              <div className="sticky top-0 z-10 border-b border-slate-200 bg-white py-1.5 text-xs font-medium text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                {group.dateLabel}
+              </div>
+              {group.messages.map((msg, j) => {
+                const i = startIdx + j;
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-lg p-3 ${
+                      msg.role === "user"
+                        ? "ml-8 bg-indigo-100 dark:bg-indigo-900/30"
+                        : "mr-8 bg-slate-100 dark:bg-slate-700"
+                    }`}
+                  >
             <div className="whitespace-pre-wrap text-slate-800 dark:text-slate-100">{msg.content}</div>
             {msg.sql && (
               <div className="mt-2 group/sql">
@@ -394,8 +509,12 @@ export default function ChatPage() {
                 )}
               </div>
             )}
-          </div>
-        ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
         {loading && (
           <div className="mr-8 rounded-lg bg-slate-100 p-3 dark:bg-slate-700">
             <span className="text-slate-500">Thinking…</span>
