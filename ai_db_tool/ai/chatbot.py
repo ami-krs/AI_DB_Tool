@@ -455,11 +455,14 @@ class SQLChatbot:
             prompt += f"Database Type: {db_type}\n"
             prompt += "You MUST generate SQL valid ONLY for this database type. "
             if db_type == 'postgresql':
-                prompt += "For PostgreSQL: list tables with information_schema.tables (e.g. SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'), NOT sqlite_master.\n\n"
+                prompt += "For PostgreSQL: list tables with information_schema.tables (e.g. SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'), NOT sqlite_master.\n"
+                prompt += "For loading CSV/data from a file: Do NOT use COPY ... FROM '/path/to/file' - that requires the file on the DB server and pg_read_server_files (most users get 'permission denied'). "
+                prompt += "Instead generate INSERT INTO table (col1, col2, ...) VALUES (val1, val2, ...), (val2_1, val2_2, ...); for each row, or ask the user to paste a few sample CSV lines and you will generate the INSERTs.\n\n"
             elif db_type == 'sqlite':
                 prompt += "For SQLite: list tables with sqlite_master (e.g. SELECT name FROM sqlite_master WHERE type='table').\n\n"
             else:
-                prompt += "Use the correct system tables/catalog for this database.\n\n"
+                prompt += "Use the correct system tables/catalog for this database.\n"
+                prompt += "For loading CSV/data: Do NOT use server-side file commands (e.g. COPY FROM file, LOAD DATA INFILE). Use INSERT INTO ... VALUES (...), (...); instead.\n\n"
         
         # Add existing data analysis if available (CRITICAL for INSERT operations)
         if self.schema_context and self.schema_context.get('data_analysis'):

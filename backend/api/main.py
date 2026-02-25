@@ -29,6 +29,8 @@ if str(ROOT_DIR) not in sys.path:
 from ai_db_tool.ai.chatbot import SQLChatbot
 from ai_db_tool.connectors.base import DatabaseConfig, DatabaseManager
 
+from backend.smart_import import smart_import  # noqa: E402
+
 load_dotenv()
 
 
@@ -114,6 +116,43 @@ def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+def _is_upload_intent(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    upload = any(x in t for x in ["upload", "import", "load"])
+    file_terms = any(x in t for x in ["file", "csv", "excel", "xlsx", "xls"])
+    table_terms = any(x in t for x in ["table", "database", "db"])
+    return upload and file_terms and table_terms
+
+
+def _infer_table_from_message(user_message: str, schema_context: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not schema_context or not user_message:
+        return None
+    tables = schema_context.get("tables") or []
+    if not tables:
+        return None
+    names = []
+    for t in tables:
+        if isinstance(t, dict):
+            names.append(str(t.get("table_name", "")).strip())
+        else:
+            names.append(str(t).strip())
+    names = [n for n in names if n]
+    text = (user_message or "").strip().lower()
+    best = None
+    best_len = 0
+    for n in names:
+        if not n:
+            continue
+        n_lower = n.lower()
+        if n_lower in text or n_lower.replace("_", " ") in text:
+            if len(n_lower) > best_len:
+                best = n
+                best_len = len(n_lower)
+    return best
+
+
 @app.post("/v1/chat")
 def chat(request: ChatRequest, x_api_token: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     _auth_guard(x_api_token)
@@ -127,6 +166,22 @@ def chat(request: ChatRequest, x_api_token: Optional[str] = Header(default=None)
         chatbot.set_schema_context(request.schema_context)
 
     response = chatbot.chat(request.user_message, include_sql=request.include_sql)
+    if _is_upload_intent(request.user_message):
+        response["show_upload_panel"] = True
+        response["upload_target_table"] = _infer_table_from_message(
+            request.user_message, request.schema_context
+        )
+        # Replace AI response so we don't show COPY FROM file SQL; direct user to upload panel
+        table_hint = response.get("upload_target_table") or "the selected"
+        response["response"] = (
+            f"Use the **Upload** panel below to load your CSV into the table. "
+            f"Choose the target table ({table_hint}), select your file, then click **Load file to table**. "
+            f"Column names are matched automatically (case-insensitive) and primary key conflicts are handled for you. "
+            f"Do not use COPY or a file path — the app uploads the file from your device."
+        )
+        response["sql_query"] = None
+        if "error" in response:
+            del response["error"]
     return response
 
 
@@ -211,6 +266,39 @@ def import_table(
     try:
         inserted = dbm.insert_rows(request.table_name, columns, request.rows)
         return {"inserted": inserted, "table": request.table_name}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        dbm.disconnect()
+
+
+@app.post("/v1/import/smart")
+def import_smart(
+    request: ImportTableRequest,
+    x_api_token: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    """
+    Smart import: auto-map CSV columns to table columns (case-insensitive)
+    and handle primary key duplicates (remap numeric PKs, skip duplicate rows).
+    rows: list of dicts with keys = CSV/upload column names (any case).
+    """
+    _auth_guard(x_api_token)
+    dbm = DatabaseManager()
+    cfg = _build_config(request.db_config)
+    if not dbm.connect(cfg):
+        raise HTTPException(status_code=400, detail="Failed to connect to database")
+    if not request.rows:
+        raise HTTPException(status_code=400, detail="No rows to import")
+    try:
+        result = smart_import(
+            dbm,
+            request.table_name,
+            request.rows,
+            db_type=cfg.db_type or "postgresql",
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
