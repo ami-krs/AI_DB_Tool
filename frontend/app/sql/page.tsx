@@ -236,9 +236,18 @@ export default function SqlPage() {
     );
   }
 
+  const dbTypeLabel = dbConfig?.db_type ? dbConfig.db_type.charAt(0).toUpperCase() + dbConfig.db_type.slice(1).toLowerCase() : "DB";
+  const dbName = dbConfig?.database?.split("/").pop()?.split("\\").pop() || dbConfig?.database || "—";
+  const dbLabel = dbConfig ? `${dbTypeLabel} · ${dbName}` : "";
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">SQL Editor</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">SQL Editor</h1>
+        {dbLabel && (
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Connected: {dbLabel}</p>
+        )}
+      </div>
       <p className="text-sm text-slate-600 dark:text-slate-400">
         Type SQL with hints (e.g. <kbd className="rounded bg-slate-200 px-1 dark:bg-slate-600">SEL</kbd> → SELECT, after <kbd className="rounded bg-slate-200 px-1 dark:bg-slate-600">FROM </kbd> choose a table). Use <kbd className="rounded bg-slate-200 px-1 dark:bg-slate-600">⌘+Enter</kbd> (Mac) or <kbd className="rounded bg-slate-200 px-1 dark:bg-slate-600">Ctrl+Enter</kbd> to execute.
       </p>
