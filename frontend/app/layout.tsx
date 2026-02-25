@@ -5,7 +5,7 @@ import { Nav } from "@/components/Nav";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "AI Database Tool",
+  title: "AI Database Copilot",
   description: "AI-powered database management and SQL assistant",
 };
 
