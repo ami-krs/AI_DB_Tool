@@ -71,6 +71,30 @@ export async function authMe(token: string): Promise<AuthUser> {
   return { email: data.email, name: data.name };
 }
 
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Request failed");
+  }
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl().replace(/\/$/, "")}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Failed to reset password");
+  }
+}
+
 export async function chat(
   userMessage: string,
   options: { includeSql?: boolean; schemaContext?: Record<string, unknown> } = {}

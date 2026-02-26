@@ -18,6 +18,8 @@ uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
 - `API_AUTH_TOKEN` - if set, clients must send `X-API-Token`
 - `CORS_ALLOW_ORIGINS` - comma-separated origins (default `*`)
 - `PORT` - service port (default `8000`)
+- `AUTH_DB_PATH` - path to SQLite auth DB (default `/data/auth.db`; use a persistent disk path in production)
+- **Password reset email (SMTP):** `SMTP_HOST`, `SMTP_PORT` (default `587`), `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`, `FRONTEND_URL` (base URL for reset links, e.g. `https://yourapp.com`). If SMTP is not set, reset links are only logged (suitable for development).
 
 ## Endpoints
 

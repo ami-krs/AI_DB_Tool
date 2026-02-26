@@ -32,7 +32,14 @@ from ai_db_tool.ai.agents import DebugAgent
 from ai_db_tool.ai.chatbot import SQLChatbot
 from ai_db_tool.connectors.base import DatabaseConfig, DatabaseManager
 
-from backend.auth_store import register as auth_register, verify_user
+from backend.auth_store import (
+    consume_reset_token,
+    create_reset_token,
+    register as auth_register,
+    set_password,
+    verify_user,
+)
+from backend.email_sender import send_reset_email
 from backend.smart_import import smart_import  # noqa: E402
 
 load_dotenv()
@@ -84,6 +91,15 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str = Field(min_length=1)
     password: str = Field(min_length=1)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=1)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=6)
 
 
 def _serialize_value(value: Any) -> Any:
@@ -185,6 +201,42 @@ def auth_login_endpoint(request: LoginRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = _encode_jwt(user)
     return {"user": {"email": user.get("email"), "name": user.get("name")}, "token": token}
+
+
+@app.post("/auth/forgot-password")
+def auth_forgot_password(request: ForgotPasswordRequest) -> Dict[str, Any]:
+    """
+    Request a password-reset email. Always returns the same message to avoid user enumeration.
+    If the email exists, a time-limited reset link is sent.
+    """
+    email = (request.email or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email")
+    token = create_reset_token(email)
+    if token:
+        try:
+            send_reset_email(email, token)
+        except Exception as e:
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to send reset email. Please try again later or contact support.",
+            ) from e
+    return {"message": "If an account exists for this email, you will receive a reset link shortly."}
+
+
+@app.post("/auth/reset-password")
+def auth_reset_password(request: ResetPasswordRequest) -> Dict[str, Any]:
+    """
+    Reset password using a token from the email link. Token is one-time use and time-limited.
+    """
+    email = consume_reset_token(request.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
+    try:
+        set_password(email, request.new_password)
+        return {"message": "Password has been reset. You can sign in with your new password."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/auth/me")
