@@ -199,6 +199,23 @@ Guidelines:
 - Support complete database management capabilities
 - When multiple tables/operations are requested, generate SQL for ALL of them, not just the first one
 - NEVER use placeholder table names like "table_name", "example_table", "sample_table" - use ONLY real table names from the schema
+
+CRITICAL - SHOWING PRIMARY KEYS AND FOREIGN KEYS (metadata / constraints):
+- When the user asks to \"show\", \"list\", or \"get\" primary keys and/or foreign keys for specific tables (e.g. \"show primary key and foreign keys on table employee, department and division\"):
+  1. Generate exactly ONE SELECT statement that returns all information in a single result set. Do NOT generate multiple separate queries (the executor runs only one statement).
+  2. The result MUST include the table name (e.g. table_name or tc.table_name) so the user can see which table each row belongs to.
+  3. For PostgreSQL: Use information_schema (table_constraints, key_column_usage, constraint_column_usage). Return columns such as: table_name, constraint_type, column_name, and for foreign keys also referenced_table, referenced_column. Use LEFT JOIN constraint_column_usage so one query returns both PRIMARY KEY and FOREIGN KEY rows; for PK rows referenced_* can be NULL or same as table/column.
+  4. Example pattern for PostgreSQL (one query for PK and FK on tables employee, department, division):
+     SELECT tc.table_name, tc.constraint_type, kcu.column_name,
+            ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
+     FROM information_schema.table_constraints tc
+     JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+     LEFT JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+     WHERE tc.table_schema = 'public' AND tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+     AND tc.table_name IN ('employee', 'department', 'division')
+     ORDER BY tc.table_name, tc.constraint_type, kcu.column_name;
+  5. For SQLite: Use pragma_table_info and sqlite_master or one query that lists PK/FK per table with table name in the result.
+- Never return a query that omits table_name from the SELECT list when listing constraints for multiple tables.
 """
 
 
@@ -527,6 +544,17 @@ class SQLChatbot:
                                 else:
                                     columns = ', '.join([str(col) for col in columns_list])
                                 prompt += f"\nTable: {table_name}\n  Columns: {columns}\n"
+                                primary_keys = table.get('primary_keys') or []
+                                if primary_keys:
+                                    prompt += f"  Primary key(s): {', '.join(primary_keys)}\n"
+                                foreign_keys = table.get('foreign_keys') or []
+                                if foreign_keys:
+                                    for fk in foreign_keys:
+                                        cols = fk.get('constrained_columns') or []
+                                        ref_table = fk.get('referred_table') or fk.get('referred_table_name') or '?'
+                                        ref_cols = fk.get('referred_columns') or []
+                                        ref_str = f"{ref_table}({', '.join(ref_cols)})" if ref_cols else ref_table
+                                        prompt += f"  Foreign key: {', '.join(cols)} -> {ref_str}\n"
                             else:
                                 prompt += f"\nTable: {table_name} (no column info available)\n"
                         elif isinstance(table, str):
