@@ -94,10 +94,12 @@ def verify_user(email: str, password: str) -> Optional[dict]:
             "SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?",
             (email,),
         ).fetchone()
+        if not row:
+            return None
         stored = row["password_hash"]
         if isinstance(stored, str):
             stored = stored.encode("ascii")
-        if not row or not bcrypt.checkpw(_password_bytes(password), stored):
+        if not bcrypt.checkpw(_password_bytes(password), stored):
             return None
         return {"id": row["id"], "email": row["email"], "name": row["name"], "created_at": row["created_at"]}
     finally:
